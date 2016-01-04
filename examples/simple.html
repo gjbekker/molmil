@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <script>  
+      var molmil_settings = {src: "http://gjbekker.github.io/molmil/"}, canvas;
+  
+      function initViewer() {
+        if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+        canvas = document.getElementById("molmilViewer");
+        canvas = molmil.createViewer(canvas);
+        molmil.loadPDB(canvas.getAttribute("data-pdbid"), null, null, canvas.molmilViewer);
+      }
+    </script>
+  </head>
+  
+  <body onload="initViewer();">
+    <center>
+      <h1 id="mm_title">molmil viewer</h1>
+      <h3>Integration test page</h3>
+      <span class="molmil_UI_container">
+        <canvas id="molmilViewer" data-pdbid="1crn" width="600" height="400" style="display: block; border: 1px solid #DDD;"></canvas>
+      </span>
+    </center>
+  </body>
+  <script src="http://gjbekker.github.io/molmil/molmil.js"></script>
+</html>

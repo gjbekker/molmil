@@ -1,0 +1,585 @@
+<html>
+  <head>
+  
+  <style>
+    html, body {
+      font-family: verdana, meiryo, sans-serif, Arial Unicode MS, Cambria Math;
+    }
+
+  
+    .molmil_UI_container {
+      border: 1px solid black;
+    }
+    
+    #mm_title {
+      font-size: 3em;
+      margin-bottom: 0px;
+    }
+    
+    #infoBox {
+      display: block;
+    }
+    
+    #pdbid_container {
+      color: #cc0000;
+      font-weight: bold;
+      font-size: 2em;
+    }
+    
+    #pdbid_container .fls {
+      margin-left: -0.25em;
+      margin-right: 0.25em;
+      font-style: italic;
+      color: #020166;
+      font-weight: bold;
+    }
+    
+    #fSiteBox {
+      display: inline-block;
+      text-align: left;
+    }
+    
+    #goto_top {
+      position: absolute;
+      top: 0px;
+      left: 0px;
+      color: grey;
+    }
+    
+    #goto_top:hover {color: red;}
+    
+  </style>
+  
+  <script>  
+  
+var molmil_settings = {
+  src: "http://gjbekker.github.io/molmil/",
+};
+    var canvas, pdbid, efID, chainsList;
+
+    window.onresize = function() {
+      if (canvas && window.innerHeight != screen.height) {
+        canvas.setSize((window.innerWidth || document.documentElement.clientWidth)/3, (window.innerHeight || document.documentElement.clientHeight)/2);
+      }
+    };
+  
+    function initViewer() {
+      
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+
+      if (! canvas) {
+        canvas = document.getElementById("molmilViewer");
+        canvas.width = (window.innerWidth || document.documentElement.clientWidth)/3;
+        canvas.height = (window.innerHeight || document.documentElement.clientHeight)/2;
+      
+        canvas = molmil.createViewer(canvas);
+        if (! canvas) return false;
+      }
+      else {
+        canvas.molmilViewer.clear(); canvas.renderer.initBuffers(); canvas.renderer.camera.reset();
+        canvas.displayMode = 0;
+      }
+      
+      var id = window.location.hash.replace(/#(\!)?/, '');
+      pdbid = id.substr(0, 4);
+      
+      var infoBox = document.getElementById("infoBox"), inp, lbl; infoBox.innerHTML = "";
+      lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Cartoon"); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayDefault;
+      lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Wireframe"); lbl.style.marginRight = "1em"; lbl.onclick = selectWireframe;
+      lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "CPK"); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayCPK;
+      lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Cartoon without hetero atoms "); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayDefaultNoHET;
+
+      if (! pdbid) return;
+      
+      canvas.molmilViewer.skipCOGupdate = true;
+      
+      var pdbid_container = document.getElementById("pdbid_container"); 
+      var tmp = id.split("-");
+      chainsList = (tmp[1] || "").trim();
+      pdbid_container.innerHTML = tmp[0].toLowerCase() + (tmp.length > 1 ? "-"+tmp[1].toUpperCase() : "");
+
+      var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true; request.responseType = "json";
+      request.OnDone = function() {
+        //var jso = JSON.parse(this.request.responseText);
+        var jso = this.request.response;
+        if (typeof jso != "object" && jso != null) jso = JSON.parse(this.request.responseText);
+        canvas.molmilViewer.jso = jso;
+        canvas.molmilViewer.loadStructureData(jso, 1, pdbid, function(soup, models) {});
+      };
+      request.OnError = function() {document.getElementById("pdbid_container").innerHTML = "Unknown entry: "+efID;};
+      request.Send(molmil_settings.pdb_url.replace("__ID__", pdbid));
+      
+      // download entry's mmjson file
+      var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true;
+      request.OnDone = function() {
+        if (! canvas.molmilViewer.structures.length) return molmil_dep.asyncStart(this.OnDone, [], this, 50);
+        
+        var data = canvas.molmilViewer.jso["data_"+pdbid.toUpperCase()];
+        
+        // chain info
+        var protein_chains = [], xna_chains = [];
+        var entity_poly = data.entity_poly || {entity_id: []};
+        for (var i=0; i<entity_poly.entity_id.length; i++) {
+          if (entity_poly.type[i] == "polypeptide(D)" || entity_poly.type[i] == "polypeptide(L)") protein_chains = protein_chains.concat(entity_poly.pdbx_strand_id[i].split(","));
+          else if (entity_poly.type[i] == "polydeoxyribonucleotide/polyribonucleotide hybrid" || entity_poly.type[i] == "polydeoxyribonucleotide" || entity_poly.type[i] == "polyribonucleotide") xna_chains = xna_chains.concat(entity_poly.pdbx_strand_id[i].split(","));
+        }
+        
+        // chainid info
+        if (chainsList.length) {
+          for (var c=0, m, mol, a; c<canvas.molmilViewer.structures[0].chains.length; c++) {
+            if (chainsList.indexOf(canvas.molmilViewer.structures[0].chains[c].authName) == -1) {
+              canvas.molmilViewer.structures[0].chains[c].display = false;
+              for (m=0; m<canvas.molmilViewer.structures[0].chains[c].molecules.length; m++) {
+                mol = canvas.molmilViewer.structures[0].chains[c].molecules[m];
+                mol.status = false;
+                for (a=0; a<mol.atoms.length; a++) mol.atoms[a].status = false;
+              }
+            }
+          }
+        }
+        else {
+          for (var c=0, m, mol, a; c<canvas.molmilViewer.structures[0].chains.length; c++) {
+            m = protein_chains.indexOf(canvas.molmilViewer.structures[0].chains[c].authName);
+            if (m != -1) protein_chains[m] = canvas.molmilViewer.structures[0].chains[c];
+            else {
+              m = xna_chains.indexOf(canvas.molmilViewer.structures[0].chains[c].authName);
+              if (m != -1) xna_chains[m] = canvas.molmilViewer.structures[0].chains[c];
+            }
+          }
+          for (var i=0; i<protein_chains.length; i++) {if (! protein_chains[i] instanceof molmil.chainObject) {protein_chains = protein_chains.splice(i, 1); i--;}}
+          for (var i=0; i<xna_chains.length; i++) {if (! xna_chains[i] instanceof molmil.chainObject) {xna_chains = xna_chains.splice(i, 1); i--;}}
+        }
+        canvas.protein_chains = protein_chains;
+        canvas.xna_chains = xna_chains;
+        
+        canvas.molmilViewer.skipCOGupdate = false;
+        canvas.molmilViewer.calculateCOG();
+        canvas.renderer.camera.z = canvas.molmilViewer.calcZ();
+
+        // extract meta data (binding sites and such)
+        var buffer_ = data.struct_site || {id: []};
+        var buffer2_ = mmjsonGroupData(data.struct_site_gen, "site_id");
+        var buffer = {info_subtype: []}, buffer2 = [];
+        
+        if (this.request.responseText) {
+          var jso = JSON.parse(this.request.responseText);
+          var plus = jso["data_"+pdbid.toUpperCase()+"-plus"];
+
+          buffer = plus.struct_site_pdbmlplus || {id: []};
+          buffer2 = mmjsonGroupData(plus.struct_site_gen_pdbmlplus, "site_id");
+        }
+       
+        for (var e in buffer_) {
+          if (! buffer.hasOwnProperty(e)) buffer[e] = [];
+          buffer[e].push.apply(buffer[e], buffer_[e]);
+        }
+        for (var e=0; e<buffer_.id.length; e++) buffer.info_subtype.push("pdb");
+        
+        for (var e in buffer2_) buffer2[e] = buffer2_[e];
+        
+        var fgroups = [], fgroup;
+        
+        var chainid, resid, residx, residx2, chains, c, r, tmp, tmp2, tmpList, seq, i, j, mol;
+        var model = canvas.molmilViewer.structures[0];
+        
+        var aaCode = {"ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I","LYS":"K","LEU":"L","MET":"M","ASN":"N","PYL":"O","PRO":"P","GLN":"Q","ARG":"R","SER":"S","THR":"T","SEC":"U","VAL":"V","TRP":"W","TYR":"Y"} ;
+        
+        for (i=0; i<buffer.id.length; i++) {
+          if (! buffer.info_subtype) break;
+          
+          fgroup = {
+            name: "", 
+            sequence: "",
+            description: buffer.details[i],
+            source: buffer.info_subtype[i]+" : "+buffer.id[i],
+            residueList: [] // list of molObject/s 
+          };
+          
+          residues = buffer2[buffer.id[i]] || [];
+          tmp = [];
+          fgroup.ligand = residues.length ? residues[0].ligand : null;
+          if (buffer.info_subtype[i] == "binding" || buffer.info_subtype[i] == "prosite") {
+            for (r=0; r<residues.length; r++) {
+              tmpList = [];
+              
+              chainid = residues[r].auth_asym_id;
+              if (chainsList.length && chainsList.indexOf(chainid) == -1) continue;
+              residx = parseInt(residues[r].beg_label_seq_id);
+              residx2 = parseInt(residues[r].end_label_seq_id);
+
+              chains = canvas.molmilViewer.getChainAuth(model, chainid);
+              
+              if (fgroup.sequence.length) fgroup.sequence += ", ";
+              for (c=residx; c<=residx2; c++) {
+                mol = canvas.molmilViewer.getMolObject4Chain(chains, c) || canvas.molmilViewer.getMolObject4ChainAlt(chains, c);
+                fgroup.sequence += aaCode[mol.name] || "";
+                fgroup.residueList.push(mol);
+              }
+
+              tmp.push([chainid+": "+residues[r].beg_auth_seq_id+(residues[r].beg_auth_seq_id != residues[r].end_auth_seq_id ? "-"+residues[r].end_auth_seq_id : "")]);
+            }
+          }
+          else if (buffer.info_subtype[i] == "ACT_SITE" || buffer.info_subtype[i] == "NP_BIND" || buffer.info_subtype[i] == "BINDING" || buffer.info_subtype[i] == "DNA_BIND" || buffer.info_subtype[i] == "pdb") {
+          
+            for (r=0; r<residues.length; r++) {
+              tmpList = [];
+              chainid = residues[r].auth_asym_id; residx = null; tmp2 = [], residx = residx2 = null;
+              if (chainsList.length && chainsList.indexOf(chainid) == -1) continue;
+              if (residues[r].beg_label_seq_id) {
+                try {
+                  residx = parseInt(residues[r].beg_label_seq_id.replace(/\D/g,''));
+                  residx2 = parseInt(residues[r].end_label_seq_id.replace(/\D/g,''));
+                  tmp2 = [residues[r].beg_auth_seq_id, residues[r].end_auth_seq_id];
+                }
+                catch (e) {}
+              }
+              if (residx == null) {
+                if (! residues[r].label_seq_id) continue;
+                resid2 = residx = parseInt(residues[r].label_seq_id.replace(/\D/g,''));
+                tmp2 = [null, null];
+              }
+              if (! residx2) residx2 = residx;
+
+              chains = canvas.molmilViewer.getChainAuth(model, chainid);
+              
+              if (fgroup.sequence.length) fgroup.sequence += ", ";
+              for (c=residx; c<=residx2; c++) {
+                mol = canvas.molmilViewer.getMolObject4Chain(chains, c) || canvas.molmilViewer.getMolObject4ChainAlt(chains, c);
+                if (! mol) continue;
+                fgroup.sequence += aaCode[mol.name] || "";
+                fgroup.residueList.push(mol);
+              }
+
+              try {
+                if (tmp2[0] == null) tmp2 = [(canvas.molmilViewer.getMolObject4Chain(chains, residx) || canvas.molmilViewer.getMolObject4ChainAlt(chains, residx)).RSID, (canvas.molmilViewer.getMolObject4Chain(chains, residx2) || canvas.molmilViewer.getMolObject4ChainAlt(chains, residx2)).RSID];
+              }
+              catch (e) {}
+  
+              if (tmp2[0] != null) tmp.push([chainid+": "+tmp2[0]+(tmp2[0] != tmp2[1] ? "-"+tmp2[1] : "")]);
+            }
+
+          }
+          
+          fgroup.name = tmp.join(", ")+(buffer.info_subtype[i] != "pdb" ? " ("+buffer.info_subtype[i]+")" : "");
+          if (fgroup.residueList.length) fgroups.push(fgroup);
+        }
+        
+        // build table which lists all the sites
+        var tbl = molmil_dep.dcE("table"), tr, td, tbl2, tr2, td2, check;
+        tr = tbl.pushNode("tr");
+        tr.style.color = "#cc0000";
+        tr.pushNode("td", "");
+        tr.pushNode("td", "");
+        
+        var site_color_list = [[0, 127, 255, 255], [153, 102, 255, 255], [255, 165, 0, 255], [255, 255, 0, 255], [0, 255, 255, 255], [255, 192, 203, 255], [0, 255, 0, 255], [255, 0, 0, 255]];
+        var n = 0;
+        var arr = [];
+        for (var i=0; i<fgroups.length; i++) {
+          tr = tbl.pushNode("tr");
+          td = tr.pushNode("td");
+          td.style.verticalAlign = "top";
+          td.style.paddingTop = ".4em";
+          check = td.pushNode("input");
+          check.type = "checkbox";
+          check.onclick = toggleSite;
+          check.data = fgroups[i];
+          check.data.color = [site_color_list[n][0], site_color_list[n][1], site_color_list[n][2], 255];
+          arr.push(check);
+          
+          td = tr.pushNode("td");
+          tbl2 = td.pushNode("table");
+          
+          tr2 = tbl2.pushNode("tr");
+          td2 = tr2.pushNode("td", fgroups[i].name);
+          td2.colSpan = 2;
+          td2.style.backgroundColor = "#003366";
+          td2.style.color = "rgba("+site_color_list[n].join(",")+")";
+          td2.style.fontWeight = "bold";
+          td2.style.padding = ".25em";
+          
+          if (fgroups[i].sequence) {
+            tr2 = tbl2.pushNode("tr"); 
+            td2 = tr2.pushNode("td", "Sequence:"); 
+            td2.style.color = "#cc0000";
+            tr2.pushNode("td", fgroups[i].sequence);
+          }
+          if (fgroups[i].description) {
+            tr2 = tbl2.pushNode("tr"); 
+            td2 = tr2.pushNode("td", "Description:"); 
+            td2.style.color = "#cc0000";
+            tr2.pushNode("td", fgroups[i].description);
+          }
+          if (fgroups[i].source) {
+            tr2 = tbl2.pushNode("tr"); 
+            td2 = tr2.pushNode("td", "Source:"); 
+            td2.style.color = "#cc0000";
+            tr2.pushNode("td", fgroups[i].source);
+          }
+          if (fgroups[i].ligand) {
+            tr2 = tbl2.pushNode("tr"); 
+            td2 = tr2.pushNode("td", "Ligand:"); 
+            td2.style.color = "#cc0000";
+            tr2.pushNode("td", fgroups[i].ligand);
+          }
+          
+          n += 1;
+          if (n >= site_color_list.length) n = 0;
+        }
+        
+        var fSiteBox = document.getElementById("fSiteBox");
+        fSiteBox.innerHTML = "";
+        // also add some title
+        //struct.title 
+        
+        var title = fSiteBox.pushNode("a");
+        title.style.fontWeight = "bold";
+        title.style.fontSize = "1.25em";
+        title.href = "http://pdbj.org/mine/summary/"+pdbid;
+        title.target = "_blank";
+        title.onclick = function() {window.open(this.href, "", "height="+(screen.height*.75)+",width="+(screen.width*.75)+",top="+(screen.height*.125)+",left="+(screen.width*.125)+",modal=yes,alwaysRaised=yes,scrollbars=yes"); return false;};
+        if (canvas.molmilViewer.jso["data_"+pdbid.toUpperCase()].struct && canvas.molmilViewer.jso["data_"+pdbid.toUpperCase()].struct.title) title.innerHTML = (canvas.molmilViewer.jso["data_"+pdbid.toUpperCase()].struct.title[0] || "").toUpperCase();
+        else title.innerHTML = "PDBj Mine";
+        
+        
+        fSiteBox.pushNode(tbl);
+        
+        var clear = fSiteBox.pushNode("button", "Clear");
+        clear.arr = arr;
+        clear.onclick = function() {
+          for (var i=0; i<this.arr.length; i++) {
+            if (this.arr[i].data.enabled) {this.arr[i].data.enabled = false; this.arr[i].data.update = true; this.arr[i].checked = false;}
+          }
+          
+          displaySites();
+        };
+        if (fgroups.length == 0) clear.style.display = "none";
+        
+        canvas.fgroups = fgroups;
+        if (canvas.molmilViewer.AID > 1e5) document.getElementById("infoBox").firstChild.nextSibling.firstChild.click();
+        else document.getElementById("infoBox").firstChild.firstChild.click();
+      };
+      request.OnError = request.OnDone;
+      request.Send(molmil_settings.pdb_url.replace("__ID__", pdbid).replace("format=mmjson-all", "format=mmjson-plus-add")); // also download the mmjson-plus-add data form additional sites
+    }
+    
+    // wireframe representation
+    function selectWireframe() {
+      document.getElementById("option_field").childNodes[3].currentDisplayMode = selectWireframe;
+      
+      var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
+      list = molmil.interpolateBR(model.chains.length);
+      for (c=0; c<model.chains.length; c++) {
+        chain = model.chains[c];
+        if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
+        chain.displayMode = 1;
+        //chain.display = true;
+        
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          mol.rgba = list[c];
+          for (a=0; a<mol.atoms.length; a++) {
+            mol.atoms[a].displayMode = 4;
+            mol.atoms[a].rgba = list[c];
+          }
+          mol.displayMode = 0;
+
+          if (mol.ligand) {
+            for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);
+          }
+        }
+      }
+      
+      canvas.displayMode = 4;
+      
+      for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
+      
+      displaySites();
+    }
+    
+    // cartoon representation (with HETATM)
+    function selectDisplayDefault() {
+      document.getElementById("option_field").childNodes[3].currentDisplayMode = selectDisplayDefault;
+      
+      var xna_atoms = molmil.configBox.xna_simple_base_atoms;
+      
+      var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
+      list = molmil.interpolateBR(model.chains.length);
+      for (c=0; c<model.chains.length; c++) {
+        chain = model.chains[c];
+        if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
+        chain.displayMode = 3;
+        //chain.display = true;
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          mol.rgba = list[c];
+          if (mol.ligand) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+          else if (mol.xna) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = xna_atoms.hasOwnProperty(mol.atoms[a].atomName) || mol.atoms[a].element == "H" ? 0 : 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
+          
+          mol.displayMode = 3;
+        }
+      }
+
+      canvas.displayMode = 1;
+      
+      for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
+      
+      displaySites();
+    }
+    
+    // CPK representation
+    function selectDisplayCPK() {
+      document.getElementById("option_field").childNodes[3].currentDisplayMode = selectDisplayCPK;
+      
+      canvas.displayMode = 2;
+      
+      var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
+      list = molmil.interpolateBR(model.chains.length);
+
+      for (c=0; c<model.chains.length; c++) {
+        chain = model.chains[c];
+        if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
+        chain.displayMode = 1;
+        //chain.display = true;
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          if (mol.ligand) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+          else if (! mol.water) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 1; mol.atoms[a].rgba = list[c];}
+          else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
+          mol.displayMode = 0;
+        }
+      }
+      
+      for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
+
+      displaySites();
+    }
+    
+    // cartoon representation without HETATM
+    function selectDisplayDefaultNoHET() {
+      document.getElementById("option_field").childNodes[3].currentDisplayMode = selectDisplayDefaultNoHET;
+      
+      var xna_atoms = molmil.configBox.xna_simple_base_atoms;
+      
+      canvas.displayMode = 3;
+      
+      var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
+      list = molmil.interpolateBR(model.chains.length);
+      for (c=0; c<model.chains.length; c++) {
+        chain = model.chains[c];
+        if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
+        chain.displayMode = 3;
+        //chain.display = true;
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          mol.rgba = list[c];
+          
+          if (mol.xna) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = xna_atoms.hasOwnProperty(mol.atoms[a].atomName) || mol.atoms[a].element == "H" ? 0 : 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
+          mol.displayMode = 3;
+        }
+      }
+      
+      for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
+
+      displaySites();
+    }
+    
+    // display all selected sites
+    function displaySites() {
+      var f, r, mol;
+      for (f=0; f<canvas.fgroups.length; f++) if (canvas.fgroups[f].update) {
+        if (canvas.displayMode == 1 || canvas.displayMode == 3) { // cartoon sse + ball-n-stick side chains
+          if (canvas.fgroups[f].enabled) {
+            for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
+              mol = canvas.fgroups[f].residueList[r];
+              mol.rgba_prev = mol.rgba_prev || mol.rgba;
+              mol.rgba = canvas.fgroups[f].color;
+              for (a=0; a<mol.atoms.length; a++) if (! molmil.configBox.backboneAtoms4Display.hasOwnProperty(mol.atoms[a].atomName)) {mol.atoms[a].displayMode = mol.atoms[a].atomName == "CA" ? 3 : 2; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+              mol.showSC = true;
+            }
+          }
+          else {
+            for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
+              mol = canvas.fgroups[f].residueList[r];
+              mol.rgba = mol.rgba_prev || mol.rgba; mol.rgba_prev = null;
+              for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
+              mol.showSC = false;
+            }
+          }
+        }
+        else if (canvas.displayMode == 2 || canvas.displayMode == 4) { // cpk or wireframe
+          if (canvas.fgroups[f].enabled) {
+            for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
+              mol = canvas.fgroups[f].residueList[r];
+              for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].rgba_prev = mol.atoms[a].rgba_prev || mol.atoms[a].rgba; mol.atoms[a].rgba = canvas.fgroups[f].color;}
+              mol.showSC = true;
+            }
+          }
+          else {
+            for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
+              mol = canvas.fgroups[f].residueList[r];
+              for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].rgba = mol.atoms[a].rgba_prev; mol.atoms[a].rgba_prev = null;}
+              mol.showSC = false;
+            }
+          }
+        }
+        molmil.geometry.reInitChains = true;
+        canvas.fgroups[f].update = false;
+      }
+      
+      canvas.renderer.initBuffers();
+      canvas.update = true;
+    }
+    
+    function toggleSite() {
+      this.data.enabled = this.checked;
+      this.data.update = true;
+      
+      displaySites();
+    }
+    
+// mmjson extractor helper function
+function mmjsonGroupData(obj, field) {
+  if (! obj) return {};
+  var output = {}, tmp;
+  var keys = Object.keys(obj);
+  for (var i=0; i<obj[field].length; i++) {
+    if (! output.hasOwnProperty(obj[field][i])) output[obj[field][i]] = [];
+    tmp = {};
+    for (k=0; k<keys.length; k++) tmp[keys[k]] = obj[keys[k]][i];
+    output[obj[field][i]].push(tmp);
+  }
+  return output;
+}
+    
+    
+    window.onhashchange = function() {initViewer();}
+    
+  </script>
+  
+  </head>
+  
+  <body onload="initViewer();">
+    
+    <center>
+      <span>
+        <span id="pdbid_container"></span>
+      </span>
+      <br />
+      <span class="molmil_UI_container">
+        <canvas id="molmilViewer"></canvas>
+      </span>
+      <span id="infoBox"></span>
+      <span id="option_field" style="display: none;">
+        <span>Chain selection:</span>
+        <select></select>
+      </span>
+      <hr />
+      <span id="fSiteBox"></span>
+    </center>
+    
+  </body>
+  
+  <script src="http://gjbekker.github.io/molmil/molmil.js"></script>
+</html>
