@@ -517,6 +517,53 @@ molmil.viewer.prototype.clear = function() {
   this.renderer.clear();
 };
 
+
+molmil.viewer.prototype.gotoMol = function(mol) {
+  // for residue:
+  // along N-CA-C axis
+  // then zoom out 10A?
+  if (mol.N && mol.CA && mol.C) {
+    // norm(CA - ((C+N)*.5))
+    var xyz1, xyz2, xyz3, vec = [0, 0, 0];
+    var xyz1 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz+2]];
+    var xyz2 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz+2]];
+    var xyz3 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz+2]];
+    
+    xyz1[0] -= this.avgXYZ[0]; xyz1[1] -= this.avgXYZ[1]; xyz1[2] -= this.avgXYZ[2];
+    xyz2[0] -= this.avgXYZ[0]; xyz2[1] -= this.avgXYZ[1]; xyz2[2] -= this.avgXYZ[2];
+    xyz3[0] -= this.avgXYZ[0]; xyz3[1] -= this.avgXYZ[1]; xyz3[2] -= this.avgXYZ[2];
+    
+    vec[0] = xyz3[0] - ((xyz1[0] + xyz2[0]) * .5);
+    vec[1] = xyz3[1] - ((xyz1[1] + xyz2[1]) * .5);
+    vec[2] = xyz3[2] - ((xyz1[2] + xyz2[2]) * .5);
+    vec3.normalize(vec, vec);
+    
+    
+    this.renderer.camera.reset();
+    
+    var A = [xyz1[0]-xyz3[0], xyz1[1]-xyz3[1], xyz1[2]-xyz3[2]]; vec3.normalize(A, A);
+    var B = [xyz2[0]-xyz3[0], xyz2[1]-xyz3[1], xyz2[2]-xyz3[2]]; vec3.normalize(B, B);
+    var C = vec3.cross([0, 0, 0], A, B); vec3.normalize(C, C);
+    
+    var eye = [vec[0]*5 - xyz3[0], vec[1]*5 - xyz3[1], vec[2]*5 - xyz3[2]];
+    var s = vec3.cross([0, 0, 0], vec, C); vec3.normalize(s, s);
+    var u = vec3.cross([0, 0, 0], s, vec);
+
+    var matrix = mat4.create();
+    matrix[0] = s[0]; matrix[4] = s[1]; matrix[8] = s[2];
+    matrix[1] = u[0]; matrix[5] = u[1]; matrix[9] = u[2];
+    matrix[2] = -vec[0]; matrix[6] = -vec[1]; matrix[10] = -vec[2];
+    matrix[12] = -vec3.dot(s, eye); matrix[13] = -vec3.dot(u, eye); matrix[14] = -vec3.dot(vec, eye);
+
+    this.renderer.camera.x = -matrix[12];
+    this.renderer.camera.y = -matrix[13];
+    this.renderer.camera.z = matrix[14]-molmil.configBox.zNear;
+
+    quat.fromMat3(this.renderer.camera.QView, mat3.fromMat4(mat3.create(), matrix));
+    quat.normalize(this.renderer.camera.QView, this.renderer.camera.QView);
+  }
+};
+
 molmil.viewer.prototype.waterToggle = function(show) {
   for (var m=0, c, a; m<this.structures.length; m++) {
     if (! this.structures[m].chains) continue;
@@ -5790,6 +5837,7 @@ molmil.render.prototype.render = function() {
       this.camera.y += 2*(to[1]-from[1]);
     }
     this.camera.z += this.TransZ*Math.max(-this.camera.z/(this.width*.5), 0.05);
+    
     if (this.camera.z > this.maxRange) this.camera.z = this.maxRange;
     if (this.camera.z < -(this.maxRange+molmil.configBox.zFar)) this.camera.z = -(this.maxRange+molmil.configBox.zFar);
   
@@ -5802,8 +5850,6 @@ molmil.render.prototype.render = function() {
       var zoomFraction = -(this.camera.z*2)/molmil.configBox.zFar;
       mat4.ortho(this.projectionMatrix, -this.width*zoomFraction, this.width*zoomFraction, -this.height*zoomFraction, this.height*zoomFraction, Math.max(molmil.configBox.zNear, 0.1), this.camera.z+(molmil.configBox.zFar*10));
     }
-    
-    
   }
   else this.canvas.update = false;
 
@@ -6753,6 +6799,11 @@ molmil.UI.prototype.showResidues=function(target, payload) {
     item.ref = mol;
     item.ondblclick = function() {
       this.UI.canvas.molmilViewer.gotoMol(this.payload);
+    };
+    item.onclick = function() {
+      this.UI.canvas.molmilViewer.atomSelection = [this.payload.CA || this.payload.atoms[0]];
+      this.UI.canvas.renderer.updateSelection();
+      this.UI.canvas.update = true;
     };
   }
   target.pushNode("hr");
