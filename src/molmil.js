@@ -1815,8 +1815,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
     var indices = new Int32Array(buffer, offset, metadata[2]*3); offset += metadata[2]*3*4;
 
     var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
-    
-    
+
     for (var i=0; i<vertices.length; i+=7) {
       COR[0] += vertices[i];
       COR[1] += vertices[i+1];
@@ -1835,8 +1834,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
     var struct = new molmil.polygonObject({filename: filename, COR: COR}); this.structures.push(struct);
     struct.options = [];
     struct.meta.geomRanges = geomRanges;
-    
-          
+
     var renderer = this.renderer;
     var gl = renderer.gl;
           
@@ -2641,7 +2639,8 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
       sitems = items[i].childNodes;
       for (j=0; j<sitems.length; j++) {
         if (sitems[j].tagName != "vertex") continue;
-        data = sitems[j].getAttribute("image").split(/\s+/);
+        data = sitems[j].getAttribute("image").trim().split(/\s+/);
+        //console.log(data);
         for (k=0; k<9; k++) data[k] = parseFloat(data[k]);
         data[6] = data[6]; data[7] = data[7]; data[8] = data[8];
         vertexRef[sitems[j].getAttribute("id")] = vertices.length;
@@ -2664,10 +2663,30 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
       vList = []; iList = [];
       for (j=0; j<sitems.length; j++) {
         if (sitems[j].tagName != "triangle") continue;
-        data = sitems[j].getAttribute("vertex").split(/\s+/);
+        data = sitems[j].getAttribute("vertex").trim().split(/\s+/);
         for (k=0; k<3; k++) data[k] = vertexRef[data[k]];
         iList.push(data);
         vList.push(data[0], data[1], data[2]);
+      }
+      if (vList.length) {
+        triangleVertices.push(vList.unique());
+        triangles_lists.push(iList);
+      }
+    }
+    else if (items[i].tagName == "quad_array") {
+      sitems = items[i].childNodes;
+      vList = []; iList = [];
+      for (j=0; j<sitems.length; j++) {
+        if (sitems[j].tagName != "quad") continue;
+        data = sitems[j].getAttribute("vertex").trim().split(/\s+/);
+        for (k=0; k<4; k++) data[k] = vertexRef[data[k]];
+        
+        // now split up this quad into two triangles...
+        iList.push([data[0], data[1], data[2]]);
+        vList.push(data[0], data[1], data[2]);
+        
+        iList.push([data[0], data[2], data[3]]);
+        vList.push(data[0], data[2], data[3]);
       }
       if (vList.length) {
         triangleVertices.push(vList.unique());
@@ -2679,7 +2698,7 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
       vList = []; iList = [];
       for (j=0; j<sitems.length; j++) {
         if (sitems[j].tagName != "line") continue;
-        data = sitems[j].getAttribute("vertex").split(/\s+/);
+        data = sitems[j].getAttribute("vertex").trim().split(/\s+/);
         for (k=0; k<2; k++) data[k] = vertexRef[data[k]];
         iList.push(data);
         vList.push(data[0], data[1]);
@@ -2694,7 +2713,7 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
       vList = []; iList = [];
       for (j=0; j<sitems.length; j++) {
         if (sitems[j].tagName != "polyline") continue;
-        data = sitems[j].getAttribute("vertex").split(/\s+/);
+        data = sitems[j].getAttribute("vertex").trim().split(/\s+/);
         for (k=0; k<data.length; k++) data[k] = vertexRef[data[k]];
         for (k=0; k<data.length-1; k++) {
           iList.push([data[k], data[k+1]]);
@@ -6077,7 +6096,7 @@ molmil.handle_molmilViewer_mouseUp = function (event) {
     var dpr = window.devicePixelRatio || 1;
     activeCanvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);
     if (event.which == 3) {
-      activeCanvas.renderer.soup.UI.showContextMenuAtom(event.clientX, event.clientY);
+      activeCanvas.renderer.soup.UI.showContextMenuAtom(event.clientX, event.clientY, event.pageX);
     }
   }
 
@@ -6175,7 +6194,7 @@ molmil.handle_molmilViewer_touchHold = function () {
       var dpr = window.devicePixelRatio || 1;
       molmil.activeCanvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);
     }
-    molmil.activeCanvas.renderer.soup.UI.showContextMenuAtom(molmil.previousTouchEvent.touches[0].clientX, molmil.previousTouchEvent.touches[0].clientY);
+    molmil.activeCanvas.renderer.soup.UI.showContextMenuAtom(molmil.previousTouchEvent.touches[0].clientX, molmil.previousTouchEvent.touches[0].clientY, molmil.previousTouchEvent.touches[0].pageX);
   }
   
   molmil.longTouchTID = null; molmil.previousTouchEvent = null;
@@ -6383,7 +6402,9 @@ molmil.UI.prototype.showColorMenu=function(ref, entry) {
   var menu = ref.subMenu = molmil_dep.dcE("div");
   
   menu.className = "contextMenu cM_sub";
-  if (entry.inv) {menu.style.left = "auto"; menu.style.right = "10.75em";}
+  //if (entry.inv) {menu.style.left = "auto"; menu.style.right = "10.75em";}
+  if (ref.inv || entry.inv) {menu.style.left = "auto"; menu.style.right = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  else {menu.style.left = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
   var item, UI=this;
   
   var addEntry=function(name, action, hover) {
@@ -6446,6 +6467,12 @@ molmil.UI.prototype.showDisplayMenuCM=function(ref) {
 
   var pos = molmil_dep.findPos(ref);
   var menu = ref.subMenu = molmil_dep.dcE("div");
+  if (ref.inv) {menu.style.left = "auto"; menu.style.right = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  else {menu.style.left = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  
+  var pageX = pos[0]+(ref.inv ? -1 : 1)*(ref.parentNode.clientWidth+(2*molmil_dep.fontSize))
+  var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+  var inv = mw < pageX+(molmil_dep.fontSize*25);
 
   menu.className = "contextMenu cM_sub";
   var item, UI=this;
@@ -6462,8 +6489,8 @@ molmil.UI.prototype.showDisplayMenuCM=function(ref) {
     else item.addEventListener("touchstart", function() {this.onclick();}, false);
   };
 
-  addEntry("Residue", function() {this.UI.showDisplayMenu(this, {mtype: 3, ref: atom.molecule});}, true);
-  addEntry("Chain", function() {this.UI.showDisplayMenu(this, {mtype: 2, ref: atom.molecule.chain});}, true);
+  addEntry("Residue", function() {this.UI.showDisplayMenu(this, {mtype: 3, ref: atom.molecule, inv: inv});}, true);
+  addEntry("Chain", function() {this.UI.showDisplayMenu(this, {mtype: 2, ref: atom.molecule.chain, inv: inv});}, true);
   
   ref.onmouseout = function() {
     this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
@@ -6483,7 +6510,14 @@ molmil.UI.prototype.showColorMenuCM=function(ref) {
 
   var pos = molmil_dep.findPos(ref);
   var menu = ref.subMenu = molmil_dep.dcE("div");
-
+  if (ref.inv) {menu.style.left = "auto"; menu.style.right = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  else {menu.style.left = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  
+  var pageX = pos[0]+(ref.inv ? -1 : 1)*(ref.parentNode.clientWidth+(2*molmil_dep.fontSize))
+  var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+  var inv = mw < pageX+(molmil_dep.fontSize*25);
+  
+  
   menu.className = "contextMenu cM_sub";
   var item, UI=this;
 
@@ -6499,11 +6533,11 @@ molmil.UI.prototype.showColorMenuCM=function(ref) {
     else item.addEventListener("touchstart", function() {this.onclick();}, false);
   };
 
-  addEntry("Atom", function() {this.UI.showColorMenu(this, {mtype: 4, ref: atom});}, true);
-  addEntry("Residue", function() {this.UI.showColorMenu(this, {mtype: 3, ref: atom.molecule});}, true);
-  addEntry("Residue (cartoon)", function() {this.UI.showColorMenu(this, {mtype: 3.1, ref: atom.molecule});}, true);
-  addEntry("Residue (atoms)", function() {this.UI.showColorMenu(this, {mtype: 3.2, ref: atom.molecule});}, true);
-  addEntry("Chain", function() {this.UI.showColorMenu(this, {mtype: 2, ref: atom.molecule.chain});}, true);
+  addEntry("Atom", function() {this.UI.showColorMenu(this, {mtype: 4, ref: atom, inv: inv});}, true);
+  addEntry("Residue", function() {this.UI.showColorMenu(this, {mtype: 3, ref: atom.molecule, inv: inv});}, true);
+  addEntry("Residue (cartoon)", function() {this.UI.showColorMenu(this, {mtype: 3.1, ref: atom.molecule, inv: inv});}, true);
+  addEntry("Residue (atoms)", function() {this.UI.showColorMenu(this, {mtype: 3.2, ref: atom.molecule, inv: inv});}, true);
+  addEntry("Chain", function() {this.UI.showColorMenu(this, {mtype: 2, ref: atom.molecule.chain, inv: inv});}, true);
   
   ref.onmouseout = function() {
     this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
@@ -6522,11 +6556,16 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
   
   menu.className = "contextMenu cM_sub";
   var item, UI=this;
-  if (entry.inv) {menu.style.left = "auto"; menu.style.right = "10.75em";}
+  if (ref.inv || entry.inv) {menu.style.left = "auto"; menu.style.right = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  else {menu.style.left = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  
+  var pageX = pos[0]+(ref.inv ? -1 : 1)*(ref.parentNode.clientWidth+(2*molmil_dep.fontSize))
+  var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+  var inv = mw < pageX+(molmil_dep.fontSize*25);
 
   var addEntry=function(name, action, hover) {
     item = menu.pushNode("div", name);
-    item.className = "contextMenu_E";
+    item.className = "contextMenu_E"; item.inv = inv;
     item.UI = UI; item.entry = entry;
     item.onclick = action;
     if (hover) {
@@ -6555,6 +6594,11 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
         }
         var pos = molmil_dep.findPos(ref2);
         var menu2 = ref2.subMenu = molmil_dep.dcE("div");
+        
+        if (ref2.inv) {menu2.style.left = "auto"; menu2.style.right = ((ref2.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+        else {menu2.style.left = ((ref2.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+        
+        // figure out whether or not to invert the placement of this menu...
   
         menu2.className = "contextMenu cM_sub";
         var item;
@@ -6584,11 +6628,6 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
 
       addEntry("Amino acid", function() {aaMenu(this, 1);}, true);
       addEntry("Side chain", function() {aaMenu(this, 2);}, true);
-    
-    
-    
-    
-    
     }
     if (entry.mtype < 3 && ! (entry.ref.ligand || entry.ref.water)) {
       addEntry("Ca trace", function() {this.UI.displayEntry(entry, 6);});
@@ -6597,15 +6636,14 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
       addEntry("CG Surface", function() {this.UI.displayEntry(entry, molmil.displayMode_ChainSurfaceCG);});
     }
   }
-  
-  
+
   ref.onmouseout = function() {
     this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
   };
   ref.pushNode(menu);
 };
 
-molmil.UI.prototype.showContextMenuAtom=function(x, y) {
+molmil.UI.prototype.showContextMenuAtom=function(x, y, pageX) {
   if (document.body.onmousedown) document.body.onmousedown();
   
   var atom = this.soup.atomSelection[this.soup.atomSelection.length-1];
@@ -6613,7 +6651,8 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y) {
   
   var delta = 0;
   var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-  if (mw < x+(molmil_dep.fontSize*12)) delta = (x+(molmil_dep.fontSize*12))-mw;
+  if (mw < pageX+(molmil_dep.fontSize*12)) delta = (pageX+(molmil_dep.fontSize*12))-mw;
+  var inv = mw < pageX+(molmil_dep.fontSize*25);
   
   //scrollTop
   var menu = molmil_dep.dcE("div");
@@ -6632,7 +6671,7 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y) {
     item = menu.pushNode("div", name);
     if (! item.pushNode) return; // workaround for weird bug in IE --> makes it non-functional
     item.className = "contextMenu_E";
-    item.UI = UI; item.entry = null;
+    item.UI = UI; item.entry = null; item.inv = inv;
     item.onclick = action;
     if (hover) {
       item.onmouseover = action;
@@ -6661,7 +6700,7 @@ molmil.UI.prototype.showCM=function(e, entry) {
   var delta = 0;
   var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
   if (mw < e.pageX+(molmil_dep.fontSize*12)) delta = (e.pageX+(molmil_dep.fontSize*12))-mw;
-  entry.inv = mw < e.pageX+(molmil_dep.fontSize*30);
+  entry.inv = mw < e.pageX+(molmil_dep.fontSize*25);
   
   var menu = molmil_dep.dcE("div");
   menu.className = "contextMenu";
@@ -8545,7 +8584,7 @@ molmil.loadFile = function(loc, format, cb, async, soup) {
   soup.loadStructure(loc, format, cb || function(target, struc) {
     molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
-  }, {async: async});
+  }, {async: async ? true : false});
 };
 
 molmil.loadPDB = function(pdbid, cb, async, soup) {
@@ -8554,7 +8593,7 @@ molmil.loadPDB = function(pdbid, cb, async, soup) {
     if (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints)) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
-  }, {async: async});
+  }, {async: async ? true : false});
 };
 
 molmil.loadCC = function(comp_id, cb, async, soup) {
@@ -8562,7 +8601,7 @@ molmil.loadCC = function(comp_id, cb, async, soup) {
   soup.loadStructure(molmil.settings.comp_url.replace("__ID__", comp_id), 1, cb || function(target, struc) {
     molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
-  }, {async: async});
+  }, {async: async ? true : false});
 };
 
 // ** resets molmil (empties the system) **
