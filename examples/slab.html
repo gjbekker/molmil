@@ -1,0 +1,61 @@
+
+<html>
+  <head>
+    <script>  
+      var molmil_settings = {src: "http://gjbekker.github.io/molmil/"}, canvas;
+  
+      function initViewer() {
+        if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+        canvas = document.getElementById("molmilViewer");
+        canvas = molmil.createViewer(canvas);
+        
+        
+        var slab_near = document.getElementById("slab_near");
+        var slab_far = document.getElementById("slab_far");
+        
+        slab_near.oninput = function() {
+          this.parentNode.nextSibling.innerHTML = this.value;
+          if (parseInt(slab_far.value) <= parseInt(this.value)) {
+            slab_far.value = parseInt(this.value)+1;
+            slab_far.oninput();
+          }
+          else molmil.setSlab(parseInt(slab_near.value), parseInt(slab_far.value), canvas.molmilViewer);
+        };
+        
+        slab_far.oninput = function() {
+          this.parentNode.nextSibling.innerHTML = this.value;
+          if (parseInt(slab_near.value) >= parseInt(this.value)) {
+            slab_near.value = parseInt(this.value)-1;
+            slab_near.oninput();
+          }
+          else molmil.setSlab(parseInt(slab_near.value), parseInt(slab_far.value), canvas.molmilViewer);
+        };
+        
+        slab_near.value = slab_near.min = slab_far.min = 0;
+        slab_far.value = slab_near.max = slab_far.max = 50;
+        
+        slab_near.oninput();
+        slab_far.oninput();
+        
+        molmil.loadPDB(canvas.getAttribute("data-pdbid"), null, null, canvas.molmilViewer);
+      }
+    </script>
+  </head>
+  
+  <body onload="initViewer();">
+    <center>
+      <h1 id="mm_title">molmil viewer</h1>
+      <h3>Integration test page</h3>
+      <span class="molmil_UI_container">
+        <canvas id="molmilViewer" data-pdbid="1crn" width="600" height="400" style="display: block; border: 1px solid #DDD;"></canvas>
+      </span>
+      
+      <table>
+      <tr><th colspan="3">Slab:</th></tr>
+      <tr><th>Near:</th><td><input id="slab_near" type="range"><br /></td><td style="min-width: 4em; text-align: right;">0</td></tr>
+      <tr><th>Far:</th><td><input id="slab_far" type="range"><br /></td><td style="min-width: 4em; text-align: right;">0</td></tr>
+      
+    </center>
+  </body>
+  <script src="http://gjbekker.github.io/molmil/molmil.js"></script>
+</html>
