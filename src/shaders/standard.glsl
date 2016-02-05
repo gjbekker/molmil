@@ -11,7 +11,10 @@
     "normalMatrix": -1,
     "focus": -1,
     "fogSpan": -1,
-    "uniform_color": -1
+    "uniform_color": -1,
+    "backgroundColor": -1,
+    "slabNear": -1,
+    "slabFar": -1
   }
 }
 //#vertex
@@ -50,6 +53,7 @@ varying vec3 ex_Normal;
 varying vec3 vertPos;
 
 varying float fogFactor;
+varying float Pz;
 
 uniform float focus;
 uniform float fogSpan;
@@ -67,6 +71,8 @@ void main() {
 #endif
   ex_Normal = normalMatrix * in_Normal;
   
+  Pz = -vertPos.z;
+
 #ifdef ENABLE_FOG
   fogFactor = clamp((fogSpan - -vertPos.z) / (fogSpan - focus), 0.05, 1.0);
 #endif
@@ -94,10 +100,19 @@ varying vec3 ex_Colour;
 const vec3 lightPos = vec3(50.0,50.0,100.0);
 
 varying float fogFactor;
+varying float Pz;
 
-const vec4 backgroundColor = vec4(0.0, 0.0, 0.0, 1.0);
+uniform vec4 backgroundColor;
+
+#ifdef ENABLE_SLAB
+uniform float slabNear, slabFar;
+#endif
 
 void main() {
+#ifdef ENABLE_SLAB
+  if (Pz < slabNear || Pz > slabFar+1.0) discard; // later change the slabFar functionality to a more fog-like function..
+#endif
+
   vec3 normal = normalize(ex_Normal);
   vec3 lightDir = normalize(lightPos - vertPos);
   vec3 lightDir2 = lightPos - vertPos;
@@ -126,6 +141,11 @@ void main() {
   gl_FragColor = mix(backgroundColor, color, fogFactor);
 #else
   gl_FragColor = color;
-  //if (color.x > -1.0) {gl_FragColor = vec4(normal, 1.0);}
 #endif
+
+
+#ifdef ENABLE_SLAB
+  if (Pz > slabFar) gl_FragColor = mix(backgroundColor, color, clamp((slabFar+1.-Pz) / (1.0), 0.00, 1.0));
+#endif
+
 }

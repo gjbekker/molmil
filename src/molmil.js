@@ -36,7 +36,9 @@ molmil.settings = window.molmil_settings || molmil.settings_default;
 for (var e in molmil.settings_default) if (! molmil.settings.hasOwnProperty(e)) molmil.settings[e] = molmil.settings_default[e];
 
 molmil.configBox = {
-  initFinished: false, 
+  initFinished: false,
+  liteMode: false,
+  cullFace: true,
   
   vdwR: {
     DUMMY: 1.7, 
@@ -233,6 +235,7 @@ molmil.displayMode_Wireframe_SC = 5.5;
 molmil.displayMode_CaTrace = 6;
 molmil.displayMode_Tube = 7;
 molmil.displayMode_Cartoon = 8;
+molmil.displayMode_CartoonRocket = 8.5;
 molmil.displayMode_ChainSurfaceCG = 10;
 
 molmil.displayMode_XNA = 400;
@@ -293,6 +296,7 @@ molmil.chainObject = function (name, entry) {
   this.bondsOK = false;
   this.displayMode = molmil.displayMode_Default;
   this.isHet = true;
+  this.rgba = [255, 255, 255, 255];
 }
 
 molmil.chainObject.prototype.toString = function() {return " Chain";};
@@ -728,6 +732,12 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
       return this.target.load_ccp4(this.request.response, this.filename);
+    };
+  }
+  else if ((format+"").toLowerCase() == "obj") {
+    request.ASYNC = true;
+    request.parse = function() {
+      return this.target.load_obj(this.request.response, this.filename);
     };
   }
   else if ((format+"").toLowerCase() == "mdl") {
@@ -1527,7 +1537,91 @@ molmil.decodeUtf8=function(arrayBuffer) {
   return result;
 }
 
+molmil.viewer.prototype.load_obj = function(data, filename, settings) {
+  if (! settings) settings = {solid: true};
+  data = data.split("\n");
+  var tmp, i;
+  var pos = [], norm = [], idx = [], n, hihi = [0, 0, 0, 0];
+  
+  var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
+  
+  for (i=0; i<data.length; i++) {
+    if (data[i].substr(0,2) == "vn") {
+      tmp = data[i].split(/\s+/);
+      norm.push(n=[parseFloat(tmp[1]), parseFloat(tmp[2]), parseFloat(tmp[3])]);
+      vec3.normalize(n, n);
+    }
+    else if (data[i].substr(0,1) == "v") {
+      tmp = data[i].split(/\s+/);
+      pos.push(n=[parseFloat(tmp[1]), parseFloat(tmp[2]), parseFloat(tmp[3])]);
+      
+      if (n[0] < geomRanges[0]) geomRanges[0] = n[0];
+      if (n[0] > geomRanges[1]) geomRanges[1] = n[0];
+      
+      if (n[1] < geomRanges[2]) geomRanges[2] = n[1];
+      if (n[1] > geomRanges[3]) geomRanges[3] = n[1];
+     
+      if (n[2] < geomRanges[4]) geomRanges[4] = n[2];
+      if (n[2] > geomRanges[5]) geomRanges[5] = n[2];
+      
+      hihi[0] += n[0];
+      hihi[1] += n[1];
+      hihi[2] += n[2];
+      hihi[3] += 1;
+      
+    }
+    else if (data[i].substr(0,1) == "f") {
+      tmp = data[i].split(/\s+/);
+      idx.push([parseInt(tmp[1].split("//")[0])-1, parseInt(tmp[2].split("//")[0])-1, parseInt(tmp[3].split("//")[0])-1]);
+    }
+  }
 
+  var vertices = new Float32Array(pos.length*7); // x, y, z, nx, ny, nz, rgba
+  var indices = new Int32Array(idx.length*3);
+      
+  var vertices8 = new Uint8Array(vertices.buffer);
+  
+  var i, p=0, p8=0;
+  
+  for (i=0; i<pos.length; i++, p8 += 28) {
+    vertices[p++] = pos[i][0];
+    vertices[p++] = pos[i][1];
+    vertices[p++] = pos[i][2];
+    
+    vertices[p++] = norm[i][0];
+    vertices[p++] = norm[i][1];
+    vertices[p++] = norm[i][2];
+    
+    vertices8[p8+24] = 255;
+    vertices8[p8+25] = 255;
+    vertices8[p8+26] = 255;
+    vertices8[p8+27] = 255;
+    p++;
+  }
+  
+  p = 0;
+  for (i=0; i<idx.length; i++) {
+    indices[p++] = idx[i][0];
+    indices[p++] = idx[i][1];
+    indices[p++] = idx[i][2];
+  }
+  
+  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); canvas.molmilViewer.structures.push(struct);
+  struct.options = [];
+  struct.meta.geomRanges = geomRanges;
+  
+  var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
+  canvas.renderer.programs.push(program);
+  
+  canvas.molmilViewer.calculateCOG();
+  this.renderer.camera.z = this.calcZ();
+  
+  canvas.renderer.initBuffers();
+  canvas.update = true;
+          
+  molmil.safeStartViewer(canvas);
+  
+};
 
 molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   if (! settings) settings = {sigma: 1.0};
@@ -1698,95 +1792,8 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
     indices[i2+1] = surf.faces[i][1];
     indices[i2+2] = surf.faces[i][2];
   }
-     
-  var gl = canvas.renderer.gl;
-          
-  var vbuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-  
-  var ibuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-          
-  var program = {}; program.settings = settings;
-  program.gl = canvas.renderer.gl; program.renderer = canvas.renderer;
-  program.nElements = surf.faces.length*3;
-  program.vertexBuffer = vbuffer;
-  program.indexBuffer = ibuffer;
-      
-  program.angle = canvas.renderer.angle;
 
-  program.standard_shader = canvas.renderer.shaders.standard_alpha;
-  program.standard_attributes = canvas.renderer.shaders.standard_alpha.attributes;
-      
-  program.wireframe_shader = canvas.renderer.shaders.lines;
-  program.wireframe_attributes = canvas.renderer.shaders.lines.attributes;
-      
-  program.status = true;
-      
-  program.render = function(modelViewMatrix, COR) {
-    if (this.settings.solid) this.standard_render(modelViewMatrix, COR);
-    else this.wireframe_render(modelViewMatrix, COR);
-  };
-      
-  program.wireframe_render = function(modelViewMatrix, COR) {
-    if (! this.status) return;
-    var normalMatrix = mat3.create();
-    this.gl.useProgram(this.wireframe_shader.program);
-    this.gl.uniformMatrix4fv(this.wireframe_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-    this.gl.uniformMatrix4fv(this.wireframe_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-    this.gl.uniform3f(this.wireframe_shader.uniforms.COR, COR[0], COR[1], COR[2]);
-    this.gl.uniform1f(this.wireframe_shader.uniforms.focus, this.renderer.fogStart);
-    this.gl.uniform1f(this.wireframe_shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-  
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-    this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-    //this.gl.vertexAttribPointer(this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-    this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
-    
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        
-    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-      var dv = 0, vtd;
-      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-    }
-    else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
-  };
-      
-  program.standard_render = function(modelViewMatrix, COR) {
-    if (! this.status) return;
-    var normalMatrix = mat3.create();
-    mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-      
-    this.gl.useProgram(this.standard_shader.program);
-    this.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-    this.gl.uniformMatrix3fv(this.standard_shader.uniforms.normalMatrix, false, normalMatrix);
-    this.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-    this.gl.uniform3f(this.standard_shader.uniforms.COR, COR[0], COR[1], COR[2]);
-    this.gl.uniform1f(this.standard_shader.uniforms.focus, this.renderer.fogStart);
-    this.gl.uniform1f(this.standard_shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-  
-        
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-    this.gl.vertexAttribPointer(this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-    this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-    this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
-    
-    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        
-    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-      var dv = 0, vtd;
-      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-    }
-    else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-        
-  };
-          
-  program.renderPicking = function() {};
-
+  var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
   canvas.renderer.programs.push(program);
 
   canvas.molmilViewer.calculateCOG();
@@ -1870,6 +1877,8 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
       this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
       this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
       this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
+      
+      this.gl.uniform4f(this.shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
   
       this.render_internal();
     };
@@ -2373,9 +2382,11 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
 };
 
 // ** calculates the optimal zoom amount **
-molmil.viewer.prototype.calcZ = function() {
-  var mx = Math.max(Math.abs(this.geomRanges[0]), Math.abs(this.geomRanges[1]), Math.abs(this.geomRanges[2]), Math.abs(this.geomRanges[3]), Math.abs(this.geomRanges[4]), Math.abs(this.geomRanges[5]));
-  this.renderer.maxRange = (Math.max(Math.abs(this.geomRanges[1]-this.geomRanges[0]), Math.abs(this.geomRanges[3]-this.geomRanges[2]), Math.abs(this.geomRanges[5]-this.geomRanges[4]))*.5)-molmil.configBox.zNear-5;
+molmil.viewer.prototype.calcZ = function(geomRanges) {
+  var test = geomRanges;
+  geomRanges = geomRanges || this.geomRanges;
+  var mx = Math.max(Math.abs(geomRanges[0]), Math.abs(geomRanges[1]), Math.abs(geomRanges[2]), Math.abs(geomRanges[3]), Math.abs(geomRanges[4]), Math.abs(geomRanges[5]));
+  if (test) this.renderer.maxRange = (Math.max(Math.abs(geomRanges[1]-geomRanges[0]), Math.abs(geomRanges[3]-geomRanges[2]), Math.abs(geomRanges[5]-geomRanges[4]))*.5)-molmil.configBox.zNear-5;
   if (molmil.configBox.projectionMode == 1) return -(mx*molmil.configBox.zFar/3000)-molmil.configBox.zNear-1;
   else return -((mx/Math.min(this.renderer.width, this.renderer.height))*molmil.configBox.zFar*(.625))-molmil.configBox.zNear-1;
 }
@@ -2438,8 +2449,9 @@ molmil.viewer.prototype.load_polygonJSON = function(jso, filename, settings) { /
 molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi_l, lineVertices, lines_lists, nov_t, noi_t, triangleVertices, triangles_lists, settings) {
   var program, vbuffer, ibuffer, gl = this.renderer.gl;
   var i, j, vP, vP8, vertex, iP, vertexMap = {};
+
   var alpha = settings.alpha || 255;
-    
+  
   if (nov_l) {
     var lineVertexData = new Float32Array(nov_l*4), lineVertexData8 = new Uint8Array(lineVertexData.buffer);
     var lineIndexData = new Uint32Array(noi_l*2);
@@ -2465,54 +2477,9 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
         lineIndexData[iP++] = vertexMap[lines_lists[i][j][1]];
       }
     }
-  
-    program = {}; struct.programs.push(program);
-    program.gl = gl; program.renderer = this.renderer;
-    program.angle = this.renderer.angle;
     
-    program.shader = this.renderer.shaders.lines;
-    program.attributes = program.shader.attributes;
-
-    program.render = function(modelViewMatrix, COR) {
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-      
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 16, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 16, 12);
-      
-      // stupid program complaining about non-bound attribute...
-      this.gl.vertexAttribPointer(2, 4, this.gl.UNSIGNED_BYTE, true, 16, 12);
-
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
-
-    };
-
-    program.renderPicking = function(modelViewMatrix, COR) {};
-
+    program = molmil.geometry.build_simple_render_program(lineVertexData, lineIndexData, this.renderer, {lines_render: true});
     this.renderer.programs.push(program);
-    
-    program.vertexBuffer = vbuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, lineVertexData, gl.STATIC_DRAW);
-  
-    program.indexBuffer = ibuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, lineIndexData, gl.STATIC_DRAW);
-  
-    program.nElements = lineIndexData.length;
   }
   
   if (nov_t) {
@@ -2553,72 +2520,16 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
         triangleIndexData[iP++] = vertexMap[triangles_lists[i][j][2]];
       }
     }
-    
-    program = {}; struct.programs.push(program);
-    program.gl = gl; program.renderer = this.renderer;
-    program.angle = this.renderer.angle;
-      
-    program.shader = this.renderer.shaders.standard_alpha;
-    program.attributes = program.shader.attributes;
-    
-    program.alpha = alpha;
-        
-    program.render = function(modelViewMatrix, COR) {
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-                
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
-      if (this.alpha < 255) {
-        this.gl.enable(this.gl.BLEND);
-        this.gl.blendEquation(this.gl.FUNC_ADD);
-        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-      }
-      
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-      
-      if (this.alpha > 254) {
-        this.gl.disable(this.gl.BLEND);
-      }
-    };
-
-    program.renderPicking = function(modelViewMatrix, COR) {};
-
+    program = molmil.geometry.build_simple_render_program(triangleVertexData, triangleIndexData, this.renderer, {solid: true});
     this.renderer.programs.push(program);
-    
-    program.vertexBuffer = vbuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, triangleVertexData, gl.STATIC_DRAW);
-  
-    program.indexBuffer = ibuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, triangleIndexData, gl.STATIC_DRAW);
-  
-    program.nElements = triangleIndexData.length;
   }
-
+  
   this.renderer.initBD = true;
   
   this.calculateCOG();
   if (! this.skipCOGupdate) this.renderer.camera.z = this.calcZ();
   if (molmil.geometry.onGenerate) molmil_dep.asyncStart(molmil.geometry.onGenerate[0], molmil.geometry.onGenerate[1], molmil.geometry.onGenerate[2], 0);
-};
+}
 
 // ** loads polygon-XML data **
 molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
@@ -2769,19 +2680,18 @@ molmil.viewer.prototype.load_PDBML = function(xml) {
 
 // ** loads PDBx formatted data such as mmcif, pdbml and mmjson **
 molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated for the new model system
-  var entries = Object.keys(mmjson), structs = [];
+  var entries = Object.keys(mmjson), structs = [], offset;
   for (var e=0; e<entries.length; e++) {
 
     //var entryId = Object.keys(mmjson)[0].substr(5).split("-")[0];
     var entryId = entries[e].substr(5).split("-")[0];
-    var pdb = mmjson["data_"+entryId];
+    var pdb = mmjson[entries[e]];
     var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || null;
     
     if (! atom_site) continue;
     
     var isCC = pdb.hasOwnProperty("chem_comp_atom");
-  
-    var group_PDB = atom_site.group_PDB || atom_site.atom_id; // ATOM/HETATM
+
     var Cartn_x = atom_site.Cartn_x || (atom_site.pdbx_model_Cartn_x_ideal && atom_site.pdbx_model_Cartn_x_ideal[0] != null ? atom_site.pdbx_model_Cartn_x_ideal : atom_site.model_Cartn_x) || atom_site.model_Cartn_x; // x
     var Cartn_y = atom_site.Cartn_y || (atom_site.pdbx_model_Cartn_y_ideal && atom_site.pdbx_model_Cartn_x_ideal[0] != null ? atom_site.pdbx_model_Cartn_y_ideal : atom_site.model_Cartn_y) || atom_site.model_Cartn_y; // y
     var Cartn_z = atom_site.Cartn_z || (atom_site.pdbx_model_Cartn_z_ideal && atom_site.pdbx_model_Cartn_x_ideal[0] != null ? atom_site.pdbx_model_Cartn_z_ideal : atom_site.model_Cartn_z) || atom_site.model_Cartn_z; // z
@@ -2797,9 +2707,9 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
   
     var label_alt_id = atom_site.label_alt_id || [];
   
-    var auth_atom_id = atom_site.auth_atom_id || atom_site.atom_id; // atom name
+    var auth_atom_id = atom_site.auth_atom_id || atom_site.atom_id || []; // atom name
     var label_atom_id = atom_site.label_atom_id || []; // atom name
-    var type_symbol = atom_site.type_symbol; // Element
+    var type_symbol = atom_site.type_symbol || []; // Element
   
     var pdbx_PDB_model_num = atom_site.pdbx_PDB_model_num;
   
@@ -2815,9 +2725,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
       polyTypes.ACE = polyTypes.NME = true;
     }
     catch (e) {polyTypes = molmil.AATypes;}
-  
-    //if (group_PDB.length > 500000) {console.log("File ("+entryId+") is too large ("+group_PDB.length+" atoms)"); return;}
-    for (var a=0; a<group_PDB.length; a++) {
+
+    for (var a=0; a<Cartn_x.length; a++) {
       // split this up in structure loading (1st model) & coordinate only loading (2+ models)
     
       if ((pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) || ! struc) {
@@ -2831,10 +2740,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
         this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a], struc)); struc.chains.push(currentChain);
         currentChain.authName = auth_asym_id[a];
         currentChain.CID = this.CID++;
-        ccid = label_asym_id[a]; cmid = null;
+        ccid = label_asym_id[a]; cmid = -1;
         //console.log(ccid);
       }
-      if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol) {
+      
+      //console.log(label_comp_id[a]);
+      
+      if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1) {
         currentChain.molecules.push(currentMol = new molmil.molObject((label_comp_id[a] || auth_comp_id[a]), (label_seq_id[a] || auth_seq_id[a]), currentChain));
         currentMol.RSID = auth_seq_id[a] || label_seq_id[a];
         currentMol.MID = this.MID++;
@@ -2847,6 +2759,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
       currentChain.modelsXYZ[0].push(Cartn_x[a], Cartn_y[a], Cartn_z[a]);
     
       currentMol.atoms.push(atom=new molmil.atomObject(Xpos, auth_atom_id[a] || label_atom_id[a] || "", type_symbol[a] || "", currentMol, currentChain));
+      
+      if (! atom.element) {
+        for (offset=0; offset<atom.atomName.length; offset++) if (! molmil_dep.isNumber(atom.atomName[offset])) break;
+        if (atom.atomName.length > 1 && ! molmil_dep.isNumber(atom.atomName[1]) && atom.atomName[1] == atom.atomName[1].toLowerCase()) atom.element = atom.atomName.substring(offset, offset+2);
+        else atom.element = atom.atomName.substring(offset, offset+1);
+      }
+      
     
       atom.label_alt_id = label_alt_id[a];
       if (atom.label_alt_id && atom.label_alt_id != "A") atom.status = false;
@@ -2872,7 +2791,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
     structs.push(struc);
     
     var cid = 0, xyzs;
-    for (; a<group_PDB.length; a++) {
+    for (; a<Cartn_x.length; a++) {
       if (pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) {
         cmnum = pdbx_PDB_model_num ? pdbx_PDB_model_num[a] : 0; ccid = null; cid = -1;
       }
@@ -2911,7 +2830,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
   
     // add a check here to make sure it's not adding CRAP
     var struct_conf = pdb.struct_conf;
-    if (struct_conf && group_PDB.length) {
+    if (struct_conf && Cartn_x.length) {
       for (var i=0, m; i<struct_conf.id.length; i++) {
         conf_type_id = struct_conf.conf_type_id[i];
         if (conf_type_id == "HELX_P") conf_type_id = 3;
@@ -2936,7 +2855,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjson) { // this should be updated
     }
   
     var struct_sheet_range = pdb.struct_sheet_range;  
-    if (struct_sheet_range && group_PDB.length) {
+    if (struct_sheet_range && Cartn_x.length) {
       for (var i=0, m; i<struct_sheet_range.beg_label_asym_id.length; i++) {
         beg_label_asym_id = struct_sheet_range.beg_label_asym_id[i];
         beg_label_seq_id = struct_sheet_range.beg_label_seq_id[i];
@@ -3160,6 +3079,7 @@ molmil.viewer.prototype.calculateCOG = function() {
   }
   
   for (var i=0; i<ALTs.length; i+=2) {
+    n_tmp = ALTs[i][1];
     tmp = ALTs[i][0]-this.avgX;
     this.stdX += (tmp*tmp)*n_tmp*.5;
     if (tmp < xMin) xMin = tmp;
@@ -3188,6 +3108,7 @@ molmil.viewer.prototype.calculateCOG = function() {
   this.stdX = Math.sqrt(this.stdX/n);
   this.stdY = Math.sqrt(this.stdY/n);
   this.stdZ = Math.sqrt(this.stdZ/n);
+
   
   this.avgXYZ = [this.avgX, this.avgY, this.avgZ];
   this.stdXYZ = [this.stdX, this.stdY, this.stdZ];
@@ -3534,12 +3455,13 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
 
 // ** center of rotation manipulation **
 
-molmil.viewer.prototype.setCOR=function() {
+molmil.viewer.prototype.setCOR=function(selection) {
   var modelId = this.renderer.modelId
   if (this.lastKnowAS) resetCOR();
   this.lastKnownAS = null;
-  if (! this.atomSelection.length) return;
-  this.lastKnownAS = [this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz], this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz+1], this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz+2]]
+  if (! this.atomSelection.length && ! selection) return;
+  if (! selection) selection = [this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz], this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz+1], this.atomSelection[0].chain.modelsXYZ[modelId][this.atomSelection[0].xyz+2]];
+  this.lastKnownAS = [selection[0], selection[1], selection[2]];
   var rotMat = mat3.create(); mat3.fromMat4(rotMat, this.renderer.modelViewMatrix);
   var delta = vec3.subtract([0, 0, 0], this.lastKnownAS, this.avgXYZ);
   vec3.transformMat3(delta, delta, rotMat);
@@ -3807,7 +3729,7 @@ molmil.geometry.generate = function(structures, render, detail_or) {
       chains.push(structures[s].chains[c]);
     }
   }
-  
+
   this.initChains(chains, render, detail_or);
   this.initCartoon(cchains);
 
@@ -3825,288 +3747,243 @@ molmil.geometry.generate = function(structures, render, detail_or) {
   if (this.onGenerate) molmil_dep.asyncStart(this.onGenerate[0], this.onGenerate[1], this.onGenerate[2], 0);
 };
 
-// ** creates and registers the programs within the renderer object **
-molmil.geometry.registerPrograms = function(renderer) {
-  // create a program (or use an existing one..)
-  //renderer.angle = true;
+molmil.geometry.build_simple_render_program = function(vertices_, indices_, renderer, settings) {
+  var gl = renderer.gl;
+          
+  var program = {}; program.settings = settings;
+  program.gl = renderer.gl; program.renderer = renderer;
   
-  var gl = renderer.gl, program, vbuffer, ibuffer;
-  if (! renderer.program1) {
-    program = renderer.program1 = {};
-    program.status = true;
-    program.gl = gl; program.renderer = renderer;
-    program.angle = renderer.angle;
+  program.setBuffers = function(vertices, indices) {
+    var vbuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
+    this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
+  
+    var ibuffer = this.gl.createBuffer();
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibuffer);
+    this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, indices, this.gl.STATIC_DRAW);
+  
+    this.nElements = indices.length;
+    this.vertexBuffer = vbuffer;
+    this.indexBuffer = ibuffer;
+  };
+  if (vertices_ && indices_) program.setBuffers(vertices_, indices_);
+  
+  
+  program.angle = renderer.angle;
+  
+  if (settings.uniform_color) {
+    program.standard_shader = renderer.shaders.standard_uniform_color;
+    program.wireframe_shader = renderer.shaders.lines_uniform_color;
+  }
+  else {
+    program.standard_shader = renderer.shaders.standard_alpha;
+    program.wireframe_shader = renderer.shaders.lines;
+  }
+  program.standard_attributes = program.standard_shader.attributes;
+  program.wireframe_attributes = program.wireframe_shader.attributes;
       
-    program.shader = renderer.shaders.standard_alpha;
-    program.pickingShader = renderer.shaders.picking;
-    program.pickingAttributes = program.pickingShader.attributes;
-    program.attributes = program.shader.attributes;
+  program.status = true;   
+  
+  program.wireframe_render = function(modelViewMatrix, COR, i) {
+    if (! this.status) return;
+    var normalMatrix = mat3.create();
+    this.gl.useProgram(this.wireframe_shader.program);
+    this.gl.uniformMatrix4fv(this.wireframe_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.gl.uniformMatrix4fv(this.wireframe_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.gl.uniform3f(this.wireframe_shader.uniforms.COR, COR[0], COR[1], COR[2]);
+    this.gl.uniform1f(this.wireframe_shader.uniforms.focus, this.renderer.fogStart);
+    this.gl.uniform1f(this.wireframe_shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
+    if (this.settings.uniform_color) this.gl.uniform3f(this.wireframe_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
+    
+    if (this.renderer.settings.slab) {
+      this.gl.uniform1f(this.wireframe_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
+      this.gl.uniform1f(this.wireframe_shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
+    }
+    
+    this.gl.uniform4f(this.wireframe_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
+  
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
         
-    program.render = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-                
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-      //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+    if (this.settings.lines_render) {
+      if (this.settings.has_ID) {
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
+        if (! this.settings.uniform_color) this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
+        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
       }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
+      else {
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 16, 0);
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 16, 12);
+      }
+    }
+    else {
+      if (this.settings.has_ID) {
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
+        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+      }
+      else {
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
+        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+      }
+    }
+    
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 
-    program.renderPicking = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      this.gl.useProgram(this.pickingShader.program);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
+    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+      var dv = 0, vtd;
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+    }
+    else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
+  };
       
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+  program.standard_render = function(modelViewMatrix, COR, i) {
+    if (! this.status) return;
+    var normalMatrix = mat3.create();
+    mat3.normalFromMat4(normalMatrix, modelViewMatrix);
+      
+    this.gl.useProgram(this.standard_shader.program);
+    this.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.gl.uniformMatrix3fv(this.standard_shader.uniforms.normalMatrix, false, normalMatrix);
+    this.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.gl.uniform3f(this.standard_shader.uniforms.COR, COR[0], COR[1], COR[2]);
+    this.gl.uniform1f(this.standard_shader.uniforms.focus, this.renderer.fogStart);
+    this.gl.uniform1f(this.standard_shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
+    if (this.settings.uniform_color) this.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
     
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
+    this.gl.uniform4f(this.standard_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
+    if (this.renderer.settings.slab) {
+      this.gl.uniform1f(this.standard_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
+      this.gl.uniform1f(this.standard_shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
+    }
+  
+        
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
 
-    renderer.programs.push(program);
+    if (this.settings.has_ID) {
+      this.gl.vertexAttribPointer(this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+      this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
+      if (! this.settings.uniform_color) this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
+      //this.gl.vertexAttribPointer(this.standard_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+    }
+    else {
+      this.gl.vertexAttribPointer(this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+      this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
+      this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+    }
+    
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        
+    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+      var dv = 0, vtd;
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+    }
+    else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
+        
+  };
+
+  if (! settings.multiMatrix) {
+    if (! settings.solid) program.render = program.wireframe_render;
+    else program.render = program.standard_render;
+  }
+  else {
+    program.render = function(modelViewMatrix, COR) {
+      var mat = mat4.create();
+      for (var i=0; i<this.matrices.length; i++) {
+        mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
+        this.render_internal(mat, COR, i);
+      }
+    };
+    if (! settings.solid) {program.render_internal = program.wireframe_render; program.shader = program.wireframe_shader;}
+    else {program.render_internal = program.standard_render; program.shader = program.standard_shader;}
+  }
+
+  if (settings.has_ID) {
+    if (settings.lines_render) {
+      
+      program.pickingShader = renderer.shaders.linesPicking;
+      program.pickingAttributes = renderer.shaders.linesPicking.attributes;
+      
+      program.renderPicking = function(modelViewMatrix, COR) {
+        if (! this.status) return;
+        this.gl.useProgram(this.pickingShader.program);
+        this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
+        this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+        this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
+      
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+
+        this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
+        this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
+      
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+          var dv = 0, vtd;
+          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.POINTS, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+        }
+        else this.gl.drawElements(this.gl.POINTS, this.nElements, gl.UNSIGNED_INT, 0);
+      };
+    }
+    else {
+      program.pickingShader = renderer.shaders.picking;
+      program.pickingAttributes = renderer.shaders.picking.attributes;
+      
+      program.renderPicking = function(modelViewMatrix, COR) {
+        if (! this.status) return;
+        this.gl.useProgram(this.pickingShader.program);
+        this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
+        this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+        this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
+      
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+
+        this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+        this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+      
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+          var dv = 0, vtd;
+          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+        }
+        else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
+      };
+      
+      
+    }
+  }
+  else program.renderPicking = function() {};
+
+  return program;
+};
+
+// ** creates and registers the programs within the renderer object **
+molmil.geometry.registerPrograms = function(renderer)  {
+  if (! renderer.program1) {
+    renderer.program1 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.programs.push(renderer.program1);
   }
   if (! renderer.program2) {
-    program = renderer.program2 = {};
-    program.status = true;
-    program.gl = gl; program.renderer = renderer;
-    program.angle = renderer.angle;
-    
-    program.shader = renderer.shaders.lines;
-    program.pickingShader = renderer.shaders.linesPicking;
-    program.pickingAttributes = program.pickingShader.attributes;
-    program.attributes = program.shader.attributes;
-        
-    program.render = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-                
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
-      //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
-
-    program.renderPicking = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-
-      this.gl.useProgram(this.pickingShader.program);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
-      
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.POINTS, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.POINTS, this.nElements, gl.UNSIGNED_INT, 0);
-    };
-
-    renderer.programs.push(program);
+    renderer.program2 = this.build_simple_render_program(null, null, renderer, {has_ID: true, lines_render: true});
+    renderer.programs.push(renderer.program2);
   }
   if (! renderer.program3) {
-    program = renderer.program3 = {};
-    program.status = true;
-    program.gl = gl; program.renderer = renderer;
-    program.angle = renderer.angle;
-      
-    program.shader = renderer.shaders.standard_alpha;
-    program.pickingShader = renderer.shaders.picking;
-    program.pickingAttributes = program.pickingShader.attributes;
-    program.attributes = program.shader.attributes;
-        
-    program.render = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-                
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-      //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
-
-    program.renderPicking = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      
-      this.gl.useProgram(this.pickingShader.program);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
-      
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
-
-    renderer.programs.push(program);
+    renderer.program3 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.programs.push(renderer.program3);
   }
   if (! renderer.program4) {
-
-    program = renderer.program4 = {};
-    program.status = true;
-    program.gl = gl; program.renderer = renderer;
-    program.angle = renderer.angle;
-      
-    program.shader = renderer.shaders.standard_alpha;
-    program.pickingShader = renderer.shaders.picking;
-    program.pickingAttributes = program.pickingShader.attributes;
-    program.attributes = program.shader.attributes;
-        
-    program.render = function(modelViewMatrix, COR) {
-      if (! this.status) return;
-      
-      var normalMatrix = mat3.create();
-      mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-                
-      this.gl.useProgram(this.shader.program);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-      this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-      this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-      this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-      this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-
-      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-      //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-      if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-        var dv = 0, vtd;
-        while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-      }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-    };
-
-    program.renderPicking = function(modelViewMatrix, COR) {};
-
-    renderer.programs.push(program);
-  
+    renderer.program4 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.programs.push(renderer.program4);
   }
   
-  vbuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, this.buffer1.vertexBuffer, gl.STATIC_DRAW);
+  renderer.program1.setBuffers(this.buffer1.vertexBuffer, this.buffer1.indexBuffer);
+  renderer.program2.setBuffers(this.buffer2.vertexBuffer, this.buffer2.indexBuffer);
+  renderer.program3.setBuffers(this.buffer3.vertexBuffer, this.buffer3.indexBuffer);
+  renderer.program4.setBuffers(this.buffer4.vertexBuffer, this.buffer4.indexBuffer);
   
-  ibuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.buffer1.indexBuffer, gl.STATIC_DRAW);
+  if (molmil.configBox.liteMode) molmil.geometry.reset();
   
-  renderer.program1.nElements = this.buffer1.indexBuffer.length;
-  renderer.program1.vertexBuffer = vbuffer;
-  renderer.program1.indexBuffer = ibuffer;
-  
-
-  vbuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, this.buffer2.vertexBuffer, gl.STATIC_DRAW);
-  
-  ibuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.buffer2.indexBuffer, gl.STATIC_DRAW);
-  
-  renderer.program2.nElements = this.buffer2.indexBuffer.length;
-  renderer.program2.vertexBuffer = vbuffer;
-  renderer.program2.indexBuffer = ibuffer;
-  
-  vbuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, this.buffer3.vertexBuffer, gl.STATIC_DRAW);
-  
-  ibuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.buffer3.indexBuffer, gl.STATIC_DRAW);
-  
-  renderer.program3.nElements = this.buffer3.indexBuffer.length;
-  renderer.program3.vertexBuffer = vbuffer;
-  renderer.program3.indexBuffer = ibuffer;
-  
-  
-  vbuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, this.buffer4.vertexBuffer, gl.STATIC_DRAW);
-  
-  ibuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.buffer4.indexBuffer, gl.STATIC_DRAW);
-  
-  renderer.program4.nElements = this.buffer4.indexBuffer.length;
-  renderer.program4.vertexBuffer = vbuffer;
-  renderer.program4.indexBuffer = ibuffer;
-
-};
+}
 
 // ** resets all geometry related buffered data **
 
@@ -4135,11 +4012,13 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   var bonds2draw = this.bonds2draw; var lines2draw = this.lines2draw; var bondRef = this.bondRef;
   
   var nor = 0, nob = 0, stat;
-
+  
   for (var c=0; c<chains.length; c++) {
     chain = chains[c]; stat = false;
     if (! chain.display) continue;
     //chain.displayMode = 3; //////////!!!!!!!!!!!!
+    
+    
     
     for (var a=0; a<chain.atoms.length; a++) {
       if (chain.atoms[a].displayMode == 0 || ! chain.atoms[a].status) continue; // don't display
@@ -4200,11 +4079,13 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   
   //detail_lv = 1;
   detail_lv = this.detail_lv = Math.max(detail_lv+detail_or, 0);
+  if (molmil.configBox.liteMode) detail_lv = this.detail_lv = 1;
   
   // use a separate detail lv for atoms in case of < 250 atoms --> higher quality
   
   this.noi = molmil.configBox.QLV_SETTINGS[this.detail_lv].CB_NOI; // number of interpolation points per residue
   this.novpr = molmil.configBox.QLV_SETTINGS[this.detail_lv].CB_NOVPR;
+  if (molmil.configBox.liteMode) this.noi = 1;
   
   
   var buffer1 = this.buffer1, buffer2 = this.buffer2;
@@ -4234,7 +4115,6 @@ molmil.geometry.initCartoon = function(chains) {
   
   var noi = this.noi;
   var novpr = this.novpr;
-
   
   if (this.dome[2] != this.detail_lv) {
     var dome = this.dome = [molmil.buildOctaDome(molmil.configBox.QLV_SETTINGS[this.detail_lv].CB_DOME_TESS_LV, 0), molmil.buildOctaDome(molmil.configBox.QLV_SETTINGS[this.detail_lv].CB_DOME_TESS_LV, 1), this.detail_lv];
@@ -4276,13 +4156,17 @@ molmil.geometry.initCartoon = function(chains) {
   }
   
   for (c=0; c<chains.length; c++) {
+    
     chain = chains[c];
     if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG) continue;
     nowp = 0;
     cartoonChains.push(chain);
+
     for (b=0; b<chain.twoDcache.length; b++) {
       currentBlock = chain.twoDcache[b];
+
       if (chain.displayMode > 2 && currentBlock.sndStruc == 2) { // sheet
+      
         if (! currentBlock.isFirst) { // N-cap
           vs += novpr;
           is += novpr*2;
@@ -4294,6 +4178,29 @@ molmil.geometry.initCartoon = function(chains) {
         nowp += currentBlock.molecules.length*(noi+1);
         if (currentBlock.isLast) nowp -= noi;
       }
+      else if (currentBlock.rocket) { // cylinder
+        if (currentBlock.skip) continue;
+        // for cylinders, there are no molecules, but waypoints instead...
+
+        // something is still going wrong somewhere (maybe the connection points between cylinders and loops???)
+
+        vs += novpr+1 + (currentBlock.waypoints.length*novpr) + novpr+1;
+        is += novpr + (currentBlock.waypoints.length*novpr*2) + novpr;
+
+        if (! currentBlock.isFirst) {
+          vs += novpr*(Math.round(noi*.5)+1);
+          is += novpr*2*(Math.round(noi*.5)+1);
+        }
+        
+        if (! currentBlock.isLast) {
+          vs += novpr; // next loop start
+          vs += novpr*(Math.round(noi*.5)+2);
+          is += novpr*2*(Math.round(noi*.5)+2);
+        }
+        
+        nowp += currentBlock.molecules.length*(noi+1);
+        
+      }
       else { // helix/loop
         if (currentBlock.isFirst) {vs += dome[0].vertices.length; is += dome[0].faces.length-(novpr*2);} // N-term cap
         if (currentBlock.isLast) {vs += dome[0].vertices.length + novpr; is += dome[0].faces.length+(novpr*2);} // C-term cap
@@ -4301,6 +4208,7 @@ molmil.geometry.initCartoon = function(chains) {
         is += currentBlock.molecules.length*novpr*2*(noi+1);
         
         nowp += currentBlock.molecules.length*(noi+1);
+        
         if (currentBlock.isLast) {
           nowp -= noi;
           vs -= novpr*(noi+1);
@@ -4310,7 +4218,7 @@ molmil.geometry.initCartoon = function(chains) {
     }
     nowps.push(nowp);
   }
-
+  
   var buffer3 = this.buffer3;
   buffer3.vertexBuffer = new Float32Array(vs*8); // x, y, z, nx, ny, nz, rgba, aid
   buffer3.vertexBuffer8 = new Uint8Array(buffer3.vertexBuffer.buffer);
@@ -4636,14 +4544,14 @@ molmil.geometry.generateSurfaces = function(chains) {
 
 // ** build cartoon representation **
 molmil.geometry.generateCartoon = function() {
-  var chains = this.cartoonChains, c, b, m, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges;
+  var chains = this.cartoonChains, c, b, b2, m, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges;
   var noi = this.noi;
   var novpr = this.novpr;
   
   var nowp, wp, tmp, rotationMatrix;
   
   // in the future speed this up a bit by using a line[idx]/tangents[idx] instead of .push()
-  
+
   var int_ratio = [];
   for (i=0; i<noi+1; i++) int_ratio.push(i/(noi+1));
   for (c=0; c<chains.length; c++) {
@@ -4655,38 +4563,91 @@ molmil.geometry.generateCartoon = function() {
     for (b=0; b<chain.twoDcache.length; b++) {
       t_ranges.push(line.length);
       currentBlock = chain.twoDcache[b];
-      for (m=0; m<currentBlock.molecules.length-1; m++) {
-        molmil.hermiteInterpolate(currentBlock.xyz[m], currentBlock.xyz[m+1], currentBlock.tangents[m], currentBlock.tangents[m+1], noi, line, tangents);
-        for (i=0; i<noi+1; i++) {
-          rgba[wp] = currentBlock.molecules[m].rgba;
-          aid[wp] = currentBlock.molecules[m].CA.AID;
-          wp++;
+      if (currentBlock.rocket) { // cylinder
+        if (currentBlock.skip) continue;
+        
+        currentBlock.rocketPre = 0;
+        currentBlock.rocketPost = 0;
+        
+        if (! currentBlock.isFirst) {
+          currentBlock.rocketPre = Math.round(noi*.5)+2;
+          molmil.hermiteInterpolate(chain.twoDcache[b-1].xyz[m], currentBlock.waypoints[0], chain.twoDcache[b-1].tangents[m], currentBlock.waypoint_tangents[0], Math.round(noi*.5)+1, line, tangents);
+          for (i=0; i<Math.round(noi*.5)+2; i++) {
+            rgba[wp] = currentBlock.molecules[0].rgba;
+            aid[wp] = 0;
+            wp++;
+          }
         }
-      }
-      if (! currentBlock.isLast) {
-        molmil.hermiteInterpolate(currentBlock.xyz[m], chain.twoDcache[b+1].xyz[0], currentBlock.tangents[m], currentBlock.tangents[m+1], noi, line, tangents);
-        for (i=0; i<noi+1; i++) {
-          rgba[wp] = currentBlock.molecules[m].rgba;
-          aid[wp] = currentBlock.molecules[m].CA.AID;
+        
+        // add waypoints instead of CAs, also no interpolation
+        for (m=0; m<currentBlock.waypoints.length; m++) {
+          rgba[wp] = currentBlock.molecules[0].rgba;
+          aid[wp] = 0;
           wp++;
+          line.push(currentBlock.waypoints[m]);
+          tangents.push(currentBlock.waypoint_tangents[m]);
         }
+        
+        // for some reason this doesn't work properly...
+        if (! currentBlock.isLast) {
+          currentBlock.rocketPost = Math.round(noi*.5)+2;
+          
+          for (b2=b+1; b2<chain.twoDcache.length; b2++) if (! chain.twoDcache[b2].skip) break;
+          
+          tmp = tangents.length;
+          
+          molmil.hermiteInterpolate(currentBlock.waypoints[m-1], chain.twoDcache[b2].xyz[0], currentBlock.waypoint_tangents[m-1], chain.twoDcache[b2].tangents[0], Math.round(noi*.5)+1, line, tangents);
+          
+          vec[0] = tangents[tmp][0]+tangents[tmp+1][0]; vec[1] = tangents[tmp][1]+tangents[tmp+1][1]; vec[2] = tangents[tmp][2]+tangents[tmp+1][2];
+          vec3.normalize(vec, vec);
+          tangents[tmp][0] = vec[0]; tangents[tmp][1] = vec[1]; tangents[tmp][2] = vec[2];
+          
+          
+          for (i=0; i<Math.round(noi*.5)+2; i++) {
+            rgba[wp] = currentBlock.molecules[0].rgba;
+            aid[wp] = 0;
+            wp++;
+          }
+          
+        }
+        
       }
       else {
-        line.push([currentBlock.xyz[m][0], currentBlock.xyz[m][1], currentBlock.xyz[m][2]]);
-        if (tangents.length) tangents.push(tangents[wp-1]);
-        else tangents.push([1, 0, 0]);
-        rgba[wp] = currentBlock.molecules[m].rgba;
-        aid[wp] = currentBlock.molecules[m].CA.AID;
-        wp++;
+        for (m=0; m<currentBlock.molecules.length-1; m++) {
+          molmil.hermiteInterpolate(currentBlock.xyz[m], currentBlock.xyz[m+1], currentBlock.tangents[m], currentBlock.tangents[m+1], noi, line, tangents);
+          for (i=0; i<noi+1; i++) {
+            rgba[wp] = currentBlock.molecules[m].rgba;
+            aid[wp] = currentBlock.molecules[m].CA.AID;
+            wp++;
+          }
+        }
+        if (! currentBlock.isLast) {
+          if (! chain.twoDcache[b+1].rocket) {
+            molmil.hermiteInterpolate(currentBlock.xyz[m], chain.twoDcache[b+1].xyz[0], currentBlock.tangents[m], currentBlock.tangents[m+1], noi, line, tangents);
+            for (i=0; i<noi+1; i++) {
+              rgba[wp] = currentBlock.molecules[m].rgba;
+              aid[wp] = currentBlock.molecules[m].CA.AID;
+              wp++;
+            }
+          }
+        }
+        else {
+          line.push([currentBlock.xyz[m][0], currentBlock.xyz[m][1], currentBlock.xyz[m][2]]);
+          if (tangents.length) tangents.push(tangents[wp-1]);
+          else tangents.push([1, 0, 0]);
+          rgba[wp] = currentBlock.molecules[m].rgba;
+          aid[wp] = currentBlock.molecules[m].CA.AID;
+          wp++;
+        }
       }
     }
     t_ranges.push(line.length);
 
     for (b=0, t=0; b<chain.twoDcache.length; b++) {
       currentBlock = chain.twoDcache[b];
+      
       //if (chain.displayMode > 2 && (currentBlock.sndStruc == 2 || currentBlock.sndStruc == 3) && t > 0) { // the problem is here...
-        if (chain.displayMode > 2 && (currentBlock.sndStruc == 2 || currentBlock.sndStruc == 3)) {
-        
+      if (chain.displayMode > 2 && (currentBlock.sndStruc == 2 || currentBlock.sndStruc == 3) && ! currentBlock.rocket) {
         ref = null;
         if (currentBlock.sndStruc == 2) {
           ref = currentBlock.normals;
@@ -4757,9 +4718,8 @@ molmil.geometry.generateCartoon = function() {
       }
       else { // otherwise --> PTF
         t = normals.length;
-      
+
         rotationMatrix = mat4.create(), identityMatrix = mat4.create();
-    
         if (t == 0) {
           smallest = Number.MAX_VALUE;
           if (tangents[0][0] <= smallest) {smallest = tangents[0][0]; normal = [1, 0, 0];}
@@ -4787,13 +4747,24 @@ molmil.geometry.generateCartoon = function() {
 
     normals.push(normals[normals.length-1]);
     binormals.push(binormals[binormals.length-1]);
-    
+
     t = 0;
+    
     for (b=0; b<chain.twoDcache.length; b++) {
       currentBlock = chain.twoDcache[b];
       if (chain.displayMode > 2) {
         if (currentBlock.sndStruc == 2) {
           t = this.buildSheet(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, currentBlock.isFirst, currentBlock.isLast); // bad
+          continue;
+        }
+        else if (currentBlock.rocket) {
+          if (currentBlock.skip) continue;
+
+          
+          t = this.buildLoop(t_ranges[b], t_ranges[b]+currentBlock.rocketPre+(currentBlock.rocketPre ? 1 : 0), line, tangents, normals, binormals, rgba, aid);
+          t = this.buildRocket(t_ranges[b]+currentBlock.rocketPre, t_ranges[b+1]-currentBlock.rocketPost, line, tangents, normals, binormals, rgba, aid, currentBlock.isLast);
+          t = this.buildLoop(t_ranges[b+1]-currentBlock.rocketPost, t_ranges[b+1], line, tangents, normals, binormals, rgba, aid);
+
           continue;
         }
         else if (currentBlock.sndStruc == 3) { // caps also need to be added...
@@ -4808,11 +4779,14 @@ molmil.geometry.generateCartoon = function() {
           continue;
         }
       }
+
       if (currentBlock.isFirst) {
         this.buildLoopNcap(t_ranges[b], line, tangents, normals, binormals, rgba, aid); t++;
         t_ranges[b] += 1;
       }
+      
       t = this.buildLoop(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid);
+      
       if (currentBlock.isLast) {
         this.buildLoopCcap(t_ranges[b+1]-1, line, tangents, normals, binormals, rgba, aid);
       }
@@ -4967,6 +4941,198 @@ molmil.geometry.buildLoop = function(t, t_next, P, T, N, B, rgba, aid) {
   this.buffer3.iP = iP;
   return t;
 };
+
+
+// note that everything has been optimized for an alpha helix...
+// how does this work for other helices???
+molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast) {
+  var radius = 1.15, i, novpr = this.novpr, go = false;
+  var ringTemplate = this.ringTemplate, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
+  
+  var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP,
+  vBuffer8 = this.buffer3.vertexBuffer8, vP8 = vP*4;
+  var p = vP*.125;
+  var p_pre = p-novpr;
+  
+  var before = vP;
+  
+  // N-terminal cap: flat (1-ring + 1 vertices)
+  
+  Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+
+  vBuffer[vP++] = Px;
+  vBuffer[vP++] = Py;
+  vBuffer[vP++] = Pz;
+
+  vBuffer[vP++] = -Tx;
+  vBuffer[vP++] = -Ty;
+  vBuffer[vP++] = -Tz;
+
+  vBuffer8[vP8+24] = rgba_[0];
+  vBuffer8[vP8+25] = rgba_[1];
+  vBuffer8[vP8+26] = rgba_[2];
+  vBuffer8[vP8+27] = rgba_[3];
+  vP++;
+      
+  vBuffer[vP++] = aid_; // ID
+  vP8 += 32;
+
+  for (i=0; i<ringTemplate.length; i++, vP8+=32) {
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Nx + radius*ringTemplate[i][1] * Bx + Px;
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Ny + radius*ringTemplate[i][1] * By + Py;
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Nz + radius*ringTemplate[i][1] * Bz + Pz;
+      
+    vBuffer[vP++] = -Tx;
+    vBuffer[vP++] = -Ty;
+    vBuffer[vP++] = -Tz;
+
+    vBuffer8[vP8+24] = rgba_[0];
+    vBuffer8[vP8+25] = rgba_[1];
+    vBuffer8[vP8+26] = rgba_[2];
+    vBuffer8[vP8+27] = rgba_[3];
+    vP++;
+      
+    vBuffer[vP++] = aid_; // ID
+  }
+
+  for (i=0; i<ringTemplate.length; i++) {
+    iBuffer[iP++] = p+i+2;
+    iBuffer[iP++] = p+i+1;
+    iBuffer[iP++] = p;
+  }
+  iBuffer[iP-3] = p+1;
+  
+  p += ringTemplate.length+1;
+  p_pre = p-novpr;
+
+  // center region (cylinder)
+  
+  for (t; t<t_next; t++) {
+    Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    for (i=0; i<ringTemplate.length; i++, vP8+=32) {
+      vBuffer[vP++] = radius*ringTemplate[i][0] * Nx + radius*ringTemplate[i][1] * Bx + Px;
+      vBuffer[vP++] = radius*ringTemplate[i][0] * Ny + radius*ringTemplate[i][1] * By + Py;
+      vBuffer[vP++] = radius*ringTemplate[i][0] * Nz + radius*ringTemplate[i][1] * Bz + Pz;
+      
+      vBuffer[vP++] = ringTemplate[i][0] * Nx + ringTemplate[i][1] * Bx;
+      vBuffer[vP++] = ringTemplate[i][0] * Ny + ringTemplate[i][1] * By;
+      vBuffer[vP++] = ringTemplate[i][0] * Nz + ringTemplate[i][1] * Bz;
+
+      vBuffer8[vP8+24] = rgba_[0];
+      vBuffer8[vP8+25] = rgba_[1];
+      vBuffer8[vP8+26] = rgba_[2];
+      vBuffer8[vP8+27] = rgba_[3];
+      vP++;
+      
+      vBuffer[vP++] = aid_; // ID
+    }
+    
+    for (i=0; i<(novpr*2)-2; i+=2, p+=1, p_pre+=1) {
+      iBuffer[iP++] = p+novpr;
+      iBuffer[iP++] = p_pre+novpr;
+      iBuffer[iP++] = p_pre+1+novpr;
+    
+      iBuffer[iP++] = p_pre+1+novpr;
+      iBuffer[iP++] = p+1+novpr;
+      iBuffer[iP++] = p+novpr;
+    }
+    iBuffer[iP++] = p+novpr;
+    iBuffer[iP++] = p_pre+novpr;
+    iBuffer[iP++] = p_pre-(novpr-1)+novpr;
+
+    iBuffer[iP++] = p_pre-(novpr-1)+novpr;
+    iBuffer[iP++] = p-(novpr-1)+novpr;
+    iBuffer[iP++] = p+novpr;
+    
+    p++; p_pre++;
+  }
+
+  for (i=vP-(ringTemplate.length*8); i<vP; i+=8) {
+    vBuffer[i] -= Tx*2;
+    vBuffer[i+1] -= Ty*2;
+    vBuffer[i+2] -= Tz*2;
+  }
+    
+    
+  for (i=0; i<ringTemplate.length; i++, vP8+=32) {
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Nx + radius*ringTemplate[i][1] * Bx + Px - Tx*2;
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Ny + radius*ringTemplate[i][1] * By + Py - Ty*2;
+    vBuffer[vP++] = radius*ringTemplate[i][0] * Nz + radius*ringTemplate[i][1] * Bz + Pz - Tz*2;
+
+    vBuffer[vP++] = ringTemplate[i][0] * Nx + ringTemplate[i][1] * Bx;
+    vBuffer[vP++] = ringTemplate[i][0] * Ny + ringTemplate[i][1] * By;
+    vBuffer[vP++] = ringTemplate[i][0] * Nz + ringTemplate[i][1] * Bz;
+
+    vBuffer8[vP8+24] = rgba_[0];
+    vBuffer8[vP8+25] = rgba_[1];
+    vBuffer8[vP8+26] = rgba_[2];
+    vBuffer8[vP8+27] = rgba_[3];
+    vP++;
+      
+    vBuffer[vP++] = aid_; // ID
+  }
+    
+  
+  // add the same head as for sheets...
+  
+  vBuffer[vP++] = Px;
+  vBuffer[vP++] = Py;
+  vBuffer[vP++] = Pz;
+
+  vBuffer[vP++] = Tx;
+  vBuffer[vP++] = Ty;
+  vBuffer[vP++] = Tz;
+
+  vBuffer8[vP8+24] = rgba_[0];
+  vBuffer8[vP8+25] = rgba_[1];
+  vBuffer8[vP8+26] = rgba_[2];
+  vBuffer8[vP8+27] = rgba_[3];
+  vP++;
+  vP8 += 32;
+  
+  vBuffer[vP++] = aid_; // ID
+  
+  for (i=0; i<ringTemplate.length; i++) {
+    iBuffer[iP++] = p+ringTemplate.length;
+    iBuffer[iP++] = p+i;
+    iBuffer[iP++] = p+i+1;
+  }
+  iBuffer[iP-1] = p;
+  
+  p += ringTemplate.length+1;
+  p_pre = p-novpr;
+    
+    
+  radius = this.radius;
+
+  if (! isLast) {
+    var h = this.radius;
+
+    for (i=0; i<ringTemplate.length; i++, vP8+=32) {
+      vBuffer[vP++] = h*ringTemplate[i][0] * Nx + h*ringTemplate[i][1] * Bx + Px  - Tx*radius*2;
+      vBuffer[vP++] = h*ringTemplate[i][0] * Ny + h*ringTemplate[i][1] * By + Py  - Ty*radius*2;
+      vBuffer[vP++] = h*ringTemplate[i][0] * Nz + h*ringTemplate[i][1] * Bz + Pz  - Tz*radius*2;
+      
+      vBuffer[vP++] = ringTemplate[i][0] * Nx + ringTemplate[i][1] * Bx;
+      vBuffer[vP++] = ringTemplate[i][0] * Ny + ringTemplate[i][1] * By;
+      vBuffer[vP++] = ringTemplate[i][0] * Nz + ringTemplate[i][1] * Bz;
+
+      vBuffer8[vP8+24] = rgba_[0];
+      vBuffer8[vP8+25] = rgba_[1];
+      vBuffer8[vP8+26] = rgba_[2];
+      vBuffer8[vP8+27] = rgba_[3];
+      vP++;
+      
+      vBuffer[vP++] = aid_; // ID
+    }
+  }
+  
+  
+  this.buffer3.vP = vP;
+  this.buffer3.iP = iP;
+  return t;
+
+}
 
 // ** build helix representation **
 molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentBlock) {
@@ -5360,6 +5526,257 @@ molmil.priestle_smoothing = function(points, from, to, skip, steps) {
   }
 };
 
+// numeric.js-1.2.6 extract
+
+var numeric = (typeof exports === "undefined")?(function numeric() {}):(exports);
+if(typeof global !== "undefined") { global.numeric = numeric; }
+
+numeric.version = "1.2.6";
+
+numeric.dotMMsmall = function(x,y) {
+    var i,j,k,p,q,r,ret,foo,bar,woo,i0,k0,p0,r0;
+    p = x.length; q = y.length; r = y[0].length;
+    ret = Array(p);
+    for(i=p-1;i>=0;i--) {
+        foo = Array(r);
+        bar = x[i];
+        for(k=r-1;k>=0;k--) {
+            woo = bar[q-1]*y[q-1][k];
+            for(j=q-2;j>=1;j-=2) {
+                i0 = j-1;
+                woo += bar[j]*y[j][k] + bar[i0]*y[i0][k];
+            }
+            if(j===0) { woo += bar[0]*y[0][k]; }
+            foo[k] = woo;
+        }
+        ret[i] = foo;
+    }
+    return ret;
+}
+numeric._getCol = function(A,j,x) {
+    var n = A.length, i;
+    for(i=n-1;i>0;--i) {
+        x[i] = A[i][j];
+        --i;
+        x[i] = A[i][j];
+    }
+    if(i===0) x[0] = A[0][j];
+}
+numeric.dotMMbig = function(x,y){
+    var gc = numeric._getCol, p = y.length, v = Array(p);
+    var m = x.length, n = y[0].length, A = new Array(m), xj;
+    var VV = numeric.dotVV;
+    var i,j,k,z;
+    --p;
+    --m;
+    for(i=m;i!==-1;--i) A[i] = Array(n);
+    --n;
+    for(i=n;i!==-1;--i) {
+        gc(y,i,v);
+        for(j=m;j!==-1;--j) {
+            z=0;
+            xj = x[j];
+            A[j][i] = VV(xj,v);
+        }
+    }
+    return A;
+}
+
+numeric.dotMV = function(x,y) {
+    var p = x.length, q = y.length,i;
+    var ret = Array(p), dotVV = numeric.dotVV;
+    for(i=p-1;i>=0;i--) { ret[i] = dotVV(x[i],y); }
+    return ret;
+}
+
+numeric.dotVM = function(x,y) {
+    var i,j,k,p,q,r,ret,foo,bar,woo,i0,k0,p0,r0,s1,s2,s3,baz,accum;
+    p = x.length; q = y[0].length;
+    ret = Array(q);
+    for(k=q-1;k>=0;k--) {
+        woo = x[p-1]*y[p-1][k];
+        for(j=p-2;j>=1;j-=2) {
+            i0 = j-1;
+            woo += x[j]*y[j][k] + x[i0]*y[i0][k];
+        }
+        if(j===0) { woo += x[0]*y[0][k]; }
+        ret[k] = woo;
+    }
+    return ret;
+}
+
+numeric.dotVV = function(x,y) {
+    var i,n=x.length,i1,ret = x[n-1]*y[n-1];
+    for(i=n-2;i>=1;i-=2) {
+        i1 = i-1;
+        ret += x[i]*y[i] + x[i1]*y[i1];
+    }
+    if(i===0) { ret += x[0]*y[0]; }
+    return ret;
+}
+
+numeric.dot = function(x,y) {
+    var d = numeric.dim;
+    switch(d(x).length*1000+d(y).length) {
+    case 2002:
+        if(y.length < 10) return numeric.dotMMsmall(x,y);
+        else return numeric.dotMMbig(x,y);
+    case 2001: return numeric.dotMV(x,y);
+    case 1002: return numeric.dotVM(x,y);
+    case 1001: return numeric.dotVV(x,y);
+    case 1000: return numeric.mulVS(x,y);
+    case 1: return numeric.mulSV(x,y);
+    case 0: return x*y;
+    default: throw new Error('numeric.dot only works on vectors and matrices');
+    }
+}
+
+numeric.dim = function(x) {
+    var y,z;
+    if(typeof x === "object") {
+        y = x[0];
+        if(typeof y === "object") {
+            z = y[0];
+            if(typeof z === "object") {
+                return numeric._dim(x);
+            }
+            return [x.length,y.length];
+        }
+        return [x.length];
+    }
+    return [];
+}
+
+numeric.transpose = function(x) {
+    var i,j,m = x.length,n = x[0].length, ret=Array(n),A0,A1,Bj;
+    for(j=0;j<n;j++) ret[j] = Array(m);
+    for(i=m-1;i>=1;i-=2) {
+        A1 = x[i];
+        A0 = x[i-1];
+        for(j=n-1;j>=1;--j) {
+            Bj = ret[j]; Bj[i] = A1[j]; Bj[i-1] = A0[j];
+            --j;
+            Bj = ret[j]; Bj[i] = A1[j]; Bj[i-1] = A0[j];
+        }
+        if(j===0) {
+            Bj = ret[0]; Bj[i] = A1[0]; Bj[i-1] = A0[0];
+        }
+    }
+    if(i===0) {
+        A0 = x[0];
+        for(j=n-1;j>=1;--j) {
+            ret[j][0] = A0[j];
+            --j;
+            ret[j][0] = A0[j];
+        }
+        if(j===0) { ret[0][0] = A0[0]; }
+    }
+    return ret;
+}
+numeric.inv = function(x) {
+    var s = numeric.dim(x), abs = Math.abs, m = s[0], n = s[1];
+    var A = numeric.clone(x), Ai, Aj;
+    var I = numeric.identity(m), Ii, Ij;
+    var i,j,k,x;
+    for(j=0;j<n;++j) {
+        var i0 = -1;
+        var v0 = -1;
+        for(i=j;i!==m;++i) { k = abs(A[i][j]); if(k>v0) { i0 = i; v0 = k; } }
+        Aj = A[i0]; A[i0] = A[j]; A[j] = Aj;
+        Ij = I[i0]; I[i0] = I[j]; I[j] = Ij;
+        x = Aj[j];
+        for(k=j;k!==n;++k)    Aj[k] /= x; 
+        for(k=n-1;k!==-1;--k) Ij[k] /= x;
+        for(i=m-1;i!==-1;--i) {
+            if(i!==j) {
+                Ai = A[i];
+                Ii = I[i];
+                x = Ai[j];
+                for(k=j+1;k!==n;++k)  Ai[k] -= Aj[k]*x;
+                for(k=n-1;k>0;--k) { Ii[k] -= Ij[k]*x; --k; Ii[k] -= Ij[k]*x; }
+                if(k===0) Ii[0] -= Ij[0]*x;
+            }
+        }
+    }
+    return I;
+}
+numeric.sclone = numeric.clone = function(A,k,n) {
+    if(typeof k === "undefined") { k=0; }
+    if(typeof n === "undefined") { n = numeric.dim(A).length; }
+    var i,ret = Array(A.length);
+    if(k === n-1) {
+        for(i in A) { if(A.hasOwnProperty(i)) ret[i] = A[i]; }
+        return ret;
+    }
+    for(i in A) {
+        if(A.hasOwnProperty(i)) ret[i] = numeric.clone(A[i],k+1,n);
+    }
+    return ret;
+}
+
+numeric.identity = function(n) { return numeric.diag(numeric.rep([n],1)); }
+
+numeric.diag = function(d) {
+    var i,i1,j,n = d.length, A = Array(n), Ai;
+    for(i=n-1;i>=0;i--) {
+        Ai = Array(n);
+        i1 = i+2;
+        for(j=n-1;j>=i1;j-=2) {
+            Ai[j] = 0;
+            Ai[j-1] = 0;
+        }
+        if(j>i) { Ai[j] = 0; }
+        Ai[i] = d[i];
+        for(j=i-1;j>=1;j-=2) {
+            Ai[j] = 0;
+            Ai[j-1] = 0;
+        }
+        if(j===0) { Ai[0] = 0; }
+        A[i] = Ai;
+    }
+    return A;
+}
+
+numeric.rep = function(s,v,k) {
+    if(typeof k === "undefined") { k=0; }
+    var n = s[k], ret = Array(n), i;
+    if(k === s.length-1) {
+        for(i=n-2;i>=0;i-=2) { ret[i+1] = v; ret[i] = v; }
+        if(i===-1) { ret[0] = v; }
+        return ret;
+    }
+    for(i=n-1;i>=0;i--) { ret[i] = numeric.rep(s,v,k+1); }
+    return ret;
+}
+
+// end numeric.js extract
+
+molmil.polynomialFit = function(x, y, order) {
+  var xMatrix = [], xTemp, i, j;
+  var yMatrix = numeric.transpose([y]);
+  
+  for (j=0; j<x.length; j++) {
+    xTemp = [1];
+    for (i=1; i<=order; i++) xTemp.push(xTemp[i-1]*x[j]);
+    xMatrix.push(xTemp);
+  }
+  var xMatrixT = numeric.transpose(xMatrix);
+  var dot1 = numeric.dot(xMatrixT,xMatrix);
+  var dotInv = numeric.inv(dot1);
+  var dot2 = numeric.dot(xMatrixT,yMatrix);
+  var solution = numeric.dot(dotInv,dot2);
+  
+  var out = [];
+  for (i=0; i<solution.length; i++) out.push(solution[i][0]);
+  
+  return out;
+}
+
+molmil.polynomialCalc = function(x, polynomial) {
+  var i, y = polynomial[0];
+  for (i=1; i<polynomial.length; i++) y += polynomial[i]*Math.pow(x, i);
+  return y;
+}
 
 // ** prepare for secondary structure element representation; transport frame calculation **
 molmil.prepare2DRepr = function (chain, mdl) {
@@ -5383,18 +5800,89 @@ molmil.prepare2DRepr = function (chain, mdl) {
   }
   nor = temp.length;
 
-//  console.log(chain.twoDcache);
   
+  
+
   for (b=0, n=0; b<twoDcache.length; b++) {
     currentBlock = twoDcache[b];
+    
     if (currentBlock.molecules[0].xna) currentBlock.sndStruc = molmil.displayMode_XNA;
     currentBlock.isFirst = currentBlock.molecules[0].previous == null;
     currentBlock.isLast = currentBlock.molecules[currentBlock.molecules.length-1].next == null || 
                           currentBlock.molecules[currentBlock.molecules.length-1].next.name == "NME" ||
                           ! currentBlock.molecules[currentBlock.molecules.length-1].next.CA;
+
+    if (currentBlock.sndStruc == 3) { // helix or turn...
+      if (currentBlock.molecules.length > 2) {
+        
+        currentBlock.waypoints = []; currentBlock.waypoint_tangents = [];
+        
+        var base = [], x = [], y = [], z = [], deg = Math.floor(currentBlock.molecules.length / 8);
+        if (deg > 5) deg = 5;
+        else if (deg < 1) deg = 1;
+
+        if (! currentBlock.isFirst) {
+          base.push(-(Math.sqrt(Math.pow(temp[n-1][0]-temp[n][0], 2)+Math.pow(temp[n-1][1]-temp[n][1], 2)+Math.pow(temp[n-1][2]-temp[n][2], 2))));
+          x.push(temp[n-1][0]); y.push(temp[n-1][1]); z.push(temp[n-1][2]);
+        }
+      
+        
+        for (m0=0; m0<currentBlock.molecules.length; m0++) {
+          if (currentBlock.molecules[m0].displayMode == 31) currentBlock.rocket = true;
+          if (m0 > 0) base.push(base[base.length-1]+Math.sqrt(Math.pow(temp[n+m0][0]-temp[n+m0-1][0], 2)+Math.pow(temp[n+m0][1]-temp[n+m0-1][1], 2)+Math.pow(temp[n+m0][2]-temp[n+m0-1][2], 2)));
+          else base.push(0.0);
+
+          x.push(temp[n+m0][0]); y.push(temp[n+m0][1]); z.push(temp[n+m0][2]);
+        }
+      
+        if (! currentBlock.isLast) {
+          base.push(base[m0-1]+Math.sqrt(Math.pow(temp[n+m0-1][0]-temp[n+m0][0], 2)+Math.pow(temp[n+m0-1][1]-temp[n+m0][1], 2)+Math.pow(temp[n+m0-1][2]-temp[n+m0][2], 2)));
+          x.push(temp[n+m0][0]); y.push(temp[n+m0][1]); z.push(temp[n+m0][2]);
+        }
+      
+        x = molmil.polynomialFit(base, x, deg);
+        y = molmil.polynomialFit(base, y, deg);
+        z = molmil.polynomialFit(base, z, deg);
+
+        var nop = Math.round(currentBlock.molecules.length/2); if (nop < 2) nop = 2;
+        if (molmil.configBox.liteMode) nop = 2;
+        var sl = (base[base.length-1]-6.0)/(nop-1), tl = 3.0;
+        
+        for (m0=0; m0<nop; m0++) {
+          currentBlock.waypoints.push([molmil.polynomialCalc(tl, x), molmil.polynomialCalc(tl, y), molmil.polynomialCalc(tl, z)]);
+          tl += sl;
+        }
+
+        currentBlock.waypoint_tangents.push([currentBlock.waypoints[1][0]-currentBlock.waypoints[0][0], currentBlock.waypoints[1][1]-currentBlock.waypoints[0][1], currentBlock.waypoints[1][2]-currentBlock.waypoints[0][2]]);
+        for (m0=1; m0<currentBlock.waypoints.length-1; m0++) currentBlock.waypoint_tangents.push([currentBlock.waypoints[m0+1][0]-currentBlock.waypoints[m0-1][0], currentBlock.waypoints[m0+1][1]-currentBlock.waypoints[m0-1][1], currentBlock.waypoints[m0+1][2]-currentBlock.waypoints[m0-1][2]]);
+        m0 = currentBlock.waypoints.length-1;
+        currentBlock.waypoint_tangents.push([currentBlock.waypoints[m0][0]-currentBlock.waypoints[m0-1][0], currentBlock.waypoints[m0][1]-currentBlock.waypoints[m0-1][1], currentBlock.waypoints[m0][2]-currentBlock.waypoints[m0-1][2]]);
+        
+        for (m0=0; m0<currentBlock.waypoint_tangents.length; m0++) vec3.normalize(currentBlock.waypoint_tangents[m0], currentBlock.waypoint_tangents[m0]);
+
+        if (vec3.distance(currentBlock.waypoints[0], currentBlock.waypoints[currentBlock.waypoints.length-1]) < 2) {
+          currentBlock.rocket = false;
+          currentBlock.sndStruc = 1;
+        }
+        
+        if (currentBlock.rocket) {
+          temp[n] = currentBlock.waypoints[0];
+          temp[n+currentBlock.molecules.length-1] = currentBlock.waypoints[currentBlock.waypoints.length-1];
+        }
+      }
+      else currentBlock.sndStruc = 1;
+    }
+    n += currentBlock.molecules.length;
+  }
+  
+  
+  
+  for (b=0, n=0; b<twoDcache.length; b++) {
+    currentBlock = twoDcache[b];
+    
     //console.log(currentBlock.molecules[currentBlock.molecules.length-1]);
     if (currentBlock.molecules.length < 3) currentBlock.sndStruc = 1;
-    if (currentBlock.sndStruc != 3 && currentBlock.sndStruc != 4 && currentBlock.sndStruc != molmil.displayMode_XNA) { // helix or turn...
+    if (currentBlock.sndStruc != 3 && currentBlock.sndStruc != 4 && currentBlock.sndStruc != molmil.displayMode_XNA) { // not helix or turn...
       if (currentBlock.sndStruc == 2) { // sheet
         currentBlock.normals = [[]], BN = null;
         for (m=1; m<currentBlock.molecules.length-1; m++) {
@@ -5455,11 +5943,13 @@ molmil.prepare2DRepr = function (chain, mdl) {
   
   for (b=0, n=0; b<twoDcache.length; b++) {
     currentBlock = twoDcache[b];
+    
     currentBlock.tangents = new Array(currentBlock.molecules.length+1);
     for (m=0; m<currentBlock.molecules.length+1; m++) currentBlock.tangents[m] = [0, 0, 0];
     if ((currentBlock.sndStruc == 3 || currentBlock.sndStruc == 4) && currentBlock.molecules.length < 3) currentBlock.sndStruc = 1;
     if (currentBlock.molecules[0].xna) hf = dhf;
     else hf = hhf;
+    
     if (currentBlock.sndStruc == molmil.displayMode_XNA) { //???
       //currentBlock.binormals = new Array(currentBlock.molecules.length+1);
       m = 0;
@@ -5500,7 +5990,7 @@ molmil.prepare2DRepr = function (chain, mdl) {
       vec3.normalize(vec1, vec1);
       currentBlock.tangents[0] = [vec1[0]*hf, vec1[1]*hf, vec1[2]*hf];
       BN = currentBlock.molecules.length-(b == twoDcache.length-1);
-
+      
       for (m=1; m<BN; m++) {
         m1 = temp[m+n-1]; m2 = temp[m+n]; m3 = temp[m+n+1];
         currentBlock.tangents[m][0] = m3[0]-m1[0]; currentBlock.tangents[m][1] = m3[1]-m1[1]; currentBlock.tangents[m][2] = m3[2]-m1[2];
@@ -5567,14 +6057,13 @@ molmil.prepare2DRepr = function (chain, mdl) {
     n += currentBlock.molecules.length;
   }
   
-  // 339
-  
-  
-  
   var nextBlock;
   for (b=0; b<twoDcache.length; b++) {
     currentBlock = twoDcache[b];
-    if (currentBlock.sndStruc == 3) { // helix...
+    
+    //console.log(b, currentBlock.molecules.length);
+    
+    if (currentBlock.sndStruc == 3 && ! currentBlock.rocket) { // helix...
       //BN = currentBlock.molecules.length-(b == twoDcache.length-1)-1;
       BN = currentBlock.molecules.length-(b == twoDcache.length-1 ? 1 : 0);
       for (m=1; m<BN; m++) {
@@ -5593,11 +6082,17 @@ molmil.prepare2DRepr = function (chain, mdl) {
           nextBlock.binormals = currentBlock.binormals.slice(m);
           nextBlock.xyz = currentBlock.xyz.slice(m);
           
-          
           currentBlock.molecules = currentBlock.molecules.splice(0, m);
           currentBlock.tangents = currentBlock.tangents.splice(0, m+1);
           currentBlock.binormals = currentBlock.binormals.splice(0, m+1);
           currentBlock.xyz = currentBlock.xyz.splice(0, m);
+          
+          if (currentBlock.rocket) {
+            nextBlock.rocket = nextBlock.skip = true;
+            nextBlock.waypoints = currentBlock.waypoints;
+            nextBlock.waypoint_tangents = currentBlock.waypoint_tangents;
+          }
+          
           if (currentBlock.molecules.length == 1) currentBlock.invertedBinormals = ! currentBlock.invertedBinormals;
           
           twoDcache.splice(b+1, 0, nextBlock);
@@ -5672,7 +6167,9 @@ molmil.render.prototype.reloadSettings=function() {
     localStorage.setItem("molmil.settings_QLV", this.QLV)
   }
   else this.QLV = parseInt(this.QLV);
+  if (molmil.configBox.liteMode) this.QLV = 1;
   if (this.gl) this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR);
+  this.settings = {};
 };
 
 molmil.render.prototype.selectDefaultContext=function() {
@@ -5714,8 +6211,10 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR);
   this.gl.enable(this.gl.DEPTH_TEST);
   
-  this.gl.enable(this.gl.CULL_FACE);
-  this.gl.cullFace(this.gl.BACK);
+  if (molmil.configBox.cullFace) {
+    this.gl.enable(this.gl.CULL_FACE);
+    this.gl.cullFace(this.gl.BACK);
+  }
   
   this.canvas = canvas;
   
@@ -5734,41 +6233,89 @@ molmil.render.prototype.initRenderer = function() { // use this to initalize the
 };
 
 // ** initiates the shaders **
+
+molmil.shaderEngine = {code: {}};
+
+molmil.shaderEngine.recompile = function(renderer) {
+  var global_defines = ""
+  if (molmil.configBox.glsl_fog) global_defines += "#define ENABLE_FOG 1\n";
+  if (renderer.settings.slab) global_defines += "#define ENABLE_SLAB 1\n"
+  
+  
+  for (var s in renderer.shaders) renderer.shaders[s].compile(global_defines);
+}
+
 molmil.render.prototype.initShaders = function(programs) {
-  this.shaders = {}; var name, fragmentShader, vertexShader, e, ploc, psettings;
+  var renderer = this;
+  
+  var name, fragmentShader, vertexShader, e, ploc, programs = molmil.configBox.glsl_shaders;
   for (var p=0; p<programs.length; p++) {
     ploc = programs[p][0];
     name = programs[p][1] || ploc.replace(/\\/g,'/').replace( /.*\//, '' ).split(".")[0];
-    psettings = programs[p][2] || "";
-    this.shaders[name] = molmil.loadShader(molmil.settings.src+ploc, psettings);
-    this.shaders[name].program = this.gl.createProgram();
-    vertexShader = molmil.setupShader(this.gl, name+"_v", this.shaders[name].program, this.shaders[name].vertexShader, this.gl.VERTEX_SHADER);
-    fragmentShader = molmil.setupShader(this.gl, name+"_f", this.shaders[name].program, this.shaders[name].fragmentShader, this.gl.FRAGMENT_SHADER);
-    this.gl.linkProgram(this.shaders[name].program);
-    if (! this.gl.getProgramParameter(this.shaders[name].program, this.gl.LINK_STATUS)) {console.log("Could not initialise shaders for "+name);}
-    this.gl.useProgram(this.shaders[name].program);
-    for (e in this.shaders[name].attributes) {
-      this.shaders[name].attributes[e] = this.gl.getAttribLocation(this.shaders[name].program, e);
-      if (this.shaders[name].attributes[e] != -1) this.gl.enableVertexAttribArray(this.shaders[name].attributes[e]);
+    
+    if (! molmil.shaderEngine.code.hasOwnProperty(molmil.settings.src+ploc)) {
+      var request = new molmil_dep.CallRemote("GET"); request.ASYNC = false;
+      request.Send(molmil.settings.src+ploc);
+      molmil.shaderEngine.code[molmil.settings.src+ploc] = request.request.responseText;
     }
-    for (e in this.shaders[name].uniforms) {this.shaders[name].uniforms[e] = this.gl.getUniformLocation(this.shaders[name].program, e);}
   }
-  this.gl.useProgram(null);
+  
+
+  var name, fragmentShader, vertexShader, e, ploc, defines, programs = molmil.configBox.glsl_shaders, program;
+  for (var p=0; p<programs.length; p++) {
+    ploc = programs[p][0];
+    name = programs[p][1] || ploc.replace(/\\/g,'/').replace( /.*\//, '' ).split(".")[0];
+    
+    source = molmil.shaderEngine.code[molmil.settings.src+ploc].split("//#");
+    program = JSON.parse(source[0]);
+    program.name = name;
+    program.vertexShader = source[1].substr(7);
+    program.fragmentShader = source[2].substr(9);
+      
+    program.defines = programs[p][2] || "";
+    program.compile = function(global_defines) {
+      this.program = renderer.gl.createProgram();
+      molmil.setupShader(renderer.gl, this.name+"_v", this.program, global_defines+this.defines+this.vertexShader, renderer.gl.VERTEX_SHADER);
+      molmil.setupShader(renderer.gl, this.name+"_f", this.program, global_defines+this.defines+this.fragmentShader, renderer.gl.FRAGMENT_SHADER);
+      renderer.gl.linkProgram(this.program);
+      if (! renderer.gl.getProgramParameter(this.program, renderer.gl.LINK_STATUS)) {console.log("Could not initialise shaders for "+this.name);}
+      renderer.gl.useProgram(this.program);
+      for (e in this.attributes) {
+        this.attributes[e] = renderer.gl.getAttribLocation(this.program, e);
+        if (this.attributes[e] != -1) renderer.gl.enableVertexAttribArray(this.attributes[e]);
+      }
+      for (e in this.uniforms) {this.uniforms[e] = renderer.gl.getUniformLocation(this.program, e);}
+    };
+    renderer.shaders[name] = program;
+  }
+    
+  molmil.shaderEngine.recompile(renderer);
 }
+
+// ** initializes a shader **
+molmil.setupShader = function (gl, name, program, src, type) {
+  //var defines = "";
+  //if (document.BrowserType.MSIE) defines += "# define MSIE";
+  //src = defines+"\n"+src;
+  var shader = gl.createShader(type);
+  gl.shaderSource(shader, src);
+  gl.compileShader(shader);
+  if (! gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {console.log(name+":\n"+gl.getShaderInfoLog(shader)); return null;}
+  gl.attachShader(program, shader);
+  return shader;
+}
+
 
 // ** updates the atom selection **
 molmil.render.prototype.updateSelection = function() {
-  var selectionData = new Float32Array(this.soup.atomSelection.length*8*6), rgb;  
+  var selectionData = new Float32Array(this.soup.atomSelection.length*8*6), rgb = [255, 255, 0];  
   
   var r;
   
   for (var i=0, p=0, j; i<this.soup.atomSelection.length; i++) {
-    r = molmil_dep.getKeyFromObject(molmil.configBox.vdwR, this.soup.atomSelection[i].element, molmil.configBox.vdwR.DUMMY)*1.5;
-  
-    if (i == 0) rgb = [1, 0, 0];
-    else if (i == 1) rgb = [0, 1, 0];
-    else if (i == 2) rgb = [0, 0, 1];
-    else rgb = [.8, .8, .8];
+    if (this.soup.atomSelection[i].displayMode == 1) r = molmil_dep.getKeyFromObject(molmil.configBox.vdwR, this.soup.atomSelection[i].element, molmil.configBox.vdwR.DUMMY)*1.1;
+    else r = 0.5;
+    
     for (j=0; j<6; j++) {
       selectionData[p++] = this.soup.atomSelection[i].chain.modelsXYZ[this.modelId][this.soup.atomSelection[i].xyz];
       selectionData[p++] = this.soup.atomSelection[i].chain.modelsXYZ[this.modelId][this.soup.atomSelection[i].xyz+1];
@@ -5815,6 +6362,7 @@ molmil.render.prototype.selectFrame = function(i, detail_or) {
 
 molmil.render.prototype.initBuffers = function() {
   molmil.geometry.generate(this.soup.structures, this);
+  this.updateSelection();
   this.initBD = true;
 };
 
@@ -5936,12 +6484,12 @@ molmil.render.prototype.renderAtomSelection = function(modelViewMatrix, COR) {
   this.gl.vertexAttribPointer(this.shaders.atomSelection.attributes.in_Colour, 3, this.gl.FLOAT, false, 32, 12);
   this.gl.vertexAttribPointer(this.shaders.atomSelection.attributes.in_ScreenSpaceOffset, 2, this.gl.FLOAT, false, 32, 24);
   
-  this.gl.enable(this.gl.BLEND); this.gl.disable(this.gl.CULL_FACE);
-  this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+  this.gl.enable(this.gl.BLEND); if (molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
+  this.gl.blendEquation(this.gl.FUNC_ADD); this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
   
   this.gl.drawArrays(this.gl.TRIANGLES, 0, this.buffers.atomSelectionBuffer.items);
   
-  this.gl.enable(this.gl.CULL_FACE); this.gl.disable(this.gl.BLEND);
+  if (molmil.configBox.cullFace) {this.gl.enable(this.gl.CULL_FACE);} this.gl.disable(this.gl.BLEND);
 };
 
 // fbo
@@ -6136,7 +6684,6 @@ molmil.handle_molmilViewer_mouseMove = function (event) {
     activeCanvas.renderer.TransZ = (event.clientY-molmil.Zcoord);
     molmil.Zcoord = event.clientY;
   }
-  
   if (event.ctrlKey != activeCanvas.atomCORset) {
     if (event.ctrlKey) activeCanvas.molmilViewer.setCOR();
     else activeCanvas.molmilViewer.resetCOR();
@@ -6633,6 +7180,7 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
       addEntry("Ca trace", function() {this.UI.displayEntry(entry, 6);});
       addEntry("Tube", function() {this.UI.displayEntry(entry, 7);});
       addEntry("Cartoon", function() {this.UI.displayEntry(entry, 8);});
+      addEntry("Rocket", function() {this.UI.displayEntry(entry, 8.5);});
       addEntry("CG Surface", function() {this.UI.displayEntry(entry, molmil.displayMode_ChainSurfaceCG);});
     }
   }
@@ -7087,7 +7635,8 @@ molmil.UI.prototype.settings=function() {
     molmil.initSettings();
     this.UI.soup.reloadSettings();
     molmil.configBox.projectionMode = this.projectionMode.value; this.UI.soup.renderer.resizeViewPort();
-    this.UI.soup.renderer.initShaders(molmil.configBox.glsl_shaders);
+    molmil.shaderEngine.recompile(this.UI.soup.renderer);
+    //this.UI.soup.renderer.initShaders(molmil.configBox.glsl_shaders);
     
     // re-render
     this.UI.soup.renderer.initBuffers();
@@ -7789,6 +8338,18 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
         }
       }
     }
+    else if (dm == molmil.displayMode_CartoonRocket) {
+      for (c=0; c<obj.chains.length; c++) {
+        chain = obj.chains[c];
+        chain.displayMode = 3;
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          if (! mol.ligand && ! mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
+          mol.displayMode = 31;
+          mol.showSC = false;
+        }
+      }
+    }
     else if (dm == molmil.displayMode_ChainSurfaceCG) {
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
@@ -7937,6 +8498,14 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
         mol.showSC = false;
       }
     }
+    else if (dm == molmil.displayMode_Cartoon) {
+      for (m=0; m<obj.molecules.length; m++) {
+        mol = obj.molecules[m];
+        if (! mol.ligand && ! mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
+        mol.displayMode = 31;
+        mol.showSC = false;
+      }
+    }
     else if (dm == molmil.displayMode_ChainSurfaceCG) {
       obj.displayMode = molmil.displayMode_ChainSurfaceCG;
     }
@@ -8025,6 +8594,11 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
     else if (dm == molmil.displayMode_Cartoon) {
       if (! obj.ligand && ! obj.water) {for (a=0; a<obj.atoms.length; a++) obj.atoms[a].displayMode = 0;}
       obj.displayMode = 3;
+      obj.showSC = false;
+    }
+    else if (dm == molmil.displayMode_Cartoon) {
+      if (! obj.ligand && ! obj.water) {for (a=0; a<obj.atoms.length; a++) obj.atoms[a].displayMode = 0;}
+      obj.displayMode = 31;
       obj.showSC = false;
     }
   }
@@ -8358,36 +8932,6 @@ molmil.unproject = function (dx, dy, cz, mat) {
   return [n[0]*n[3],n[1]*n[3],n[2]*n[3]];
 }
 
-// ** downloads shader **
-molmil.loadShader = function (src, defines) {
-  var request = new molmil_dep.CallRemote("GET");
-  //request.Send(src+"?t="+(new Date()).getTime());
-  request.Send(src);
-  var source = request.request.responseText.split("//#");
-  var jso = JSON.parse(source[0]);
-  jso.vertexShader = source[1].substr(7);
-  jso.fragmentShader = source[2].substr(9);
-  
-  if (! defines) defines = "";
-  if (molmil.configBox.glsl_fog) defines += "#define ENABLE_FOG 1\n";
-  jso.vertexShader = defines + jso.vertexShader;
-  jso.fragmentShader = defines + jso.fragmentShader;
-  return jso;
-}
-
-// ** initializes a shader **
-molmil.setupShader = function (gl, name, program, src, type) {
-  //var defines = "";
-  //if (document.BrowserType.MSIE) defines += "# define MSIE";
-  //src = defines+"\n"+src;
-  var shader = gl.createShader(type);
-  gl.shaderSource(shader, src);
-  gl.compileShader(shader);
-  if (! gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {console.log(name+":\n"+gl.getShaderInfoLog(shader)); return null;}
-  gl.attachShader(program, shader);
-  return shader;
-}
-
 // ** hermite interpolation for geometry **
 molmil.hermiteInterpolate = function (a1, a2, T1, T2, nop, line, tangents, post2) {
   "use strict";
@@ -8569,6 +9113,7 @@ molmil.createViewer = function (target, width, height, soupObject, noUI) {
 
 molmil.selectQLV = function (renderer, QLV, rebuildGeometry) {
   QLV = Math.min(Math.max(QLV, 0), molmil.configBox.QLV_SETTINGS.length-1);
+  if (molmil.configBox.liteMode) QLV = 1;
   renderer.QLV = QLV;
   if (rebuildGeometry) {
     renderer.initBuffers();
@@ -8606,6 +9151,65 @@ molmil.loadFile = function(loc, format, cb, async, soup) {
     molmil.colorEntry(struc, 1, null, true, soup);
   }, {async: async ? true : false});
 };
+
+molmil.loadPDBlite = function(pdbid, cb, async, soup) {
+  molmil.configBox.liteMode = true;
+  
+  soup = soup || molmil.cli_soup;
+  
+  var requestA = new molmil_dep.CallRemote("GET"), async = true; requestA.ASYNC = async;
+  requestA.OnDone = function() {this.atom_data = JSON.parse(this.request.responseText);}
+  requestA.OnError = function() {
+    this.error = true;
+    soup = soup || molmil.cli_soup;
+    soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid), 1, cb || function(target, struc) {
+      delete target.pdbxData;
+      molmil.displayEntry(struc, molmil.displayMode_Default);
+      molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
+      molmil.colorEntry(struc, 1, null, true, soup);
+    }, {async: async ? true : false});
+    
+    
+  };
+  requestA.Send(molmil.settings.pdb_url.replace("format=mmjson-all", "format=mmjson-lite").replace("__ID__", pdbid));
+  var requestB = new molmil_dep.CallRemote("GET"), async = true; requestB.ASYNC = async; requestB.target = this; requestB.requestA = requestA; 
+  requestB.OnDone = function() {
+    if (this.requestA.error) return;
+    if (! this.requestA.atom_data) return molmil_dep.asyncStart(this.OnDone, [], this, 100);
+    var jso = JSON.parse(this.request.responseText);
+    jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"]
+    soup.loadStructureData(jso, "mmjson", pdbid+".json", cb || function(target, struc) { // later switch this to use the new lite mmjson files...
+      delete target.pdbxData;
+      molmil.displayEntry(struc, molmil.displayMode_Default);
+      molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
+      molmil.colorEntry(struc, 1, null, true, soup);
+    });
+  };
+  requestB.Send(molmil.settings.pdb_url.replace("__ID__", pdbid).replace("format=mmjson-all", "format=mmjson-plus-noatom"));
+};
+
+molmil.loadPDBlite__ = function(pdbid, cb, async, soup) {
+  molmil.configBox.liteMode = true;
+  
+  soup = soup || molmil.cli_soup;
+  
+  var requestA = new molmil_dep.CallRemote("GET"), async = true; requestA.ASYNC = async;
+  requestA.OnDone = function() {this.atom_data = JSON.parse(this.request.responseText);}
+  requestA.Send("http://ipr.pdbj.org/molmil_alpha/mmjson-lite/__ID__-lite.json".replace("__ID__", pdbid));
+  var requestB = new molmil_dep.CallRemote("GET"), async = true; requestB.ASYNC = async; requestB.target = this; requestB.requestA = requestA; 
+  requestB.OnDone = function() {
+    if (! this.requestA.atom_data) return molmil_dep.asyncStart(this.OnDone, [], this, 100);
+    var jso = JSON.parse(this.request.responseText);
+    jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"]
+    soup.loadStructureData(jso, "mmjson", pdbid+".json", cb || function(target, struc) { // later switch this to use the new lite mmjson files...
+      delete target.pdbxData;
+      molmil.displayEntry(struc, molmil.displayMode_Default);
+      molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
+      molmil.colorEntry(struc, 1, null, true, soup);
+    });
+  };
+  requestB.Send(molmil.settings.pdb_url.replace("__ID__", pdbid).replace("format=mmjson-all", "format=mmjson-plus-noatom"));
+}
 
 molmil.loadPDB = function(pdbid, cb, async, soup) {
   soup = soup || molmil.cli_soup;
@@ -9442,16 +10046,10 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
     else uniform_colors.push(molmil.configBox.bu_colors[m]);
     
   }
-  //
-  
-  
+
   var xMin = 1e99, xMax = -1e99, yMin = 1e99, yMax = -1e99, zMin = 1e99, zMax = -1e99, A = [0, 0, 0], B = [0, 0, 0];
-  //var A = [soup.sceneBU.geomRanges[0]+soup.sceneBU.COR[0], soup.sceneBU.geomRanges[2]+soup.sceneBU.COR[1], soup.sceneBU.geomRanges[4]+soup.sceneBU.COR[2]]; // xyzMin
-  //var B = [soup.sceneBU.geomRanges[1]+soup.sceneBU.COR[0], soup.sceneBU.geomRanges[3]+soup.sceneBU.COR[1], soup.sceneBU.geomRanges[5]+soup.sceneBU.COR[2]]; // xyzMax
   
   var chainInfo = {}, any_identity = false, NOC = 0, rangeInfo;
-  // simpleDM
-  // displayMode
   for (p=0, j=0; p<BU.length; p++) {
     asym_ids = asym_ids_list[p];
     // generate stuff...
@@ -9565,21 +10163,13 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
             vertices[m++] = surf.normals[c][1];
             vertices[m++] = surf.normals[c][2];
             
-            
-            //vertices8[m8+12] = rgba[0];
-            //vertices8[m8+13] = rgba[1];
-            //vertices8[m8+14] = rgba[2];
-            //vertices8[m8+15] = rgba[3];
             m++; // color
-            
             m++; // AID
           }
           
           COM[0] /= COM[3]; COM[1] /= COM[3]; COM[2] /= COM[3];
           
-          for (c=0, m=0; c<surf.faces.length; c++) {
-            indices[m++] = surf.faces[c][0]; indices[m++] = surf.faces[c][1]; indices[m++] = surf.faces[c][2];
-          }
+          for (c=0, m=0; c<surf.faces.length; c++) {indices[m++] = surf.faces[c][0]; indices[m++] = surf.faces[c][1]; indices[m++] = surf.faces[c][2];}
           
           vbuffer = gl.createBuffer();
           gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
@@ -9723,302 +10313,75 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
         if (m[0] == "identity operation") {no_identity = false; continue;}
         chainInfo[asym_ids[i]].push(m[1]);
       }
-      
-      // next setup the shader, matrices, alt_color info...
-      var program = {}; program.BUprogram = true;
-      program.gl = gl; program.renderer = renderer;
-      program.nElements = noe;
-      program.vertexBuffer = vbuffer;
-      program.indexBuffer = ibuffer;
-      //program.data = {};
 
-      program.angle = renderer.angle;
-      program.matrices = [];
+      var settings = {multiMatrix: true}, matrices = [], uniform_color = [];
       
       // bb cpk, ca cpk, ca structure
       if ((displayMode == 1 && colorMode == 1) || (displayMode == 2 && colorMode == 1) || (displayMode == 2 && colorMode == 4)) {
         for (c=0; c<BU[p][0].length; c++) {
           m = soup.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
-          program.matrices.push(m[1]);
+          matrices.push(m[1]);
         }
-      
-        program.shader = renderer.shaders.lines;
-        program.attributes = renderer.shaders.lines.attributes;
         
-        program.render = function(modelViewMatrix, COR) {
-          var mat = mat4.create();
-          // something is lacking here...
-          for (var i=0; i<this.matrices.length; i++) {
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-      
-            this.gl.useProgram(this.shader.program);
-            this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-  
-            this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-            this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-   
-            this.render_internal();
-          }
-        };
-      
-        program.render_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-          this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-          this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
-          //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
-          
-          // for some reason this needs to be bound for it to work --> I HAVE NO IDEA WHY!!!!
-          this.gl.vertexAttribPointer(2, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
-    
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-          
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
-        };
-        
-        program.renderPicking = function() {};
-
+        settings.has_ID = true;
+        settings.lines_render = true;
       }
       else if ((displayMode == 3 || displayMode == 4) && colorMode == 4) {
         for (c=0; c<BU[p][0].length; c++) {
           m = soup.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
-          program.matrices.push(m[1]);
+          matrices.push(m[1]);
         }
       
-      
-        program.shader = renderer.shaders.standard_alpha;
-        program.attributes = program.shader.attributes;
-        program.pickingShader = renderer.shaders.picking;
-        program.pickingAttributes = program.pickingShader.attributes;
-        
-        program.render = function(modelViewMatrix, COR) {
-          var mat = mat4.create(), normalMatrix = mat3.create();
-          for (var i=0; i<this.matrices.length; i++) {
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-            mat3.normalFromMat4(normalMatrix, mat);
-
-            this.gl.useProgram(this.shader.program);
-            this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-  
-            this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-            this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-   
-            this.render_internal();
-          }
-        };
-      
-        program.render_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-          
-          this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-          this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-          this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-    
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-          //else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0); // USING LINES INSTEAD OF TRIANGLES GIVE WIREFRAME REPRESENTATION!!!!
-        };
-        
-        program.renderPicking = function(modelViewMatrix, COR) {
-          var mat = mat4.create();
-          for (var i=0; i<this.matrices.length; i++) {
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-
-            this.gl.useProgram(this.pickingShader.program);
-            this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-   
-            this.renderPicking_internal();
-          }
-        };
-
-        program.renderPicking_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-          this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-          this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-        };
-        
-        
+        settings.solid = true;
+        settings.has_ID = true;
       }
       else if ((displayMode == 3 || displayMode == 4 || displayMode == 5) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
-        program.uniform_color = [];
+        uniform_color = [];
         for (c=0; c<BU[p][0].length; c++) {
-          //console.log(c, j);
           m = soup.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
-          //console.log(m, no_identity);
-          program.matrices.push(m[1]);
-          if (colorMode == 2) program.uniform_color.push(uniform_colors[i] || [255, 255, 255]); // asym chain
+          matrices.push(m[1]);
+          if (colorMode == 2) uniform_color.push(uniform_colors[i] || [255, 255, 255]); // asym chain
           else if (colorMode == 3) {
-            program.uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
+            uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
           }
           else if (colorMode == 5) {
-            program.uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
+            uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
           }
           if (j >= uniform_colors.length) j = 0;
         }
         
-        program.shader = renderer.shaders.standard_uniform_color;
-        program.attributes = program.shader.attributes;
-        program.pickingShader = renderer.shaders.picking;
-        program.pickingAttributes = program.pickingShader.attributes;
-        
-        program.render = function(modelViewMatrix, COR) {
-          var mat = mat4.create(), normalMatrix = mat3.create();   
-          for (var i=0; i<this.matrices.length; i++) {
-            
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-            mat3.normalFromMat4(normalMatrix, mat);
-
-            this.gl.useProgram(this.shader.program);
-            this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniform3f(this.shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-  
-            this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-            this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-   
-            this.render_internal();
-          }
-        };
-      
-        program.render_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-          this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-          this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-          //this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-    
-          // for some reason this needs to be bound for it to work --> I HAVE NO IDEA WHY!!!!
-          this.gl.vertexAttribPointer(2, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-    
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-          
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-          //else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0); // USING LINES INSTEAD OF TRIANGLES GIVE WIREFRAME REPRESENTATION!!!!
-        };
-        
-        program.renderPicking = function(modelViewMatrix, COR) {
-          var mat = mat4.create();
-          for (var i=0; i<this.matrices.length; i++) {
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-
-            this.gl.useProgram(this.pickingShader.program);
-            this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-   
-            this.renderPicking_internal();
-          }
-        };
-        
-        program.renderPicking_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
-          this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-          this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
-    
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-        };
-        
+        settings.solid = true;
+        settings.uniform_color = true;
+        settings.has_ID = true;
       }
       else {
-        program.uniform_color = [];
+        uniform_color = [];
         for (c=0; c<BU[p][0].length; c++) {
-          //console.log(c, j);
           m = soup.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
-          program.matrices.push(m[1]);          
-          if (colorMode == 2) program.uniform_color.push(uniform_colors[i]); // asym chain
+          matrices.push(m[1]);          
+          if (colorMode == 2) uniform_color.push(uniform_colors[i]); // asym chain
           else if (colorMode == 3) {
-            program.uniform_color.push(uniform_colors[j++]); // chain
+            uniform_color.push(uniform_colors[j++]); // chain
           }
           else if (colorMode == 5) {
-            program.uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
+            uniform_color.push(uniform_colors[j++] || [255, 255, 255]); // chain
           }
           if (j >= uniform_colors.length) j = 0;
         }
-      
-      
-      
-        program.shader = renderer.shaders.lines_uniform_color;
-        program.attributes = renderer.shaders.lines_uniform_color.attributes;
         
-        program.render = function(modelViewMatrix, COR) {
-          var mat = mat4.create();
-          for (var i=0; i<this.matrices.length; i++) {
-            mat4.multiply(mat, modelViewMatrix, this.matrices[i]);
-      
-            this.gl.useProgram(this.shader.program);
-            this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
-            this.gl.uniform3f(this.shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, mat);
-            this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-  
-            this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
-            this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
-   
-            this.render_internal();
-          }
-        };
-      
-        program.render_internal = function() {
-          this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-          this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-          //this.gl.vertexAttribPointer(this.attributes.in_Colour, 3, this.gl.FLOAT, false, 20, 12);
-          //this.gl.vertexAttribPointer(this.attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
-          
-          // for some reason this needs to be bound for it to work --> I HAVE NO IDEA WHY!!!!
-          this.gl.vertexAttribPointer(1, 3, this.gl.FLOAT, false, 20, 12);
-          this.gl.vertexAttribPointer(2, 3, this.gl.FLOAT, false, 20, 12);
-
-          this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-          if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
-            var dv = 0, vtd;
-            while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
-          }
-          else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
-        };
-        
-        program.renderPicking = function() {};
-        
+        settings.lines_render = true;
+        settings.uniform_color = true;
+        settings.has_ID = true;
       }
-
+      
+      var program = molmil.geometry.build_simple_render_program(null, null, renderer, settings);
+      program.vertexBuffer = vbuffer; program.indexBuffer = ibuffer; program.nElements = noe;
+      program.BUprogram = true; program.matrices = matrices; program.uniform_color = uniform_color;
+      
       if (program.matrices.length) renderer.programs.push(program);
       if (rangeInfo) {A = rangeInfo[0]; B = rangeInfo[1];}
       else {
@@ -10130,8 +10493,8 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
     soup.COR = JSON.parse(JSON.stringify(soup.sceneBU.COR));
     soup.geomRanges = JSON.parse(JSON.stringify(soup.sceneBU.geomRanges));
   }
-  
-  
+
+  // add some way to update stdXYZ to deal properly with fog (and DoF in the future)
   
   if (update || ! renderer.initBD) renderer.initBuffers();
   
@@ -10356,6 +10719,10 @@ molmil.commandLines = {};
 molmil.commandLine = function(canvas) {
   this.environment = {};
   for (var e in window) this.environment[e] = undefined;
+  
+  this.environment.setTimeout = function(cb, tm) {window.setTimeout(cb, tm);}
+  this.environment.clearTimeout = function() {window.clearTimeout();}
+  this.environment.navigator = window.navigator;
   
   this.environment.console = {};
   this.environment.molmil = molmil;
@@ -10753,7 +11120,7 @@ molmil.commandLines.pyMol.show = function (repr, atoms, quiet) {
       }
     }
   }
-  else if (repr == "balls-sticks") {
+  else if (repr == "ball_stick") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 2;
       if (atoms[i].molecule.CA == atoms[i]) {
@@ -10985,6 +11352,97 @@ molmil.initVideo = function(UI) {
 
 // END
 
+// misc stuff
+
+molmil.setSlab = function(near, far, soup) {
+  soup = soup || molmil.cli_soup;
+  
+  if (! soup.renderer.settings.slab) {
+    soup.renderer.settings.slab = true;
+    molmil.configBox.glsl_fog = false;
+    molmil.shaderEngine.recompile(soup.renderer);
+  }
+  
+  soup.renderer.settings.slabNear = near;
+  soup.renderer.settings.slabFar = far;
+  
+  soup.canvas.update = true;
+};
+
+molmil.selectAtoms = function(atoms, append, soup) {
+  soup = soup || molmil.cli_soup;
+  if (! append) soup.atomSelection = [];
+  
+  for (var a=0; a<atoms.length; a++) soup.atomSelection.push(atoms[a]);
+};
+
+molmil.selectionFocus = function(soup) {
+  soup = soup || molmil.cli_soup;
+  // center & zoom on atomSelection
+  
+  var xyz, Xpos, xyzRef, modelId = soup.renderer.modelId, avgX = 0.0, avgY = 0.0, avgZ = 0.0;
+  
+  var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
+  
+  for (var a=0; a<soup.atomSelection.length; a++) {
+    Xpos = soup.atomSelection[a].xyz;
+    xyzRef = soup.atomSelection[a].chain.modelsXYZ[modelId];
+    xyz = [xyzRef[Xpos], xyzRef[Xpos+1], xyzRef[Xpos+2]];
+    avgX += xyz[0];
+    avgY += xyz[1];
+    avgZ += xyz[2];
+  }
+  avgX /= soup.atomSelection.length;
+  avgY /= soup.atomSelection.length;
+  avgZ /= soup.atomSelection.length;
+  
+  
+  for (var a=0; a<soup.atomSelection.length; a++) {
+    Xpos = soup.atomSelection[a].xyz;
+    xyzRef = soup.atomSelection[a].chain.modelsXYZ[modelId];
+    xyz = [xyzRef[Xpos]-avgX, xyzRef[Xpos+1]-avgY, xyzRef[Xpos+2]-avgZ];
+    
+    if (xyz[0] < geomRanges[0]) geomRanges[0] = xyz[0];
+    if (xyz[0] > geomRanges[1]) geomRanges[1] = xyz[0];
+    
+    if (xyz[1] < geomRanges[2]) geomRanges[2] = xyz[1];
+    if (xyz[1] > geomRanges[3]) geomRanges[3] = xyz[1];
+    
+    if (xyz[2] < geomRanges[4]) geomRanges[4] = xyz[2];
+    if (xyz[2] > geomRanges[5]) geomRanges[5] = xyz[2];
+  }
+
+  soup.renderer.camera.z = soup.calcZ(geomRanges);
+  
+  soup.setCOR([avgX, avgY, avgZ]);
+  soup.renderer.camera.x = soup.renderer.camera.y = 0.0;
+  soup.renderer.modelViewMatrix = soup.renderer.camera.generateMatrix();
+  soup.canvas.atomCORset = false;
+};
+
+molmil.selectSequence = function(seq, soup) {
+  soup = soup || molmil.cli_soup;
+
+  var seq3 = [], conv = {"A": "ALA", "C": "CYS", "D": "ASP", "E": "GLU", "F": "PHE", "G": "GLY", "H": "HIS", "I": "ILE", "K": "LYS", "L": "LEU", "M": "MET", "N": "ASN", "P": "PRO", "Q": "GLN", "R": "ARG", "S": "SER", "T": "THR", "V": "VAL", "W": "TRP", "Y": "TYR"};
+  molmil.AATypesBase = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, "SER": 1, "THR": 1, "VAL": 1, "TRP": 1, "TYR": 1, "ACE": 1, "NME": 1, "HIP": 1, "HIE": 1, "HID": 1};
+  for (var i=0; i<seq.length; i++) {
+    if (conv.hasOwnProperty(seq[i])) seq3.push(conv[seq[i]]);
+    else seq3.push("***");
+  }
+  
+  var output = [], m1, m2, n, OK;
+  for (var c=0; c<soup.chains.length; c++) {
+    for (m1=0; m1<soup.chains[c].molecules.length; m1++) {
+      OK = true;
+      for (m2=m1, n=0; m2<Math.min(soup.chains[c].molecules.length, m1+seq3.length); m2++, n++) if (soup.chains[c].molecules[m2].name != seq3[n]) {OK = false; break;}
+      if (OK) for (m2=m1; m2<m1+seq3.length; m2++) output.push(soup.chains[c].molecules[m2]);
+    }
+  }
+  return output;
+}
+
+// END
+
 if (typeof(requestAnimationFrame) != "undefined") molmil.animate_molmilViewers();
 
 if (! window.molmil_dep) {
@@ -10995,4 +11453,3 @@ if (! window.molmil_dep) {
 }
 
 molmil.initSettings();
-
