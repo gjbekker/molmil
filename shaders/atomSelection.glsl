@@ -40,6 +40,15 @@ varying vec2 ex_FragTexCoord;
 
 void main() {
   float d = distance(ex_FragTexCoord, vec2(.5, .5));
+  if (d > .5) discard;
+  float a = 1.0;
+  if (d < .45) a = .25;
+  
+  gl_FragColor = vec4(ex_Colour, a);
+}
+/*
+void main() {
+  float d = distance(ex_FragTexCoord, vec2(.5, .5));
   if (d > .5 || d < .3) discard;
 
   float a;
@@ -49,3 +58,4 @@ void main() {
   gl_FragColor = vec4(ex_Colour, a);
 }
 
+*/
