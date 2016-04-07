@@ -58,16 +58,20 @@ var molmil_settings = {
 };
     var canvas, pdbid, efID, chainsList;
 
+    // automatically adapts the size of the Molmil canvas to the window size
     window.onresize = function() {
       if (canvas && window.innerHeight != screen.height) {
         canvas.setSize((window.innerWidth || document.documentElement.clientWidth)/3, (window.innerHeight || document.documentElement.clientHeight)/2);
       }
     };
   
+    // called onload
     function initViewer() {
       
+      // wait until Molmil has been properly loaded
       if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
 
+      // initializes the canvas if it hasn't been defined yet
       if (! canvas) {
         canvas = document.getElementById("molmilViewer");
         canvas.width = (window.innerWidth || document.documentElement.clientWidth)/3;
@@ -76,48 +80,57 @@ var molmil_settings = {
         canvas = molmil.createViewer(canvas);
         if (! canvas) return false;
       }
-      else {
+      else { // resets the canvas (e.g. if the PDBID has been changed via the URL)
         canvas.molmilViewer.clear(); canvas.renderer.initBuffers(); canvas.renderer.camera.reset();
         canvas.displayMode = 0;
       }
       
+      // extract the PDBID-CHAINID from the URL (hash)
       var id = window.location.hash.replace(/#(\!)?/, '');
       pdbid = id.substr(0, 4);
       
+      // create radio buttons to change the style of the structure
       var infoBox = document.getElementById("infoBox"), inp, lbl; infoBox.innerHTML = "";
       lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Cartoon"); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayDefault;
       lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Wireframe"); lbl.style.marginRight = "1em"; lbl.onclick = selectWireframe;
       lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "CPK"); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayCPK;
       lbl = infoBox.pushNode("label"); inp = lbl.pushNode("input"); inp.type = "radio"; inp.name = "displayStyle"; lbl.pushNode("span", "Cartoon without hetero atoms "); lbl.style.marginRight = "1em"; lbl.onclick = selectDisplayDefaultNoHET;
 
-      if (! pdbid) return;
+      if (! pdbid) return; // don't continue if no entry has been defined
       
       canvas.molmilViewer.skipCOGupdate = true;
       
       var pdbid_container = document.getElementById("pdbid_container"); 
       var tmp = id.split("-");
-      chainsList = (tmp[1] || "").trim();
+      chainsList = (tmp[1] || "").trim(); // chainsList of chains to display, extracted from the URL (hash)
       pdbid_container.innerHTML = tmp[0].toLowerCase() + (tmp.length > 1 ? "-"+tmp[1].toUpperCase() : "");
 
+      // fetch the entry
       var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true; request.responseType = "json";
       request.OnDone = function() {
         //var jso = JSON.parse(this.request.responseText);
         var jso = this.request.response;
         if (typeof jso != "object" && jso != null) jso = JSON.parse(this.request.responseText);
         canvas.molmilViewer.jso = jso;
+        
+        // load the entry
         canvas.molmilViewer.loadStructureData(jso, 1, pdbid, function(soup, models) {});
       };
+      
+      // handle unknown entry
       request.OnError = function() {document.getElementById("pdbid_container").innerHTML = "Unknown entry: "+efID;};
+      
+      // xhr send
       request.Send(molmil_settings.pdb_url.replace("__ID__", pdbid));
       
-      // download entry's mmjson file
+      // download entry's mmjson-add file (PDBj's additional annotations)
       var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true;
       request.OnDone = function() {
-        if (! canvas.molmilViewer.structures.length) return molmil_dep.asyncStart(this.OnDone, [], this, 50);
+        if (! canvas.molmilViewer.structures.length) return molmil_dep.asyncStart(this.OnDone, [], this, 50); // wait until the main entry has finished loading
         
         var data = canvas.molmilViewer.jso["data_"+pdbid.toUpperCase()];
         
-        // chain info
+        // fetch chain info
         var protein_chains = [], xna_chains = [];
         var entity_poly = data.entity_poly || {entity_id: []};
         for (var i=0; i<entity_poly.entity_id.length; i++) {
@@ -125,7 +138,7 @@ var molmil_settings = {
           else if (entity_poly.type[i] == "polydeoxyribonucleotide/polyribonucleotide hybrid" || entity_poly.type[i] == "polydeoxyribonucleotide" || entity_poly.type[i] == "polyribonucleotide") xna_chains = xna_chains.concat(entity_poly.pdbx_strand_id[i].split(","));
         }
         
-        // chainid info
+        // hide chains that are not included in the chainsList
         if (chainsList.length) {
           for (var c=0, m, mol, a; c<canvas.molmilViewer.structures[0].chains.length; c++) {
             if (chainsList.indexOf(canvas.molmilViewer.structures[0].chains[c].authName) == -1) {
@@ -138,7 +151,7 @@ var molmil_settings = {
             }
           }
         }
-        else {
+        else { 
           for (var c=0, m, mol, a; c<canvas.molmilViewer.structures[0].chains.length; c++) {
             m = protein_chains.indexOf(canvas.molmilViewer.structures[0].chains[c].authName);
             if (m != -1) protein_chains[m] = canvas.molmilViewer.structures[0].chains[c];
@@ -199,6 +212,7 @@ var molmil_settings = {
           residues = buffer2[buffer.id[i]] || [];
           tmp = [];
           fgroup.ligand = residues.length ? residues[0].ligand : null;
+          // deal with binding/prosite sites
           if (buffer.info_subtype[i] == "binding" || buffer.info_subtype[i] == "prosite") {
             for (r=0; r<residues.length; r++) {
               tmpList = [];
@@ -220,6 +234,7 @@ var molmil_settings = {
               tmp.push([chainid+": "+residues[r].beg_auth_seq_id+(residues[r].beg_auth_seq_id != residues[r].end_auth_seq_id ? "-"+residues[r].end_auth_seq_id : "")]);
             }
           }
+          // deal with other sites
           else if (buffer.info_subtype[i] == "ACT_SITE" || buffer.info_subtype[i] == "NP_BIND" || buffer.info_subtype[i] == "BINDING" || buffer.info_subtype[i] == "DNA_BIND" || buffer.info_subtype[i] == "pdb") {
           
             for (r=0; r<residues.length; r++) {
@@ -265,7 +280,7 @@ var molmil_settings = {
           if (fgroup.residueList.length) fgroups.push(fgroup);
         }
         
-        // build table which lists all the sites
+        // build table (html) which lists all the sites
         var tbl = molmil_dep.dcE("table"), tr, td, tbl2, tr2, td2, check;
         tr = tbl.pushNode("tr");
         tr.style.color = "#cc0000";
@@ -327,10 +342,9 @@ var molmil_settings = {
           if (n >= site_color_list.length) n = 0;
         }
         
+        // main sites interface
         var fSiteBox = document.getElementById("fSiteBox");
         fSiteBox.innerHTML = "";
-        // also add some title
-        //struct.title 
         
         var title = fSiteBox.pushNode("a");
         title.style.fontWeight = "bold";
@@ -351,7 +365,7 @@ var molmil_settings = {
             if (this.arr[i].data.enabled) {this.arr[i].data.enabled = false; this.arr[i].data.update = true; this.arr[i].checked = false;}
           }
           
-          displaySites();
+          displaySites(); // function to display the selected sites
         };
         if (fgroups.length == 0) clear.style.display = "none";
         
@@ -368,33 +382,32 @@ var molmil_settings = {
       document.getElementById("option_field").childNodes[3].currentDisplayMode = selectWireframe;
       
       var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
-      list = molmil.interpolateBR(model.chains.length);
+      list = molmil.interpolateBR(model.chains.length); // linear blue-red interpolation for each residue in the chain
       for (c=0; c<model.chains.length; c++) {
         chain = model.chains[c];
         if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
-        chain.displayMode = 1;
-        //chain.display = true;
-        
+        chain.displayMode = 1; // display chain
+
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
           mol.rgba = list[c];
           for (a=0; a<mol.atoms.length; a++) {
-            mol.atoms[a].displayMode = 4;
+            mol.atoms[a].displayMode = 4; // 4 for wireframe
             mol.atoms[a].rgba = list[c];
           }
-          mol.displayMode = 0;
+          mol.displayMode = 0; // don't shown cartoon
 
-          if (mol.ligand) {
+          if (mol.ligand) { // color ligands as CPK
             for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);
           }
         }
       }
       
-      canvas.displayMode = 4;
+      canvas.displayMode = 4; // this is used by custom-select.html to keep track of the current display mode
       
       for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
       
-      displaySites();
+      displaySites(); // function to display the selected sites
     }
     
     // cartoon representation (with HETATM)
@@ -404,56 +417,59 @@ var molmil_settings = {
       var xna_atoms = molmil.configBox.xna_simple_base_atoms;
       
       var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
-      list = molmil.interpolateBR(model.chains.length);
+      list = molmil.interpolateBR(model.chains.length); // linear blue-red interpolation for each residue in the chain
       for (c=0; c<model.chains.length; c++) {
         chain = model.chains[c];
         if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
-        chain.displayMode = 3;
-        //chain.display = true;
+        chain.displayMode = 3; // show chains as cartoon
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
           mol.rgba = list[c];
-          if (mol.ligand) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
-          else if (mol.xna) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = xna_atoms.hasOwnProperty(mol.atoms[a].atomName) || mol.atoms[a].element == "H" ? 0 : 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
-          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
           
-          mol.displayMode = 3;
+          // show ligands as stick (3) and CPK coloring
+          if (mol.ligand) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
+          else if (mol.xna) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = xna_atoms.hasOwnProperty(mol.atoms[a].atomName) || mol.atoms[a].element == "H" ? 0 : 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);} // show the bases of DNA/RNA
+          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;} // hide other atoms
+          
+          mol.displayMode = 3; // show as cartoon
         }
       }
 
-      canvas.displayMode = 1;
+      canvas.displayMode = 1; // this is used by custom-select.html to keep track of the current display mode
       
       for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
       
-      displaySites();
+      displaySites(); // function to display the selected sites
     }
     
     // CPK representation
     function selectDisplayCPK() {
       document.getElementById("option_field").childNodes[3].currentDisplayMode = selectDisplayCPK;
       
-      canvas.displayMode = 2;
+      canvas.displayMode = 2; // this is used by custom-select.html to keep track of the current display mode
       
       var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
-      list = molmil.interpolateBR(model.chains.length);
+      list = molmil.interpolateBR(model.chains.length); // linear blue-red interpolation for each residue in the chain
 
       for (c=0; c<model.chains.length; c++) {
         chain = model.chains[c];
         if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
-        chain.displayMode = 1;
-        //chain.display = true;
+        chain.displayMode = 1; // show chain as CPK
+        
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
+          
+          // show ligands as stick (3) and CPK coloring
           if (mol.ligand) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
-          else if (! mol.water) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 1; mol.atoms[a].rgba = list[c];}
-          else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
-          mol.displayMode = 0;
+          else if (! mol.water) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = 1; mol.atoms[a].rgba = list[c];} // show other non-waters as CPK
+          else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0; // hide the rest
+          mol.displayMode = 0; // don't show any cartoons
         }
       }
       
       for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
 
-      displaySites();
+      displaySites(); // function to display the selected sites
     }
     
     // cartoon representation without HETATM
@@ -462,28 +478,28 @@ var molmil_settings = {
       
       var xna_atoms = molmil.configBox.xna_simple_base_atoms;
       
-      canvas.displayMode = 3;
+      canvas.displayMode = 3; // this is used by custom-select.html to keep track of the current display mode
       
       var model = canvas.molmilViewer.structures[0], chain, list, c, m, mol, a;
-      list = molmil.interpolateBR(model.chains.length);
+      list = molmil.interpolateBR(model.chains.length); // linear blue-red interpolation for each residue in the chain
       for (c=0; c<model.chains.length; c++) {
         chain = model.chains[c];
         if (canvas.molmilViewer.sceneBU && ! canvas.molmilViewer.sceneBU.chainInfo.hasOwnProperty(chain.name)) continue
-        chain.displayMode = 3;
-        //chain.display = true;
+        chain.displayMode = 3; // show chain as cartoon
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
           mol.rgba = list[c];
           
+          // show bases as sticks for DNA/RNA
           if (mol.xna) for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].displayMode = xna_atoms.hasOwnProperty(mol.atoms[a].atomName) || mol.atoms[a].element == "H" ? 0 : 3; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
-          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;}
-          mol.displayMode = 3;
+          else {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;} //hide the rest
+          mol.displayMode = 3; // show molecule as cartoon
         }
       }
       
       for (var f=0; f<canvas.fgroups.length; f++) canvas.fgroups[f].update = canvas.fgroups[f].enabled;
 
-      displaySites();
+      displaySites(); // function to display the selected sites
     }
     
     // display all selected sites
@@ -494,18 +510,20 @@ var molmil_settings = {
           if (canvas.fgroups[f].enabled) {
             for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
               mol = canvas.fgroups[f].residueList[r];
-              mol.rgba_prev = mol.rgba_prev || mol.rgba;
-              mol.rgba = canvas.fgroups[f].color;
+              mol.rgba_prev = mol.rgba_prev || mol.rgba; // remember previous color
+              mol.rgba = canvas.fgroups[f].color; // set a specific color for the functional site
+              
+              // show the side chains (i.e. atoms not part of molmil.configBox.backboneAtoms4Display) as ball-n-stick (2), unless it's a CA then display as stick (2)
               for (a=0; a<mol.atoms.length; a++) if (! molmil.configBox.backboneAtoms4Display.hasOwnProperty(mol.atoms[a].atomName)) {mol.atoms[a].displayMode = mol.atoms[a].atomName == "CA" ? 3 : 2; mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);}
-              mol.showSC = true;
+              mol.showSC = true; // display side chains
             }
           }
           else {
             for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
               mol = canvas.fgroups[f].residueList[r];
-              mol.rgba = mol.rgba_prev || mol.rgba; mol.rgba_prev = null;
-              for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
-              mol.showSC = false;
+              mol.rgba = mol.rgba_prev || mol.rgba; mol.rgba_prev = null; //reset color to previous value
+              for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0; // hide all atoms
+              mol.showSC = false; // hide side chains
             }
           }
         }
@@ -513,34 +531,36 @@ var molmil_settings = {
           if (canvas.fgroups[f].enabled) {
             for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
               mol = canvas.fgroups[f].residueList[r];
+              // remember previous color and keep cpk/wirframe display mode
               for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].rgba_prev = mol.atoms[a].rgba_prev || mol.atoms[a].rgba; mol.atoms[a].rgba = canvas.fgroups[f].color;}
-              mol.showSC = true;
+              mol.showSC = true; // display side chains
             }
           }
           else {
             for (r=0; r<canvas.fgroups[f].residueList.length; r++) {
               mol = canvas.fgroups[f].residueList[r];
+              // reset color to previous value
               for (a=0; a<mol.atoms.length; a++) {mol.atoms[a].rgba = mol.atoms[a].rgba_prev; mol.atoms[a].rgba_prev = null;}
-              mol.showSC = false;
+              mol.showSC = false; // hide side chains
             }
           }
         }
-        molmil.geometry.reInitChains = true;
-        canvas.fgroups[f].update = false;
+        molmil.geometry.reInitChains = true; // re-calculate local geometry (tangents) of chains
+        canvas.fgroups[f].update = false; // mark as group having been updated
       }
       
-      canvas.renderer.initBuffers();
-      canvas.update = true;
+      canvas.renderer.initBuffers(); // rebuild the buffers
+      canvas.update = true; // signal Molmil to render the scene on the next sync
     }
     
-    function toggleSite() {
+    function toggleSite() { // enable/disable site
       this.data.enabled = this.checked;
       this.data.update = true;
       
       displaySites();
     }
     
-// mmjson extractor helper function
+// mmjson extractor helper function; converts column-first to row-first representation (i.e. list of rows, where each row is an associative array of column:value)
 function mmjsonGroupData(obj, field) {
   if (! obj) return {};
   var output = {}, tmp;

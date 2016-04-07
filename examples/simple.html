@@ -7,10 +7,11 @@
       var molmil_settings = {src: "http://gjbekker.github.io/molmil/"}, canvas;
   
       function initViewer() {
+        // wait until Molmil has been properly loaded
         if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
-        canvas = document.getElementById("molmilViewer");
-        canvas = molmil.createViewer(canvas);
-        molmil.loadPDB(canvas.getAttribute("data-pdbid"), null, null, canvas.molmilViewer);
+        canvas = document.getElementById("molmilViewer"); 
+        canvas = molmil.createViewer(canvas); // initialize the canvas
+        molmil.loadPDB(canvas.getAttribute("data-pdbid"), null, null, canvas.molmilViewer); // load the entry
       }
     </script>
   </head>

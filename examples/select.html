@@ -8,21 +8,22 @@
       var molmil_settings = {src: "http://gjbekker.github.io/molmil/"}, canvas;
   
       function initViewer() {
+        // wait until Molmil has been properly loaded
         if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
         canvas = document.getElementById("molmilViewer");
-        canvas = molmil.createViewer(canvas);
+        canvas = molmil.createViewer(canvas); // initialize the canvas
         
-        molmil.loadPDB("4xwh", null, null, canvas.molmilViewer);
+        molmil.loadPDB("4xwh", null, null, canvas.molmilViewer); // load 4xwh
         
-        var residues = molmil.selectSequence("LPRPLPAVP", canvas.molmilViewer), atoms = [];
-        for (var r=0; r<residues.length; r++) for (var a=0; a<residues[r].atoms.length; a++) atoms.push(residues[r].atoms[a]);
+        var residues = molmil.selectSequence("LPRPLPAVP", canvas.molmilViewer), atoms = []; // select the sequence (returns molmil.molObject)
+        for (var r=0; r<residues.length; r++) for (var a=0; a<residues[r].atoms.length; a++) atoms.push(residues[r].atoms[a]); // build a list of atoms (molmil.atomObject)
         
-        molmil.selectAtoms(atoms, null, canvas.molmilViewer);
+        molmil.selectAtoms(atoms, null, canvas.molmilViewer); // marks the atoms as selected
         
-        canvas.renderer.updateSelection();
+        canvas.renderer.updateSelection(); // generate the geometry for the selection (yellow circles)
         
-        molmil.selectionFocus(canvas.molmilViewer);
-        canvas.update = true;
+        molmil.selectionFocus(canvas.molmilViewer);  // focuses (zoom) on the selected atoms
+        canvas.update = true; // signal Molmil to render the scene on the next sync
         
       }
     </script>
