@@ -107,10 +107,16 @@ molmil.configBox = {
     ["shaders/lines.glsl", "lines_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alpha", "#define ALPHA_MODE 1\n"],
     ["shaders/standard.glsl", "standard_uniform_color", "#define UNIFORM_COLOR 1\n"],
-    ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"]
+    ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
+    ["shaders/anaglyph.glsl"], 
   ],
   glsl_fog: 0, // 0: off, 1: on
   skipClearGeometryBuffer: true,
+  stereoMode: 0,
+  stereoFocalFraction: 1.5,
+  stereoEyeSepFraction: 30,
+  camera_fovy: 45.0,
+  HQsurface_gridSpacing: 1.0,
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -210,6 +216,7 @@ molmil.initSettings = function () {
   
   molmil.configBox.glsl_fog = localStorage.getItem("molmil.settings_glsl_fog") == 1;
   molmil.configBox.projectionMode = localStorage.getItem("molmil.settings_PROJECTION") || 1;
+  molmil.configBox.stereoMode = parseInt(localStorage.getItem("molmil.settings_STEREO")) || 0;
   
   molmil.configBox.smoothFactor = localStorage.getItem("molmil.settings_BBSF") || 2;
   
@@ -477,6 +484,7 @@ molmil.viewer.prototype.clear = function() {
   this.chains = [];
   
   this.files = [];
+  this.infoBag = {};
 
   this.bumats = [];
   this.BUmatrices = {};
@@ -506,8 +514,8 @@ molmil.viewer.prototype.clear = function() {
   
   this.atomSelection = [];
   
-  this.hideWaters = false;
-  this.hideHydrogens = false;
+  this.hideWaters = true;
+  this.hideHydrogens = true;
   
   this.sceneBU = null;
   
@@ -520,6 +528,8 @@ molmil.viewer.prototype.clear = function() {
     this.canvases = [this.canvas];
   }
   this.renderer.clear();
+  
+  this.renderer.camera.z_set = false;
 };
 
 
@@ -527,46 +537,102 @@ molmil.viewer.prototype.gotoMol = function(mol) {
   // for residue:
   // along N-CA-C axis
   // then zoom out 10A?
-  if (mol.N && mol.CA && mol.C) {
-    // norm(CA - ((C+N)*.5))
-    var xyz1, xyz2, xyz3, vec = [0, 0, 0];
-    var xyz1 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.N.xyz+2]];
-    var xyz2 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.C.xyz+2]];
-    var xyz3 = [mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz], mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][mol.CA.xyz+2]];
+  
+  var one = mol.N;
+  var two = mol.CA;
+  var three = mol.C;
+  
+  if (! (mol.N && mol.CA && mol.C)) {
     
-    xyz1[0] -= this.avgXYZ[0]; xyz1[1] -= this.avgXYZ[1]; xyz1[2] -= this.avgXYZ[2];
-    xyz2[0] -= this.avgXYZ[0]; xyz2[1] -= this.avgXYZ[1]; xyz2[2] -= this.avgXYZ[2];
-    xyz3[0] -= this.avgXYZ[0]; xyz3[1] -= this.avgXYZ[1]; xyz3[2] -= this.avgXYZ[2];
+    var xyz = mol.chain.modelsXYZ[this.renderer.modelId], x, y, z, COG = [0, 0, 0];
     
-    vec[0] = xyz3[0] - ((xyz1[0] + xyz2[0]) * .5);
-    vec[1] = xyz3[1] - ((xyz1[1] + xyz2[1]) * .5);
-    vec[2] = xyz3[2] - ((xyz1[2] + xyz2[2]) * .5);
-    vec3.normalize(vec, vec);
+    for (var i=0; i<mol.atoms.length; i++) {
+      x = xyz[mol.atoms[i].xyz]; y = xyz[mol.atoms[i].xyz+1]; z = xyz[mol.atoms[i].xyz+2];
+      COG[0] += x;
+      COG[1] += y;
+      COG[2] += z;
+    }
+    COG[0] /= mol.atoms.length;
+    COG[1] /= mol.atoms.length;
+    COG[2] /= mol.atoms.length;
     
+    var nearest = [1e99, -1], r;
+    for (var i=0; i<mol.atoms.length; i++) {
+      x = xyz[mol.atoms[i].xyz]; y = xyz[mol.atoms[i].xyz+1]; z = xyz[mol.atoms[i].xyz+2];
+      
+      r = Math.pow(COG[0]-x, 2) + Math.pow(COG[1]-y, 2) + Math.pow(COG[2]-z, 2);
+      if (r < nearest[0]) {nearest[0] = r; nearest[1] = i}
+    }
     
-    this.renderer.camera.reset();
+    two = mol.atoms[nearest[1]];
     
-    var A = [xyz1[0]-xyz3[0], xyz1[1]-xyz3[1], xyz1[2]-xyz3[2]]; vec3.normalize(A, A);
-    var B = [xyz2[0]-xyz3[0], xyz2[1]-xyz3[1], xyz2[2]-xyz3[2]]; vec3.normalize(B, B);
-    var C = vec3.cross([0, 0, 0], A, B); vec3.normalize(C, C);
+    var x2, y2, z2, farthest = [-1, -1, -1];
+    for (var i=0; i<mol.atoms.length; i++) {
+      x = xyz[mol.atoms[i].xyz]; y = xyz[mol.atoms[i].xyz+1]; z = xyz[mol.atoms[i].xyz+2];
+      for (var j=i+1; j<mol.atoms.length; j++) {
+        x2 = xyz[mol.atoms[j].xyz]; y2 = xyz[mol.atoms[j].xyz+1]; z2 = xyz[mol.atoms[j].xyz+2];
+        
+        r = Math.pow(x-x2, 2) + Math.pow(y-y2, 2) + Math.pow(z-z2, 2);
+        if (r > farthest[0]) {
+          farthest[0] = r;
+          farthest[1] = i;
+          farthest[2] = j;
+        }
+      }
+    }
     
-    var eye = [vec[0]*5 - xyz3[0], vec[1]*5 - xyz3[1], vec[2]*5 - xyz3[2]];
-    var s = vec3.cross([0, 0, 0], vec, C); vec3.normalize(s, s);
-    var u = vec3.cross([0, 0, 0], s, vec);
-
-    var matrix = mat4.create();
-    matrix[0] = s[0]; matrix[4] = s[1]; matrix[8] = s[2];
-    matrix[1] = u[0]; matrix[5] = u[1]; matrix[9] = u[2];
-    matrix[2] = -vec[0]; matrix[6] = -vec[1]; matrix[10] = -vec[2];
-    matrix[12] = -vec3.dot(s, eye); matrix[13] = -vec3.dot(u, eye); matrix[14] = -vec3.dot(vec, eye);
-
-    this.renderer.camera.x = -matrix[12];
-    this.renderer.camera.y = -matrix[13];
-    this.renderer.camera.z = matrix[14]-molmil.configBox.zNear;
-
-    quat.fromMat3(this.renderer.camera.QView, mat3.fromMat4(mat3.create(), matrix));
-    quat.normalize(this.renderer.camera.QView, this.renderer.camera.QView);
+    one = mol.atoms[farthest[1]];
+    three = mol.atoms[farthest[2]];
   }
+  
+  this.renderer.camera.reset();
+  if (this.canvas.atomCORset) this.resetCOR();
+
+  if (! one || ! three || one == two || two == three) {
+    var x = xyz[two.xyz]; var y = xyz[two.xyz+1]; var z = xyz[two.xyz+2];
+    
+    this.renderer.camera.x = -x+this.COR[0];
+    this.renderer.camera.y = -y+this.COR[1];
+    this.renderer.camera.z = -z-molmil.configBox.zNear+this.COR[2]-2;
+
+    return;
+  }
+    
+  // norm(CA - ((C+N)*.5))
+  var xyz1, xyz2, xyz3, vec = [0, 0, 0];
+  var xyz1 = [mol.chain.modelsXYZ[this.renderer.modelId][one.xyz], mol.chain.modelsXYZ[this.renderer.modelId][one.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][one.xyz+2]];
+  var xyz2 = [mol.chain.modelsXYZ[this.renderer.modelId][three.xyz], mol.chain.modelsXYZ[this.renderer.modelId][three.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][three.xyz+2]];
+  var xyz3 = [mol.chain.modelsXYZ[this.renderer.modelId][two.xyz], mol.chain.modelsXYZ[this.renderer.modelId][two.xyz+1], mol.chain.modelsXYZ[this.renderer.modelId][two.xyz+2]];
+    
+  xyz1[0] -= this.avgXYZ[0]; xyz1[1] -= this.avgXYZ[1]; xyz1[2] -= this.avgXYZ[2];
+  xyz2[0] -= this.avgXYZ[0]; xyz2[1] -= this.avgXYZ[1]; xyz2[2] -= this.avgXYZ[2];
+  xyz3[0] -= this.avgXYZ[0]; xyz3[1] -= this.avgXYZ[1]; xyz3[2] -= this.avgXYZ[2];
+    
+  vec[0] = xyz3[0] - ((xyz1[0] + xyz2[0]) * .5);
+  vec[1] = xyz3[1] - ((xyz1[1] + xyz2[1]) * .5);
+  vec[2] = xyz3[2] - ((xyz1[2] + xyz2[2]) * .5);
+  vec3.normalize(vec, vec);
+    
+  var A = [xyz1[0]-xyz3[0], xyz1[1]-xyz3[1], xyz1[2]-xyz3[2]]; vec3.normalize(A, A);
+  var B = [xyz2[0]-xyz3[0], xyz2[1]-xyz3[1], xyz2[2]-xyz3[2]]; vec3.normalize(B, B);
+  var C = vec3.cross([0, 0, 0], A, B); vec3.normalize(C, C);
+   
+  var eye = [vec[0]*5 - xyz3[0], vec[1]*5 - xyz3[1], vec[2]*5 - xyz3[2]];
+  var s = vec3.cross([0, 0, 0], vec, C); vec3.normalize(s, s);
+  var u = vec3.cross([0, 0, 0], s, vec);
+
+  var matrix = mat4.create();
+  matrix[0] = s[0]; matrix[4] = s[1]; matrix[8] = s[2];
+  matrix[1] = u[0]; matrix[5] = u[1]; matrix[9] = u[2];
+  matrix[2] = -vec[0]; matrix[6] = -vec[1]; matrix[10] = -vec[2];
+  matrix[12] = -vec3.dot(s, eye); matrix[13] = -vec3.dot(u, eye); matrix[14] = -vec3.dot(vec, eye);
+  
+  this.renderer.camera.x = -matrix[12];
+  this.renderer.camera.y = -matrix[13];
+  this.renderer.camera.z = matrix[14]-molmil.configBox.zNear;
+
+  quat.fromMat3(this.renderer.camera.QView, mat3.fromMat4(mat3.create(), matrix));
+  quat.normalize(this.renderer.camera.QView, this.renderer.camera.QView);
 };
 
 molmil.viewer.prototype.waterToggle = function(show) {
@@ -658,17 +724,7 @@ molmil.viewer.prototype.selectObject = function(x, y, event) {
   this.canvas.update = true;
 };
 
-// workaround for crappy pdbj servers
-var explorePDB_badData_workaround = false;
-
 // ** loads a file from a URL **
-/*
-format:
-1 mmjson
-2 mmcif
-3 pdbml
-4 pdb (flat)
-*/
 molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) { // ignore format here...
   settings = settings || {};
   var gz = loc.substr(-3).toLowerCase() == ".gz" && ! settings.no_pako_gz;
@@ -686,20 +742,12 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   request.filename = loc.substr(loc.lastIndexOf("/")+1);
   if (format == 1 || (format+"").toLowerCase() == "mmjson") {
     var loc_ = loc;
-    if (explorePDB_badData_workaround == true) loc += (loc.indexOf("?") == -1 ? "?" : "&") + "t=" + (new Date()).getTime();
     if (request.ASYNC && ! request.gz) request.responseType = "json"; // add gzip support...
     request.parse = function() {
       if (this.gz) var jso = JSON.parse(pako.inflate(new Uint8Array(this.request.response), {to: "string"}));
       else var jso = request.request.response;
-      try {
-        if (typeof jso != "object" && jso != null) jso = JSON.parse(this.request.responseText);
-        else if (jso == null) {throw "";}
-      }
-      catch (e) {
-        explorePDB_badData_workaround = true;
-        return this.target.loadStructure(loc_, format, ondone, settings);
-      }
-      explorePDB_badData_workaround = false;
+      if (typeof jso != "object" && jso != null) jso = JSON.parse(this.request.responseText);
+      else if (jso == null) {throw "";}
       return this.target.load_PDBx(jso, this.pdbid, this.filename);
     };
   }
@@ -745,7 +793,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else if ((format+"").toLowerCase() == "ccp4") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
-      return this.target.load_ccp4(this.request.response, this.filename);
+      return this.target.load_ccp4(this.request.response, this.filename, settings);
     };
   }
   else if ((format+"").toLowerCase() == "obj") {
@@ -766,7 +814,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   }
   else if ((format+"").toLowerCase() == "xyz") {
     request.parse = function() {
-      return this.target.load_xyz(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename);
+      return this.target.load_xyz(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename, settings);
     };
   }
   else if (format.toLowerCase() == "gromacs-trr") {
@@ -1374,8 +1422,9 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
   else if (format == 8 || (format+"").toLowerCase() == "mpbf") struc = this.load_MPBF(data, filename);
   else if ((format+"").toLowerCase() == "mdl") struc = this.load_mdl(data, filename);
   else if ((format+"").toLowerCase() == "mol2") struc = this.load_mol2(data, filename);
-  else if ((format+"").toLowerCase() == "xyz") struc = this.load_xyz(data, filename);
-  else if ((format+"").toLowerCase() == "ccp4") struc = this.load_ccp4(data, filename);
+  else if ((format+"").toLowerCase() == "xyz") struc = this.load_xyz(data, filename, settings);
+  else if ((format+"").toLowerCase() == "ccp4") struc = this.load_ccp4(data, filename, settings);
+  else if ((format+"").toLowerCase() == "obj") struc = this.load_obj(data, filename, settings);
   else if ((format+"").toLowerCase() == "psygene-traj") struc = this.loadMyPrestoTrj(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
   else if ((format+"").toLowerCase() == "gromacs-trr") struc = this.loadGromacsTRR(data);
   else if ((format+"").toLowerCase() == "gromacs-xtc") struc = this.loadGromacsXTC(data);
@@ -1391,6 +1440,13 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
 // ** connects amino bonds within a chain object **
 molmil.viewer.prototype.buildAminoChain = function(chain) {
   if (chain.isHet) return;
+  if (chain.molecules.length == 1 && chain.molecules[0].xna) {
+    chain.molecules[0].ligand = chain.isHet = true; chain.molecules[0].xna = false;
+    delete chain.molecules[0].N;
+    delete chain.molecules[0].CA;
+    delete chain.molecules[0].C;
+    return;
+  }
   var m1, m2, xyz1, xyz2, rC, newChains, struc = chain.entry;
   var xyzRef = chain.modelsXYZ[0];
   chain.bonds = [];
@@ -1632,7 +1688,6 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   canvas.renderer.programs.push(program);
   
   canvas.molmilViewer.calculateCOG();
-  this.renderer.camera.z = this.calcZ();
   
   canvas.renderer.initBuffers();
   canvas.update = true;
@@ -1651,6 +1706,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var f = new Int32Array(buffer, 92, 233); // header
   var g = new Float32Array(buffer, 1024, f[0]/4); // crystallographic symmetry table
   var h = new Float32Array(buffer, 0, 256); // crystallographic symmetry table
+
       
   if (! settings.hasOwnProperty("solid")) settings.solid = true;
   if (! settings.hasOwnProperty("sigma")) settings.sigma = 1.0;
@@ -1680,7 +1736,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   //var bounds = [[first[0], first[1], first[2]], [(a[0]*voxel_size[0])+first[0], (a[0]*voxel_size[1])+first[1], (a[0]*voxel_size[2])+first[2]]];
   var bounds = [[first[0], first[1], first[2]], [(size[0]*voxel_size[0])+first[0], (size[1]*voxel_size[1])+first[1], (size[2]*voxel_size[2])+first[2]]];
       
-  var sigma = settings.sigma*2;
+  var sigma = settings.sigma;
   var potentialFunction = function(x, y, z) {
     var idx = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);
     return sigma-voxels[idx];
@@ -1721,8 +1777,18 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   //var surf = molmil.surfaceNets(size, potentialFunction, gradientFunction, bounds);
   var surf = molmil.surfaceNets2(size, potentialFunction, bounds);
       
+  // is the offset caused by ccp4 being crap
+  // or is the offset caused by these ccp4 files being crap
+  // or is the offset caused by my algorithm?
+      
   var face_normals = [], face_pointers = [], i, j, a = [0, 0, 0], b = [0, 0, 0], c;
-  for (i=0; i<surf.vertices.length; i++) face_pointers.push([]);
+  for (i=0; i<surf.vertices.length; i++) {
+    surf.vertices[i][0] += voxel_size[0];
+    surf.vertices[i][1] += voxel_size[1];
+    surf.vertices[i][2] += voxel_size[2];
+    
+    face_pointers.push([]);
+  }
       
   for (i=0; i<surf.faces.length; i++) {
     // for every face, calculate the normal...
@@ -1815,7 +1881,6 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   canvas.renderer.programs.push(program);
 
   canvas.molmilViewer.calculateCOG();
-  this.renderer.camera.z = this.calcZ();
   
   canvas.renderer.initBuffers();
   canvas.update = true;
@@ -1914,11 +1979,11 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
         while (true) {
           vtd = Math.min(this.nElements-dv, 3000000);
           if (vtd < 1) break;
-          this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4);
+          this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.INDEXINT, dv*4);
           dv += vtd;
         }
       }
-      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
+      else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.INDEXINT, 0);
     };
           
     program.renderPicking = function() {};
@@ -1942,7 +2007,6 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
   
   this.calculateCOG();
   
-  if (! this.skipCOGupdate) this.renderer.camera.z = this.calcZ();
   if (molmil.geometry.onGenerate) molmil_dep.asyncStart(molmil.geometry.onGenerate[0], molmil.geometry.onGenerate[1], molmil.geometry.onGenerate[2], 0);
   
   return struct;
@@ -1952,7 +2016,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
 // ** loads XYZ data **
 
 molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
-  settings = settings || {skipBonds: true};
+  settings = settings || {};
   var struc, currentChain, atomName, x, y, z, currentMol;
   
   data = data.split("\n");
@@ -1980,14 +2044,14 @@ molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
     Xpos = currentChain.modelsXYZ[0].length;
     currentChain.modelsXYZ[0].push(x, y, z);
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomName, currentMol, currentChain));
+    atom.AID = this.AID++;
+    this.atomRef[atom.AID] = atom;
     currentChain.atoms.push(atom);
   }
 
   this.calculateCOG();
   
   molmil.resetColors(null, this);
-
-  this.renderer.camera.z = this.calcZ();
   
   return struc;
 }
@@ -2079,8 +2143,6 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   this.chains.push(currentChain);
   
   molmil.resetColors(null, this);
-
-  this.renderer.camera.z = this.calcZ();
   
   return struc;
   
@@ -2138,8 +2200,6 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
   this.chains.push(currentChain);
   
   molmil.resetColors(null, this);
-
-  this.renderer.camera.z = this.calcZ();
   
   return struc;
   
@@ -2275,8 +2335,6 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   
   molmil.resetColors(null, this);
-
-  this.renderer.camera.z = this.calcZ();
   
   return struc;
 };
@@ -2377,7 +2435,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   // add code to load multiple models...
   
   this.calculateCOG();
-
+  
   for (c=0; c<struc.chains.length; c++) this.buildAminoChain(struc.chains[c]);
   
   var newChains = [], chainRef, rC, m1;
@@ -2413,6 +2471,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       for (i=0; i<tmp[m1].atoms.length; i++) {
         atom = tmp[m1].atoms[i].xyz;
         for (c=0; c<tmp[m1].chain_alt.modelsXYZ_old.length; c++) {
+          if (c >= tmp[m1].chain.modelsXYZ.length) tmp[m1].chain.modelsXYZ.push([]); // find a more efficient spot to put this --> maybe this chain isn't part of struc.chains???
           tmp[m1].chain.modelsXYZ[c].push(
             tmp[m1].chain_alt.modelsXYZ_old[c][atom], 
             tmp[m1].chain_alt.modelsXYZ_old[c][atom+1], 
@@ -2440,8 +2499,6 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   
   molmil.resetColors(null, this);
-
-  this.renderer.camera.z = this.calcZ();
   
   return struc;
 };
@@ -2452,6 +2509,7 @@ molmil.viewer.prototype.calcZ = function(geomRanges) {
   geomRanges = geomRanges || this.geomRanges;
   var mx = Math.max(Math.abs(geomRanges[0]), Math.abs(geomRanges[1]), Math.abs(geomRanges[2]), Math.abs(geomRanges[3]), Math.abs(geomRanges[4]), Math.abs(geomRanges[5]));
   if (test) this.renderer.maxRange = (Math.max(Math.abs(geomRanges[1]-geomRanges[0]), Math.abs(geomRanges[3]-geomRanges[2]), Math.abs(geomRanges[5]-geomRanges[4]))*.5)-molmil.configBox.zNear-5;
+  if (molmil.configBox.stereoMode) return -(mx*molmil.configBox.zFar/9000)-molmil.configBox.zNear-1;
   if (molmil.configBox.projectionMode == 1) return -(mx*molmil.configBox.zFar/3000)-molmil.configBox.zNear-1;
   else return -((mx/Math.min(this.renderer.width, this.renderer.height))*molmil.configBox.zFar*(.625))-molmil.configBox.zNear-1;
 }
@@ -2519,7 +2577,8 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
   
   if (nov_l) {
     var lineVertexData = new Float32Array(nov_l*4), lineVertexData8 = new Uint8Array(lineVertexData.buffer);
-    var lineIndexData = new Uint32Array(noi_l*2);
+    if (molmil.configBox.OES_element_index_uint) var lineIndexData = new Uint32Array(noi_l*2);
+    else var lineIndexData = new Uint16Array(noi_l*2);
   
     for (i=0, vP=0, iP=0, vP8=0; i<lineVertices.length; i++) {
       for (j=0; j<lineVertices[i].length; j++, vP8+=16) {
@@ -2550,7 +2609,9 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
   if (nov_t) {
     
     var triangleVertexData = new Float32Array(nov_t*7), triangleVertexData8 = new Uint8Array(triangleVertexData.buffer);
-    var triangleIndexData = new Uint32Array(noi_t*3); vertexMap = {};
+    if (molmil.configBox.OES_element_index_uint) var triangleIndexData = new Uint32Array(noi_t*3); 
+    else var triangleIndexData = new Uint16Array(noi_t*3);
+    vertexMap = {};
     
     if (molmil.configBox.skipClearGeometryBuffer) {
       struct.data = struct.data || {};
@@ -2585,14 +2646,13 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
         triangleIndexData[iP++] = vertexMap[triangles_lists[i][j][2]];
       }
     }
-    program = molmil.geometry.build_simple_render_program(triangleVertexData, triangleIndexData, this.renderer, {solid: true});
+    program = molmil.geometry.build_simple_render_program(triangleVertexData, triangleIndexData, this.renderer, {solid: true, alphaMode: alpha != 255});
     this.renderer.programs.push(program);
   }
   
   this.renderer.initBD = true;
   
   this.calculateCOG();
-  if (! this.skipCOGupdate) this.renderer.camera.z = this.calcZ();
   if (molmil.geometry.onGenerate) molmil_dep.asyncStart(molmil.geometry.onGenerate[0], molmil.geometry.onGenerate[1], molmil.geometry.onGenerate[2], 0);
 }
 
@@ -2618,7 +2678,7 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
         data = sitems[j].getAttribute("image").trim().split(/\s+/);
         //console.log(data);
         for (k=0; k<9; k++) data[k] = parseFloat(data[k]);
-        data[6] = data[6]; data[7] = data[7]; data[8] = data[8];
+        //data[6] = data[6]; data[7] = data[7]; data[8] = data[8];
         vertexRef[sitems[j].getAttribute("id")] = vertices.length;
         
         COR[0] += data[0]; COR[1] += data[1]; COR[2] += data[2]; COR[3]++;
@@ -2976,6 +3036,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       
         //this.BUmatrices[pdbx_struct_oper_list.id[i]] = [pdbx_struct_oper_list.type[i], mat];
       }
+      
+      this.AisB = (! pdbx_struct_oper_list || ! pdb.pdbx_struct_assembly || (pdbx_struct_oper_list.id.length == 1 && pdb.pdbx_struct_assembly.id == 1));
     
       var pdbx_struct_assembly_gen = pdb.pdbx_struct_assembly_gen, tmp1, tmp2, tmp3=mat4.create(), j, k, mats;
       length = pdbx_struct_assembly_gen.assembly_id.length;
@@ -3038,8 +3100,6 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
   
     molmil.resetColors(struc, this);
   }
-  
-  this.renderer.camera.z = this.calcZ();
   
   this.pdbxData = pdb;
   delete pdb.atom_site;
@@ -3214,7 +3274,7 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
   };
   
   var BBBonds = {}, BBBondsList = {}, chains=[], chain;
-
+  
   var m1, m2, E, NC, NO, HC, HO;
   for (m1=0; m1<chainObj.molecules.length; m1++) {
     mol1 = chainObj.molecules[m1]; c1 = mol1.chain;
@@ -3868,8 +3928,11 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     this.gl.uniform4f(this.wireframe_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
   
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
-    if (this.settings.lines_render) {
+    
+    try {this.gl.vertexAttribPointer(2, 1, this.gl.FLOAT, false, 20, 16);} // for some VERY strange reason this weirdo needs something bound @ attr #2.....
+    catch (e) {}
+    
+    if (this.settings.lines_render) {      
       if (this.settings.has_ID) {
         this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
         if (! this.settings.uniform_color) this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
@@ -3898,9 +3961,9 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
 
     if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
       var dv = 0, vtd;
-      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.LINES, vtd, gl.INDEXINT, dv*4); dv += vtd;}
     }
-    else this.gl.drawElements(this.gl.LINES, this.nElements, gl.UNSIGNED_INT, 0);
+    else this.gl.drawElements(this.gl.LINES, this.nElements, gl.INDEXINT, 0);
   };
       
   program.standard_render = function(modelViewMatrix, COR, i) {
@@ -3937,15 +4000,32 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
       this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
     }
+
+    // in yasara only the "outside" is transparent, while the "inside" is opaque...
+    
+    if (this.settings.alphaMode) {
+      if (molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
+      this.gl.enable(this.gl.BLEND);
+      this.gl.blendEquation(this.gl.FUNC_ADD); 
+      this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+      this.gl.disable(this.gl.DEPTH);
+    }
+    
     
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         
     if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
       var dv = 0, vtd;
-      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.INDEXINT, dv*4); dv += vtd;}
     }
-    else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
-        
+    else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.INDEXINT, 0);
+    
+    if (this.settings.alphaMode) {
+      if (molmil.configBox.cullFace) {this.gl.enable(this.gl.CULL_FACE);} 
+      this.gl.disable(this.gl.BLEND);
+      this.gl.enable(this.gl.DEPTH);
+    }
+    
   };
 
   if (! settings.multiMatrix) {
@@ -3981,13 +4061,12 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
 
         this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
         this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
-      
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
           var dv = 0, vtd;
-          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.POINTS, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.POINTS, vtd, gl.INDEXINT, dv*4); dv += vtd;}
         }
-        else this.gl.drawElements(this.gl.POINTS, this.nElements, gl.UNSIGNED_INT, 0);
+        else this.gl.drawElements(this.gl.POINTS, this.nElements, gl.INDEXINT, 0);
       };
     }
     else {
@@ -4009,9 +4088,9 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
           var dv = 0, vtd;
-          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.UNSIGNED_INT, dv*4); dv += vtd;}
+          while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.INDEXINT, dv*4); dv += vtd;}
         }
-        else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.UNSIGNED_INT, 0);
+        else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.INDEXINT, 0);
       };
       
       
@@ -4167,11 +4246,13 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   
   buffer1.vertexBuffer = new Float32Array(vs*8); // x, y, z, nx, ny, nz, rgba, aid
   buffer1.vertexBuffer8 = new Uint8Array(buffer1.vertexBuffer.buffer);
-  buffer1.indexBuffer = new Uint32Array(is);
+  if (molmil.configBox.OES_element_index_uint) buffer1.indexBuffer = new Uint32Array(is);
+  else buffer1.indexBuffer = new Uint16Array(is);
   
   buffer2.vertexBuffer = new Float32Array(wfatoms2draw.length*5); // x, y, z, rgba, aid
   buffer2.vertexBuffer8 = new Uint8Array(buffer2.vertexBuffer.buffer);
-  buffer2.indexBuffer = new Uint32Array(lines2draw.length*2);
+  if (molmil.configBox.OES_element_index_uint) buffer2.indexBuffer = new Uint32Array(lines2draw.length*2);
+  else buffer2.indexBuffer = new Uint16Array(lines2draw.length*2);
 };
 
 // ** builds a cartoon representation **
@@ -4287,7 +4368,8 @@ molmil.geometry.initCartoon = function(chains) {
   var buffer3 = this.buffer3;
   buffer3.vertexBuffer = new Float32Array(vs*8); // x, y, z, nx, ny, nz, rgba, aid
   buffer3.vertexBuffer8 = new Uint8Array(buffer3.vertexBuffer.buffer);
-  buffer3.indexBuffer = new Uint32Array(is*3);
+  if (molmil.configBox.OES_element_index_uint) buffer3.indexBuffer = new Uint32Array(is*3);
+  else buffer3.indexBuffer = new Uint16Array(is*3);
 };
 
 // ** build atoms representation (spheres) **
@@ -4570,7 +4652,8 @@ molmil.geometry.generateSurfaces = function(chains) {
   
   for (c=0; c<chains.length; c++) {
     if (chains[c].displayMode != molmil.displayMode_ChainSurfaceCG) continue;
-    surf = molmil.coarseSurface(chains[c], 7.5, 7.5*.75);
+    if (chains[c].HQsurface) surf = molmil.coarseSurface(chains[c], molmil.configBox.HQsurface_gridSpacing, 1.4);
+    else surf = molmil.coarseSurface(chains[c], 7.5, 7.5*.75);
     surf.rgba = chains[c].rgba;
     surfaces.push(surf);
     verts += surf.vertices.length;
@@ -6265,6 +6348,8 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   this.gl = this.defaultContext;
   
   molmil.configBox.OES_element_index_uint = this.gl.getExtension('OES_element_index_uint');
+  this.gl.INDEXINT = molmil.configBox.OES_element_index_uint ? this.gl.UNSIGNED_INT : this.gl.UNSIGNED_SHORT;
+  
 
   this.width = width | canvas.width;
   this.height = height | canvas.height;
@@ -6499,18 +6584,93 @@ molmil.render.prototype.render = function() {
 
   // rendering
   
-  this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR);
-  this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
   
   var COR = [0, 0, 0];
   var tmp = mat3.create(); mat3.fromMat4(tmp, this.modelViewMatrix);
   vec3.transformMat3(COR, this.soup.COR, tmp);
+  
+  if (molmil.configBox.stereoMode) {
+    if (! this.FBOs.hasOwnProperty("stereoLeft")) {
+      this.FBOs.stereoLeft = new molmil.FBO(this.gl, this.width, this.height);
+      this.FBOs.stereoLeft.addTexture("stereoLeft", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
+      this.FBOs.stereoLeft.setup();
+      
+      this.FBOs.stereoRight = new molmil.FBO(this.gl, this.width, this.height);
+      this.FBOs.stereoRight.addTexture("stereoRight", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
+      this.FBOs.stereoRight.setup();
+    }
 
-  for (var p=0; p<this.programs.length; p++) {
-    this.programs[p].render(this.modelViewMatrix, COR);
+    var tmpVal = this.modelViewMatrix[12];
+    var sCC = molmil.configBox.stereoCameraConfig; //[bottom, top, a, b, c, eyeSep, convergence, zNear, zfar];
+    var left, right, zNear = sCC[7], zFar = sCC[8];
+    
+    // left eye
+    this.modelViewMatrix[12] = tmpVal - sCC[5]*.5;
+    
+    left = -sCC[3] * (zNear/sCC[6]);
+    right = sCC[4] * (zNear/sCC[6]);
+    mat4.frustum(this.projectionMatrix, left, right, sCC[0], sCC[1], zNear, zFar);
+    
+    if (molmil.configBox.stereoMode == 1) { // anaglyph
+      this.FBOs.stereoLeft.bind();
+      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
+      this.FBOs.stereoLeft.unbind();
+    }
+    else if (molmil.configBox.stereoMode == 2) { // VR
+      this.gl.viewport(this.width, 0, this.width, this.height);
+      this.gl.scissor(this.width, 0, this.width, this.height);
+      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
+    }
+    
+    // right eye
+    this.modelViewMatrix[12] = tmpVal + sCC[5]*.5;
+    
+    left = -sCC[4] * (zNear/sCC[6]);
+    right = sCC[3] * (zNear/sCC[6]);
+    mat4.frustum(this.projectionMatrix, left, right, sCC[0], sCC[1], zNear, zFar);
+    
+    if (molmil.configBox.stereoMode == 1) { // anaglyph
+      this.FBOs.stereoRight.bind();
+      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
+      this.FBOs.stereoRight.unbind();
+    }
+    else if (molmil.configBox.stereoMode == 2) { // VR
+      this.gl.viewport(0, 0, this.width, this.height);
+      this.gl.scissor(0, 0, this.width, this.height);
+      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
+    }
+    
+    if (molmil.configBox.stereoMode == 1) {
+      var shader = this.shaders.anaglyph;
+    
+      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    
+      this.gl.useProgram(shader.program);
+      
+      this.FBOs.stereoLeft.bindTextureToUniform("stereoLeft", shader.uniforms.stereoLeft, 0);
+      this.FBOs.stereoRight.bindTextureToUniform("stereoRight", shader.uniforms.stereoRight, 1);
+    
+      var buffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0,  1.0, -1.0,  1.0, 1.0, -1.0, 1.0,  1.0]), this.gl.STATIC_DRAW);
+      this.gl.vertexAttribPointer(shader.attributes.in_Position, 2, this.gl.FLOAT, false, 0, 0);
+      this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+    }
+    
+    // reset
+    this.modelViewMatrix[12] = tmpVal;
+  }
+  else {
+    this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+    
+    for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
   }
   
-  if (this.buffers.atomSelectionBuffer) {
+  if (this.buffers.atomSelectionBuffer) { // this doesn't work properly with stereoscopy...
     this.renderAtomSelection(this.modelViewMatrix, COR);
   }
   
@@ -6538,15 +6698,30 @@ molmil.render.prototype.initFBOs = function() {
 
 molmil.render.prototype.resizeViewPort = function() {
   this.width = this.canvas.width; this.height = this.canvas.height;
+  if (molmil.configBox.stereoMode == 2) this.width *= 0.5;
   if (molmil.configBox.projectionMode == 1) {
-    mat4.perspective(this.projectionMatrix, 45.0*(Math.PI/360), this.width/this.height, molmil.configBox.zNear, molmil.configBox.zFar);
+    mat4.perspective(this.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/360), this.width/this.height, molmil.configBox.zNear, molmil.configBox.zFar);
   }
+
+  var convergence = molmil.configBox.zNear * molmil.configBox.stereoFocalFraction;
+  var eyeSep = convergence/molmil.configBox.stereoEyeSepFraction;
+  var top, bottom;
+  top = molmil.configBox.zNear * Math.tan(molmil.configBox.camera_fovy/2) * .25;
+  bottom = -top;
+  a = (this.width/this.height) * Math.tan(molmil.configBox.camera_fovy/2) * convergence;
+  b = a - (eyeSep/2);
+  c = a + (eyeSep/2);
+  
+  delete this.FBOs.stereoLeft;
+  
+  molmil.configBox.stereoCameraConfig = [bottom, top, a, b, c, eyeSep, convergence, molmil.configBox.zNear*.25, molmil.configBox.zFar*.25];
   
   this.gl.viewport(0, 0, this.width, this.height);
   //this.initFBOs();
 };
 
 molmil.render.prototype.renderAtomSelection = function(modelViewMatrix, COR) {
+  if (! this.buffers.atomSelectionBuffer.items) return;
   this.gl.useProgram(this.shaders.atomSelection.program);
   this.gl.uniform3f(this.shaders.atomSelection.uniforms.COR, COR[0], COR[1], COR[2]);
   this.gl.uniformMatrix4fv(this.shaders.atomSelection.uniforms.modelViewMatrix, false, modelViewMatrix);
@@ -7015,6 +7190,7 @@ molmil.UI.prototype.colorEntry=function(entry, cm) {
 
 molmil.UI.prototype.showColorMenu=function(ref, entry) {
   if (ref.subMenu) {
+    ref.subMenu.style.zIndex = 9999;
     clearTimeout(ref.subMenu.TID);
     ref.subMenu.style.display = "";
     return;
@@ -7074,7 +7250,8 @@ molmil.UI.prototype.showColorMenu=function(ref, entry) {
   
    
   ref.onmouseout = function() {
-    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
+    this.subMenu.style.zIndex = 9998;
+    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 500);
   };
   ref.pushNode(menu);
 };
@@ -7084,6 +7261,7 @@ molmil.UI.prototype.showDisplayMenuCM=function(ref) {
   if (! atoms.length) return;
   
   if (ref.subMenu) {
+    ref.subMenu.style.zIndex = 9999;
     clearTimeout(ref.subMenu.TID);
     ref.subMenu.style.display = "";
     return;
@@ -7124,7 +7302,8 @@ molmil.UI.prototype.showDisplayMenuCM=function(ref) {
   addEntry("Chain", function() {this.UI.showDisplayMenu(this, {mtype: 2, ref: chains, inv: inv});}, true);
   
   ref.onmouseout = function() {
-    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
+    this.subMenu.style.zIndex = 9998;
+    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 500);
   };
   ref.pushNode(menu);
 };
@@ -7134,6 +7313,7 @@ molmil.UI.prototype.showColorMenuCM=function(ref) {
   if (! atoms.length) return;
   
   if (ref.subMenu) {
+    ref.subMenu.style.zIndex = 9999;
     clearTimeout(ref.subMenu.TID);
     ref.subMenu.style.display = "";
     return;
@@ -7178,13 +7358,15 @@ molmil.UI.prototype.showColorMenuCM=function(ref) {
   addEntry("Chain", function() {this.UI.showColorMenu(this, {mtype: 2, ref: chains, inv: inv});}, true);
   
   ref.onmouseout = function() {
-    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
+    this.subMenu.style.zIndex = 9998;
+    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 500);
   };
   ref.pushNode(menu);
 };
 
 molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
   if (ref.subMenu) {
+    ref.subMenu.style.zIndex = 9999;
     clearTimeout(ref.subMenu.TID);
     ref.subMenu.style.display = "";
     return;
@@ -7226,6 +7408,7 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
     else {
       var aaMenu = function(ref2, tp) {
         if (ref2.subMenu) {
+          ref2.subMenu.style.zIndex = 9999;
           clearTimeout(ref2.subMenu.TID);
           ref2.subMenu.style.display = "";
           return;
@@ -7259,7 +7442,8 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
         addEntry2("Wireframe", function() {this.UI.displayEntry(entry, tp == 1 ? 5 : 5.5);});
         
         ref2.onmouseout = function() {
-          this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref2.subMenu, 100);
+          this.subMenu.style.zIndex = 9998;
+          this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref2.subMenu, 500);
         };
         ref2.pushNode(menu2);
       };
@@ -7277,7 +7461,8 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
   }
 
   ref.onmouseout = function() {
-    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 100);
+    this.subMenu.style.zIndex = 9998;
+    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 500);
   };
   ref.pushNode(menu);
 };
@@ -7398,6 +7583,7 @@ molmil.UI.prototype.showCM=function(e, entry) {
 
 molmil.UI.prototype.showRM=function(icon) {
   var menu = icon.parentNode.menu;
+  molmil_dep.Clear(menu);
   if (menu.style.display == "none") {
     icon.innerHTML = "&gt;<br/>&gt;<br/>&gt;";
     menu.style.maxHeight = ((this.canvas ? this.canvas : document.body)-32)+"px";
@@ -7595,6 +7781,13 @@ molmil.UI.prototype.showLM=function(icon) {
   e.title = "Opens Molmil's advanced settings panel";
   e.onclick = function() {this.LM.onclick(); this.UI.settings();};
   
+  e = menu.appendChild(document.createElement("div")); e.UI = this; e.LM = icon;
+  e.className = "molmil_UI_ME";
+  e.innerHTML = "View >";
+  e.title = "View options";
+  e.onclick = function() {this.UI.view(menu.sub);};
+  
+  
   var number_of_frames = this.soup.structures.length ? this.soup.structures[0].number_of_frames : 0;
   
   if (number_of_frames > 1) {
@@ -7651,6 +7844,184 @@ molmil.UI.prototype.showLM=function(icon) {
   menu.sub.style.display = "none";
 };
 
+molmil.UI.prototype.view=function(sub) {
+  molmil_dep.Clear(sub);
+  var e;
+  sub.style.display = "";
+  e = sub.pushNode("div", "Reset zoom", "molmil_UI_ME");
+  e.UI = this;
+  e.onclick = function() {
+    if (this.UI.LM && this.UI.LM.parentNode.childNodes.length > 1) this.UI.LM.onclick();
+    this.UI.soup.renderer.camera.z = this.UI.soup.calcZ();
+    this.UI.soup.canvas.update = true;
+  };
+  
+  e = sub.pushNode("div", "Configure slab", "molmil_UI_ME");
+  e.UI = this;
+  e.onclick = function() {this.UI.configureSlab.apply(this.UI);};
+  
+  if (! this.soup.AisB) {
+    e = sub.pushNode("div", "Configure BU", "molmil_UI_ME");
+    e.UI = this;
+    e.onclick = function() {this.UI.configureBU.apply(this.UI);};
+  }
+}
+
+molmil.UI.prototype.configureBU = function(target) {
+  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+
+  var assembly = this.soup.infoBag.BU_assembly || -1; // make this configurable...
+  var rm = this.soup.infoBag.BU_rm || [3, 2]; // make this configurable...
+  
+  var popup = molmil_dep.dcE("div");
+  popup.setClass("molmil_menu_popup");
+  
+  popup.pushNode("div", "Biological Unit configuration");
+  popup.pushNode("hr");
+  
+  var table = popup.pushNode("table"), tr, td;
+  var US, BUrm;
+  
+  tr = table.pushNode("tr");
+  td = tr.pushNode("td", "Unit selection:");
+  
+  US = tr.pushNode("td").pushNode("select");
+  
+  
+  var soup = this.soup;
+  var noc = 0, i, c, tmp;
+  for (c=0; c<soup.chains.length; c++) {if (soup.poly_asym_ids.indexOf(soup.chains[c].name) != -1) noc++;}
+
+  td = US.pushNode("option", "Asymmetric unit (%NOC)".replace("%NOC", noc)); td.value = -1;
+  
+  var assembly_id = -1;
+  if (Object.keys(soup.BUmatrices).length > 1 || Object.keys(soup.BUassemblies).length > 1) {
+    for (var e in soup.BUassemblies) {
+      noc = 0;
+      for (i=0; i<soup.BUassemblies[e].length; i++) {
+        tmp = 0;
+        for (c=0; c<soup.BUassemblies[e][i][1].length; c++) {if (soup.poly_asym_ids.indexOf(soup.BUassemblies[e][i][1][c]) != -1) tmp++;}
+        noc += tmp*soup.BUassemblies[e][i][0].length;
+      }
+
+      td = US.pushNode("option", "Biological unit %N (%NOC)".replace("%NOC", noc).replace("%N", e)); td.value = e;
+    }
+    if (assembly && (assembly == -1 || soup.BUassemblies.hasOwnProperty(assembly))) assembly_id = assembly;
+    else {
+      assembly = figureOutAssemblyId(soup.pdbxData, soup.BUassemblies);
+      if (soup.BUassemblies.hasOwnProperty(assembly)) assembly_id = assembly;
+    }
+  }
+  
+  US.value = assembly_id;
+  
+  tr = table.pushNode("tr");
+  td = tr.pushNode("td", "Unit repr.:");
+  
+  BUrm = tr.pushNode("td").pushNode("select");
+  
+  td = BUrm.pushNode("option", "Only backbone, colored by CPK"); td.value = [1, 1];
+  td = BUrm.pushNode("option", "Only backbone, colored by each asymmetric chain"); td.value = [1, 2];
+  td = BUrm.pushNode("option", "Only backbone, colored by each chain"); td.value = [1, 3];
+  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by CPK"); td.value = [2, 1];
+  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by each asymmetric chain"); td.value = [2, 2];
+  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by each chain"); td.value = [2, 3];
+  
+  
+  td = BUrm.pushNode("option", "Tube, colored by each asymmetric chain"); td.value = [3, 2];
+  td = BUrm.pushNode("option", "Tube, colored by each chain"); td.value = [3, 3];
+  td = BUrm.pushNode("option", "Tube, colored by secondary structure"); td.value = [3, 4];
+  td = BUrm.pushNode("option", "Cartoon, colored by each asymmetric chain"); td.value = [4, 2];
+  td = BUrm.pushNode("option", "Cartoon, colored by each chain"); td.value = [4, 3];
+  td = BUrm.pushNode("option", "Cartoon, colored by secondary structure"); td.value = [4, 4];
+  
+  td = BUrm.pushNode("option", "Coarse surface, colored by each asymmetric chain"); td.value = [5, 2];
+  td = BUrm.pushNode("option", "Coarse surface, colored by each chain"); td.value = [5, 3];
+  
+  BUrm.value = rm;
+  
+  US.soup = BUrm.soup = soup;
+  
+  US.oninput = BUrm.oninput = function() {
+    var tmp = BUrm.value.split(",");
+    this.soup.infoBag.BU_assembly = US.value;
+    this.soup.infoBag.BU_rm = [parseInt(tmp[0]), parseInt(tmp[1])];
+    
+    molmil.toggleBU(this.soup.infoBag.BU_assembly, this.soup.infoBag.BU_rm[0], this.soup.infoBag.BU_rm[1], null, this.soup);
+  }
+  
+  var closeButton = popup.pushNode("button", "Close");
+  closeButton.style.marginLeft = "1em";
+  closeButton.onclick = function() {popup.parentNode.removeChild(popup);};
+  
+  if (target) target.pushNode(popup);
+  else this.LM.parentNode.pushNode(popup);
+}
+
+molmil.UI.prototype.configureSlab=function(target) {
+  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  
+  var popup = molmil_dep.dcE("div");
+  popup.setClass("molmil_menu_popup");
+  
+  popup.pushNode("div", "Slab configuration");
+  popup.pushNode("hr");
+  
+  
+  var table = popup.pushNode("table"), tr, td;
+  var slab_near, slab_far
+  tr = table.pushNode("tr");
+  tr.pushNode("td", "Slab near:");
+  slab_near = tr.pushNode("td").pushNode("input");
+  slab_near.type = "range";
+  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
+  
+  tr = table.pushNode("tr");
+  tr.pushNode("td", "Slab far:");
+  slab_far = tr.pushNode("td").pushNode("input");
+  slab_far.type = "range";
+  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
+  
+  slab_near.oninput = function() { // handle modification of the slab-near slider
+    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
+    if (parseFloat(slab_far.value) <= parseFloat(this.value)) {
+      slab_far.value = parseFloat(this.value)+1;
+      slab_far.oninput();
+    }
+    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
+  };
+  
+  slab_far.oninput = function() { // handle modification of the slab-far slider
+    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
+    if (parseFloat(slab_near.value) >= parseFloat(this.value)) {
+      slab_near.value = parseFloat(this.value)-1;
+      slab_near.oninput();
+    }
+    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
+  };
+  var szI = Math.min(this.soup.geomRanges[0], this.soup.geomRanges[2], this.soup.geomRanges[4]) + molmil.configBox.zNear;
+  var szA = Math.max(this.soup.geomRanges[1], this.soup.geomRanges[3], this.soup.geomRanges[5]) + molmil.configBox.zNear;
+  
+  slab_near.min = slab_far.min = szI;
+  slab_near.max = slab_far.max = szA;
+  
+  slab_near.step = slab_far.step = .1;
+  
+  slab_near.value = this.soup.renderer.settings.slabNear || szI;
+  slab_far.value = this.soup.renderer.settings.slabFar || szA
+
+  slab_near.oninput();
+  slab_far.oninput();
+  
+  
+  var closeButton = popup.pushNode("button", "Close");
+  closeButton.style.marginLeft = "1em";
+  closeButton.onclick = function() {popup.parentNode.removeChild(popup);};
+  
+  if (target) target.pushNode(popup);
+  else this.LM.parentNode.pushNode(popup);
+  
+}
 
 molmil.UI.prototype.settings=function() {
   
@@ -7679,6 +8050,13 @@ molmil.UI.prototype.settings=function() {
   tmp = saveButton.projectionMode.pushNode("option", "Perspective projection"); tmp.value = 1;
   tmp = saveButton.projectionMode.pushNode("option", "Orthographic projection"); tmp.value = 2;
   if (molmil.configBox.projectionMode == 2) tmp.selected = true;
+  
+  saveButton.stereoMode = molmil_dep.dcE("select");
+  tmp = saveButton.stereoMode.pushNode("option", "None"); tmp.value = 0;
+  tmp = saveButton.stereoMode.pushNode("option", "Anaglyph"); tmp.value = 1;
+  if (molmil.configBox.stereoMode == 1) tmp.selected = true;
+  tmp = saveButton.stereoMode.pushNode("option", "Side-by-side"); tmp.value = 2;
+  if (molmil.configBox.stereoMode == 2) tmp.selected = true;
   
   saveButton.colorMode = molmil_dep.dcE("select");
   tmp = saveButton.colorMode.pushNode("option", "Rasmol"); tmp.value = 1;
@@ -7723,6 +8101,10 @@ molmil.UI.prototype.settings=function() {
   tr.pushNode("td").pushNode(saveButton.projectionMode);
   
   tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Stereoscopy:");
+  tr.pushNode("td").pushNode(saveButton.stereoMode);
+  
+  tr = tbl.pushNode("tr");
   tr.pushNode("td", "Color scheme*:");
   tr.pushNode("td").pushNode(saveButton.colorMode);
   tr.title = "Atom (CPK) colors need to be manually re-applied to become effective";
@@ -7740,6 +8122,7 @@ molmil.UI.prototype.settings=function() {
     localStorage.setItem("molmil.settings_QLV", this.qlv.value);
     localStorage.setItem("molmil.settings_glsl_fog", (molmil.configBox.glsl_fog=this.fog.checked) ? "1" : "0");
     localStorage.setItem("molmil.settings_PROJECTION", this.projectionMode.value);
+    localStorage.setItem("molmil.settings_STEREO", this.stereoMode.value);
     localStorage.setItem("molmil.settings_COLORS", this.colorMode.value);
     localStorage.setItem("molmil.settings_BGCOLOR", JSON.stringify([parseFloat(this.bgcolor.R.value)/255, parseFloat(this.bgcolor.G.value)/255, parseFloat(this.bgcolor.B.value)/255, parseFloat(this.bgcolor.A.value)/255]));
     localStorage.setItem("molmil.settings_BBSF", this.bbsf.value);
@@ -7747,7 +8130,7 @@ molmil.UI.prototype.settings=function() {
     // reload settings
     molmil.initSettings();
     this.UI.soup.reloadSettings();
-    molmil.configBox.projectionMode = this.projectionMode.value; this.UI.soup.renderer.resizeViewPort();
+    molmil.configBox.projectionMode = this.projectionMode.value; molmil.configBox.stereoMode = parseInt(this.stereoMode.value); this.UI.soup.renderer.resizeViewPort();
     molmil.shaderEngine.recompile(this.UI.soup.renderer);
     //this.UI.soup.renderer.initShaders(molmil.configBox.glsl_shaders);
     
@@ -7760,6 +8143,10 @@ molmil.UI.prototype.settings=function() {
   };
   
   popup.pushNode(saveButton);
+  
+  var cancelButton = popup.pushNode("button", "Cancel");
+  cancelButton.style.marginLeft = "1em";
+  cancelButton.onclick = function() {popup.parentNode.removeChild(popup);};
   
   this.LM.parentNode.pushNode(popup);
   
@@ -7914,6 +8301,100 @@ molmil.UI.prototype.clear=function() {
   this.LM.parentNode.pushNode(popup);
 };
 
+molmil.UI.prototype.showDialog=function(func) {
+  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  
+  var popup = molmil_dep.dcE("div");
+  popup.setClass("molmil_menu_popup");
+  
+  if (func) func.apply(this, [popup]);
+  
+  if (this.LM) this.LM.parentNode.pushNode(popup);
+  
+  return popup;
+}
+
+molmil.UI.prototype.xyz_input_popup=function(fp, fn, cb) {
+  this.showDialog(function(dialog) {
+    var table = dialog.pushNode("table"), tr, td, load, cancel;
+    var skipBonds;
+
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Filename:");
+    tr.pushNode("td", fn);
+          
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Skip bond building:");
+    skipBonds = tr.pushNode("td").pushNode("input");
+    skipBonds.type = "checkbox";
+          
+    load = dialog.pushNode("button", "Load");
+    load.onclick = function() {
+      var settings = {};
+            
+      settings.skipBonds = skipBonds.checked;
+
+      this.UI.soup.loadStructureData(fp, "xyz", fn, cb, settings);
+            
+      dialog.parentNode.removeChild(dialog);
+    }
+    load.UI = this;
+
+    cancel = dialog.pushNode("button", "Cancel");
+    cancel.onclick = function() {dialog.parentNode.removeChild(dialog);};
+          
+
+  });
+}
+
+
+molmil.UI.prototype.ccp4_input_popup=function(fp, fn, cb) {
+  this.showDialog(function(dialog) {
+    var table = dialog.pushNode("table"), tr, td, load, cancel;
+    var sigma, solid, skipnorm;
+
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Filename:");
+    tr.pushNode("td", fn);
+          
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Sigma:");
+    sigma = tr.pushNode("td").pushNode("input");
+    sigma.value = 1.0;
+          
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Solid:");
+    solid = tr.pushNode("td").pushNode("input");
+    solid.type = "checkbox";
+    solid.checked = true;
+          
+    tr = table.pushNode("tr");
+    tr.pushNode("td", "Skip normalization:");
+    skipnorm = tr.pushNode("td").pushNode("input");
+    skipnorm.type = "checkbox";
+          
+    load = dialog.pushNode("button", "Load");
+    load.onclick = function() {
+      var settings = {};
+      try {settings.sigma = parseFloat(sigma.value);}
+      catch (e) {return alert("Incorrect value for sigma");}
+            
+      settings.solid = solid.checked;
+      settings.skipNormalization = skipnorm.checked;
+
+      this.UI.soup.loadStructureData(fp, "ccp4", fn, cb, settings);
+            
+      dialog.parentNode.removeChild(dialog);
+    }
+    load.UI = this;
+
+    cancel = dialog.pushNode("button", "Cancel");
+    cancel.onclick = function() {dialog.parentNode.removeChild(dialog);};
+          
+
+  });
+}
+
 molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
   
@@ -7936,17 +8417,21 @@ molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
     r.fileFormat = this.fileFormat;
     r.filename = popup.inp.files[0].name;
     r.onload = function(e) {
-      if (this.fileFormat) soup.loadStructureData(e.target.result, this.fileFormat, this.filename, function(soup, struc) {
+      popup.cancel.onclick();
+      
+      var cb = function(soup, struc) {
         UI.resetRM();
         if (ondone) ondone(soup, struc);
         else {
           molmil.displayEntry(struc, soup.AID > 1e5 ? 5 : 1);
           molmil.colorEntry(struc, 1, [], true, soup);
         }
-      }, popup.settings);
+      };
+      
+      if (this.fileFormat == "ccp4") UI.ccp4_input_popup(e.target.result, this.filename, cb);
+      else if (this.fileFormat) soup.loadStructureData(e.target.result, this.fileFormat, this.filename, cb, popup.settings);
       else ondone(this.filename, e.target.result);
       oncancel = null;
-      popup.cancel.onclick();
    };
    if (binary) r.readAsArrayBuffer(popup.inp.files[0]);
    else r.readAsText(popup.inp.files[0]);
@@ -8477,6 +8962,14 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
         chain.displayMode = molmil.displayMode_ChainSurfaceCG;
+        chain.HQsurface = false;
+      }
+    }
+    else if (dm == molmil.displayMode_ChainSurfaceCG+0.5) {
+      for (c=0; c<obj.chains.length; c++) {
+        chain = obj.chains[c];
+        chain.displayMode = molmil.displayMode_ChainSurfaceCG;
+        chain.HQsurface = true;
       }
     }
   }
@@ -9077,10 +9570,16 @@ molmil.handleLoadedTexture = function (texture) { // maybe deprecated
 
 // ** waits until all requirements are loaded, then starts the renderer **
 molmil.safeStartViewer = function (canvas) {
+  if (!canvas.renderer.camera.z_set) {
+    canvas.renderer.camera.z = canvas.molmilViewer.calcZ();
+    canvas.renderer.camera.z_set = true;
+  }
+  if (canvas.initialized) return;
   for (var t in canvas.textures) {
     if (! canvas.textures[t].loaded) return molmil_dep.asyncStart(molmil.safeStartViewer, [canvas], null, 100);
   }
-  molmil.canvasList.push(canvas);
+  canvas.renderer.resizeViewPort();
+  molmil.canvasList.push(canvas); canvas.initialized = true;
   if (document.body.classList !== undefined) document.body.classList.add("entryLoaded");
 }
 
@@ -9383,9 +9882,18 @@ molmil.clear = function(canvas) {
   if (document.body.classList !== undefined) document.body.classList.remove("entryLoaded");
 };
 
+// use an alternate way of generating the isosurface...
+// 1) use a coarse grid (e.g. 4x lower density) to calculate the nearest point on the isosurface (vdw+probeR)
+// 2) throw away everything that wasn't mapped
+// 3) use a hq grid to calculate the sasa (previous isosurface-probeR)
+
+//molmil.coarseSurface = function(chain, res, probeR) {
+//  
+//}
 
 // ** generates a coarse surface for a chain **
 molmil.coarseSurface = function(chain, res, probeR) {
+  //res = 1.0; probeR = 1.4;
   var hres = res*.5;
   var inv_res = 1 / res;
   
@@ -9441,11 +9949,6 @@ molmil.coarseSurface = function(chain, res, probeR) {
     aY = modelsXYZ[atoms[a].xyz+1] + dY;
     aZ = modelsXYZ[atoms[a].xyz+2] + dZ;
 
-    block_ranges[0] = Math.min(0, Math.floor(aX - r - probeR)); block_ranges[1] = Math.max(Math.ceil(aX + r + probeR), rX);
-    block_ranges[2] = Math.min(0, Math.floor(aY - r - probeR)); block_ranges[3] = Math.max(Math.ceil(aY + r + probeR), rY);
-    block_ranges[4] = Math.min(0, Math.floor(aZ - r - probeR)); block_ranges[5] = Math.max(Math.ceil(aZ + r + probeR), rZ);
-       
-    // no optimization for now:
     block_ranges[0] = 0; block_ranges[1] = rX;
     block_ranges[2] = 0; block_ranges[3] = rY;
     block_ranges[4] = 0; block_ranges[5] = rZ;
@@ -9548,16 +10051,18 @@ molmil.coarseSurface = function(chain, res, probeR) {
     normals.push(a);
   }
       
-  molmil.taubinSmoothing(normals, surf.faces, .33, -.331, 50);
+  molmil.taubinSmoothing(normals, surf.faces, .33, -.331, 20);
   for (i=0; i<normals.length; i++) vec3.normalize(normals[i], normals[i]);
 
+  var sf = 1./res;
+  
   for (i=0; i<normals.length; i++) {
-    surf.vertices[i][0] = ((surf.vertices[i][0] - normals[i][0] * probeR * .15) * res) - dX;
-    surf.vertices[i][1] = ((surf.vertices[i][1] - normals[i][1] * probeR * .15) * res) - dY;
-    surf.vertices[i][2] = ((surf.vertices[i][2] - normals[i][2] * probeR * .15) * res) - dZ;
+    surf.vertices[i][0] = ((surf.vertices[i][0] - normals[i][0] * probeR * sf) * res) - dX;
+    surf.vertices[i][1] = ((surf.vertices[i][1] - normals[i][1] * probeR * sf) * res) - dY;
+    surf.vertices[i][2] = ((surf.vertices[i][2] - normals[i][2] * probeR * sf) * res) - dZ;
   }
       
-  molmil.taubinSmoothing(surf.vertices, surf.faces, .33, -.331, 50);
+  molmil.taubinSmoothing(surf.vertices, surf.faces, .33, -.331, 20);
       
   surf.normals = normals;
       
@@ -10286,7 +10791,8 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
           
           vertices = new Float32Array(surf.vertices.length*8); // x, y, z, nx, ny, nz, rgba, none
           vertices8 = new Uint8Array(vertices.buffer);
-          indices = new Uint32Array(surf.faces.length*3);
+          if (molmil.configBox.OES_element_index_uint) indices = new Uint32Array(surf.faces.length*3);
+          else indices = new Uint16Array(surf.faces.length*3);
           COM = [0, 0, 0, 0];
           A[0] = A[1] = A[2] = 1e99; // xyzMin
           B[0] = B[1] = B[2] = -1e99; // xyzMax
@@ -10367,7 +10873,8 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
         // convert this to 32bit rgba
         vertices = new Float32Array((AIDs.length)*5); // x, y, z, rgba, AID
         vertices8 = new Uint8Array(vertices.buffer);
-        indices = new Uint32Array(lines2draw.length*2);
+        if (molmil.configBox.OES_element_index_uint) indices = new Uint32Array(lines2draw.length*2);
+        else indices = new Uint16Array(lines2draw.length*2);
         COM = [0, 0, 0, 0];
         A[0] = A[1] = A[2] = 1e99; // xyzMin
         B[0] = B[1] = B[2] = -1e99; // xyzMax
@@ -11481,7 +11988,7 @@ molmil.bindCanvasInputs = function(canvas) {
   
   // mypresto trajectory file
   canvas.inputFunctions.push(function(canvas, fr) {
-    if (fr.filename.indexOf(".cor", fr.filename.length-4) !== -1) {
+    if (fr.filename.indexOf(".cor", fr.filename.length-4) !== -1 || fr.filename.indexOf(".cod", fr.filename.length-4) !== -1) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "psygene-traj", this.filename);
       }
@@ -11505,7 +12012,7 @@ molmil.bindCanvasInputs = function(canvas) {
   canvas.inputFunctions.push(function(canvas, fr) {
     if (fr.filename.indexOf(".ccp4", fr.filename.length-5) !== -1) {
       fr.onload = function(e) {
-        canvas.molmilViewer.loadStructureData(e.target.result, "ccp4", this.filename);
+        canvas.molmilViewer.UI.ccp4_input_popup(e.target.result, this.filename);
       }
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
@@ -11538,7 +12045,7 @@ molmil.bindCanvasInputs = function(canvas) {
   canvas.inputFunctions.push(function(canvas, fr) {
     if (fr.filename.indexOf(".xyz", fr.filename.length-5) !== -1) {
       fr.onload = function(e) {
-        canvas.molmilViewer.loadStructureData(e.target.result, 'xyz', this.filename);
+        canvas.molmilViewer.UI.xyz_input_popup(e.target.result, this.filename);
       }
       fr.readAsText(fr.fileHandle);
       return true;

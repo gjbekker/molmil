@@ -115,9 +115,8 @@ void main() {
 
   vec3 normal = normalize(ex_Normal);
   vec3 lightDir = normalize(lightPos - vertPos);
-  vec3 lightDir2 = lightPos - vertPos;
 
-  float lambertian = min(max(dot(normal, lightDir), 0.0), 1.0);
+  float lambertian = clamp(dot(normal, lightDir), 0.0, 1.0);
   float specular = 0.0;
   
 #ifndef DISABLE_SPECULAR
@@ -131,8 +130,7 @@ void main() {
 #endif
   
 #ifdef ALPHA_MODE
-  vec4 color = vec4(vec3(max(lambertian, 0.2)), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
-  //if (lambertian > -1000.0) color = vec4(normal, 1.0);
+  vec4 color = vec4(vec3(lambertian), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
 #else
   vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0);
 #endif
@@ -146,6 +144,10 @@ void main() {
 
 #ifdef ENABLE_SLAB
   if (Pz > slabFar) gl_FragColor = mix(backgroundColor, color, clamp((slabFar+1.-Pz) / (1.0), 0.00, 1.0));
+#endif
+
+#ifdef ALPHA_MODE
+  gl_FragColor.a = 1.0 - pow(max(1.0-ex_Colour.a,0.0), 1.0/max(abs(normal.z),0.01));
 #endif
 
 }

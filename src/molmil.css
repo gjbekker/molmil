@@ -139,6 +139,7 @@
   bottom: 0px;
   width: calc(100% - 2em);
   pointer-events: auto;
+  height: 1em;
 }
 
 .molmil_UI_cl_logbox {
