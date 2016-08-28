@@ -9,3 +9,7 @@ A usable version of Molmil is available at http://gjbekker.github.io/molmil/ and
 
 Additional information with regards to how to integrate Molmil and a reference to the Molmil API can be found on https://github.com/gjbekker/molmil/wiki/Integrate-Molmil 
 and https://github.com/gjbekker/molmil/wiki/Molmil-API respectively.
+
+If you use Molmil, please cite our paper:
+<a target="_blank" href="https://jcheminf.springeropen.com/articles/10.1186/s13321-016-0155-1">Molmil: a molecular viewer for the PDB and beyond</a>
+
