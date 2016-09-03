@@ -88,6 +88,7 @@ molmil.configBox = {
   
   
   OES_element_index_uint: null,
+  EXT_frag_depth: null,
   BGCOLOR: [0.0, 0.0, 0.0, 1.0],
   
   backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1},
@@ -104,10 +105,12 @@ molmil.configBox = {
     ["shaders/picking.glsl"], 
     ["shaders/linesPicking.glsl"], 
     ["shaders/atomSelection.glsl"], 
+    //["shaders/imposterPoints.glsl", "points", "", ["EXT_frag_depth"]],
     ["shaders/lines.glsl", "lines_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alpha", "#define ALPHA_MODE 1\n"],
     ["shaders/standard.glsl", "standard_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
+    //["shaders/imposterPoints.glsl", "points_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/anaglyph.glsl"], 
   ],
   glsl_fog: 0, // 0: off, 1: on
@@ -117,6 +120,7 @@ molmil.configBox = {
   stereoEyeSepFraction: 30,
   camera_fovy: 45.0,
   HQsurface_gridSpacing: 1.0,
+  webGL2: false
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -230,6 +234,7 @@ molmil.initSettings = function () {
 
 // display modes
 molmil.displayMode_None = 0;
+molmil.displayMode_Visible = 0.5;
 molmil.displayMode_Default = 1;
 molmil.displayMode_Spacefill = 2;
 molmil.displayMode_Spacefill_SC = 2.5;
@@ -244,6 +249,7 @@ molmil.displayMode_Tube = 7;
 molmil.displayMode_Cartoon = 8;
 molmil.displayMode_CartoonRocket = 8.5;
 molmil.displayMode_ChainSurfaceCG = 10;
+molmil.displayMode_ChainSurfaceSimple = 11;
 
 molmil.displayMode_XNA = 400;
 
@@ -264,7 +270,7 @@ molmil.atomObject = function (Xpos, AN, element, molObj, chainObj) {
   this.element = element.charAt(0).toUpperCase() + element.slice(1).toLowerCase();
   this.atomName = AN;
   this.displayMode = 0;
-  this.status = 1;
+  this.display = 1;
   this.rgba = [0, 0, 0, 255];
   this.molecule = molObj;
   this.chain = chainObj;
@@ -272,7 +278,10 @@ molmil.atomObject = function (Xpos, AN, element, molObj, chainObj) {
   this.AID = 0;
 }
 
-molmil.atomObject.prototype.toString = function() {return " Atom "+this.atomName+" ("+this.AID+")";};
+molmil.atomObject.prototype.toString = function() {
+  var sgl = this.molecule.atoms.length > 1;
+  return (sgl ? this.atomName : this.element) + " ("+this.AID+") - " + (sgl ? (this.molecule.name || "") + " " : "") + (this.molecule.RSID || "") + (this.molecule.chain.name ? " - Chain " + this.molecule.chain.name : "");
+};
 
 molmil.molObject = function (name, id, chain) {
   this.atoms = [];
@@ -282,7 +291,7 @@ molmil.molObject = function (name, id, chain) {
   this.chain = chain;
   this.ligand = true;
   this.water = false;
-  this.status = 1;
+  this.display = 1;
   this.next = null, this.previous = null;
   this.rgba = [0, 0, 0, 255];
   this.sndStruc = 1;
@@ -305,6 +314,7 @@ molmil.chainObject = function (name, entry) {
   this.displayMode = molmil.displayMode_Default;
   this.isHet = true;
   this.rgba = [255, 255, 255, 255];
+  this.display = true;
 }
 
 molmil.chainObject.prototype.toString = function() {return " Chain";};
@@ -312,6 +322,7 @@ molmil.chainObject.prototype.toString = function() {return " Chain";};
 molmil.entryObject = function (meta) { // this should become a structure object instead --> models should only be virtual; i.e. only the coordinates should be saved, the structure (chain->residue->atom) is determined by the initial model
   this.chains = [];
   this.meta = meta || {};
+  this.display = true;
 };
 
 molmil.polygonObject = function (meta) {
@@ -640,7 +651,8 @@ molmil.viewer.prototype.waterToggle = function(show) {
     if (! this.structures[m].chains) continue;
     for (c=0; c<this.structures[m].chains.length; c++) {
       for (a=0; a<this.structures[m].chains[c].atoms.length; a++) {
-        if (this.structures[m].chains[c].atoms[a].molecule.water) this.structures[m].chains[c].atoms[a].status = show;
+        if (this.structures[m].chains[c].atoms[a].molecule.water && (! this.hideHydrogens || this.structures[m].chains[c].atoms[a].element != "H")) 
+          this.structures[m].chains[c].atoms[a].display = show;
       }
     }
   }
@@ -652,7 +664,7 @@ molmil.viewer.prototype.hydrogenToggle = function(show) {
     if (! this.structures[m].chains) continue;
     for (c=0; c<this.structures[m].chains.length; c++) {
       for (a=0; a<this.structures[m].chains[c].atoms.length; a++) {
-        if (this.structures[m].chains[c].atoms[a].element == "H" || this.structures[m].chains[c].atoms[a].element == "D") this.structures[m].chains[c].atoms[a].status = show;
+        if (this.structures[m].chains[c].atoms[a].element == "H" || this.structures[m].chains[c].atoms[a].element == "D") this.structures[m].chains[c].atoms[a].display = show;
       }
     }
   }
@@ -697,7 +709,7 @@ molmil.viewer.prototype.selectObject = function(x, y, event) {
     var atom = this.atomRef[ID];
     if (atom) {
       var cbox = this.canvas.commandLine ? this.canvas.commandLine.environment.console : console;
-      cbox.log("Clicked on atom: ", atom); console.log("Clicked on atom: ", atom);
+      cbox.log("Clicked on atom: "+atom); console.log("Clicked on atom: ", atom);
       if (event && event.ctrlKey) {
         var add = true;
         for (var i=0; i<this.atomSelection.length; i++) if (this.atomSelection[i] == atom) {add = false; break;}
@@ -1431,6 +1443,7 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
   if (! struc) return;
   if (this.canvas) molmil.safeStartViewer(this.canvas);
   if (ondone) ondone(this, struc);
+  else if (this.customLoaderFunc) this.customLoaderFunc(this, struc);
   else {
     molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, this);
@@ -1686,6 +1699,7 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   
   var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
   canvas.renderer.programs.push(program);
+  struct.programs.push(program);
   
   canvas.molmilViewer.calculateCOG();
   
@@ -1727,104 +1741,36 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   }
       
   var idx_inv = [c[0]-1, c[1]-1, c[2]-1];
-  //idx_inv = [0, 1, 2];
       
   var voxel_size = [b[idx_inv[0]]/a[idx_inv[0]+7], b[idx_inv[1]]/a[idx_inv[1]+7], b[idx_inv[2]]/a[idx_inv[2]+7]];
   var first = [voxel_size[0]*a[idx_inv[0]+4], voxel_size[1]*a[idx_inv[1]+4], voxel_size[2]*a[idx_inv[2]+4]];
-      
-  var size = [a[idx_inv[0]], a[idx_inv[1]], a[idx_inv[2]]];
-  //var bounds = [[first[0], first[1], first[2]], [(a[0]*voxel_size[0])+first[0], (a[0]*voxel_size[1])+first[1], (a[0]*voxel_size[2])+first[2]]];
-  var bounds = [[first[0], first[1], first[2]], [(size[0]*voxel_size[0])+first[0], (size[1]*voxel_size[1])+first[1], (size[2]*voxel_size[2])+first[2]]];
-      
-  var sigma = settings.sigma;
-  var potentialFunction = function(x, y, z) {
-    var idx = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);
-    return sigma-voxels[idx];
-  }
-      
- // gradientFunction is a mess because idx_inv is a mess (why the f did they implement it like that?)
-      
-  var gradientInfo = {};
-  var vsi = [1/voxel_size[0], 1/voxel_size[1], 1/voxel_size[2]];
-  var gradientFunction = function(x, y, z) {
-    var idx = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);
-    if (gradientInfo[idx] !== undefined) return gradientInfo[idx];
-    else {
-      gradientInfo[idx] = [0, 0, 0]; var A, B;
-          
-      A = (arguments[idx_inv[0]]-1) + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);
-      B = (arguments[idx_inv[0]]+1) + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);
-      if (A < 0) {A = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[0]] = (B-A)*vsi[idx_inv[0]];}
-      else if (B > size[idx_inv[0]]) {B = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[0]] = (B-A)*vsi[idx_inv[0]];}
-      else {A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[0]] = (B-A)*vsi[idx_inv[0]]*.5;}
-          
-      A = arguments[idx_inv[0]] + a[0] * ((arguments[idx_inv[1]]-1) + a[1] * arguments[idx_inv[2]]);
-      B = arguments[idx_inv[0]] + a[0] * ((arguments[idx_inv[1]]+1) + a[1] * arguments[idx_inv[2]]);
-      if (A < 0) {A = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[1]] = (B-A)*vsi[idx_inv[1]];}
-      else if (B > size[idx_inv[0]]) {B = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[1]] = (B-A)*vsi[idx_inv[1]];}
-      else {A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[1]] = (B-A)*vsi[idx_inv[1]]*.5;}
-          
-      A = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * (arguments[idx_inv[2]]-1));
-      B = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * (arguments[idx_inv[2]]+1));
-      if (A < 0) {A = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[2]] = (B-A)*vsi[idx_inv[2]];}
-      else if (B > size[idx_inv[0]]) {B = arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]); A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[2]] = (B-A)*vsi[idx_inv[2]];}
-      else {A = sigma-voxels[A]; B = sigma-voxels[B]; gradientInfo[idx][idx_inv[2]] = (B-A)*vsi[idx_inv[2]]*.5;}
-      
-      return gradientInfo[idx];
-    }
+
+  var selectFunc = function(x, y, z) {return arguments[idx_inv[0]] + a[0] * (arguments[idx_inv[1]] + a[1] * arguments[idx_inv[2]]);}
+  var surf = polygonize([a[idx_inv[0]], a[idx_inv[1]], a[idx_inv[2]]], voxels, settings.sigma, selectFunc);
+
+  var voxel_size = [b[0]/a[0+7], b[1]/a[1+7], b[2]/a[2+7]];
+  
+  for (i=0; i<surf.vertices.length; i++) {
+    surf.vertices[i][0] = ((surf.vertices[i][0]) * voxel_size[0]) + first[0];
+    surf.vertices[i][1] = ((surf.vertices[i][1]) * voxel_size[1]) + first[1];
+    surf.vertices[i][2] = ((surf.vertices[i][2]) * voxel_size[2]) + first[2];
   }
   
-  //var surf = molmil.surfaceNets(size, potentialFunction, gradientFunction, bounds);
-  var surf = molmil.surfaceNets2(size, potentialFunction, bounds);
-      
-  // is the offset caused by ccp4 being crap
-  // or is the offset caused by these ccp4 files being crap
-  // or is the offset caused by my algorithm?
-      
-  var face_normals = [], face_pointers = [], i, j, a = [0, 0, 0], b = [0, 0, 0], c;
-  for (i=0; i<surf.vertices.length; i++) {
-    surf.vertices[i][0] += voxel_size[0];
-    surf.vertices[i][1] += voxel_size[1];
-    surf.vertices[i][2] += voxel_size[2];
-    
-    face_pointers.push([]);
+  molmil.taubinSmoothing(surf.vertices, surf.faces, .5, -.53, 10);
+
+  var i, faces, f, normals = [], normal;
+  for (i=0; i<surf.vertices.length; i++) normals.push([0, 0, 0]);
+  
+  for (i in surf.vertexIndex) {
+    normal = normals[surf.vertexIndex[i][0]];
+    faces = surf.vertexIndex[i][1];
+    for (f=0; f<faces.length; f++) vec3.add(normal, normal, surf.face_normals[faces[f]]);
+    vec3.normalize(normal, normal);
   }
-      
-  for (i=0; i<surf.faces.length; i++) {
-    // for every face, calculate the normal...
-    a[0] = surf.vertices[surf.faces[i][1]][0]-surf.vertices[surf.faces[i][0]][0];
-    a[1] = surf.vertices[surf.faces[i][1]][1]-surf.vertices[surf.faces[i][0]][1];
-    a[2] = surf.vertices[surf.faces[i][1]][2]-surf.vertices[surf.faces[i][0]][2];
-       
-    b[0] = surf.vertices[surf.faces[i][2]][0]-surf.vertices[surf.faces[i][0]][0];
-    b[1] = surf.vertices[surf.faces[i][2]][1]-surf.vertices[surf.faces[i][0]][1];
-    b[2] = surf.vertices[surf.faces[i][2]][2]-surf.vertices[surf.faces[i][0]][2];
-        
-        
-    face_normals.push([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]);
-    face_pointers[surf.faces[i][0]].push(i);
-    face_pointers[surf.faces[i][1]].push(i);
-    face_pointers[surf.faces[i][2]].push(i);
-  }
-      
-  var normals = [];
-      
-  for (i=0; i<surf.vertices.length; i++) {
-    a = [0, 0, 0];
-    for (j=0; j<face_pointers[i].length; j++) {
-      a[0] += face_normals[face_pointers[i][j]][0];
-      a[1] += face_normals[face_pointers[i][j]][1];
-      a[2] += face_normals[face_pointers[i][j]][2];
-    }
-        
-    vec3.normalize(a, a);
-    normals.push(a);
-  }
-      
-  molmil.taubinSmoothing(normals, surf.faces, .33, -.331, 50);
-  for (i=0; i<normals.length; i++) vec3.normalize(normals[i], normals[i]);
-  molmil.taubinSmoothing(surf.vertices, surf.faces, .33, -.331, 50);
-      
+  surf.normals = normals;
+  
+  molmil.taubinSmoothing(surf.normals, surf.faces, .5, -.53, 10);
+
   var vertices = new Float32Array(surf.vertices.length*7); // x, y, z, nx, ny, nz, rgba
   var indices = new Int32Array(surf.faces.length*3);
       
@@ -1879,6 +1825,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
 
   var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
   canvas.renderer.programs.push(program);
+  struct.programs.push(program);
 
   canvas.molmilViewer.calculateCOG();
   
@@ -1969,9 +1916,11 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
     program.render_internal = function() {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
 
-      this.gl.vertexAttribPointer(this.attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-      this.gl.vertexAttribPointer(this.attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-      this.gl.vertexAttribPointer(this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+      molmil.resetAttributes();
+      molmil.bindAttribute(this.gl, this.attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+      molmil.bindAttribute(this.gl, this.attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
+      molmil.bindAttribute(this.gl, this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+      molmil.clearAttributes(this.gl);
     
       this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
       if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
@@ -1989,6 +1938,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
     program.renderPicking = function() {};
           
     renderer.programs.push(program);
+    struct.programs.push(program);
             
     // also add an entry to the structures menu for easy enabling/disabling
     struct.options.push([name, program]);
@@ -2051,7 +2001,7 @@ molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
 
   this.calculateCOG();
   
-  molmil.resetColors(null, this);
+  molmil.resetColors(struc, this);
   
   return struc;
 }
@@ -2120,7 +2070,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType.split(".")[0], currentMol, currentChain));
     currentChain.atoms.push(atom);
 
-    atom.status = true;
+    atom.display = true;
     
     atom.AID = this.AID++;
     this.atomRef[atom.AID] = atom;
@@ -2134,6 +2084,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     a1 = parseInt(tmp[1])-1;
     a2 = parseInt(tmp[2])-1;
     if (tmp[3] == "ar") tmp[3] = 2;
+    if (tmp[3] == "am") tmp[3] = 1;
     bt = parseInt(tmp[3]);
     
     currentChain.bonds.push([currentChain.atoms[a1], currentChain.atoms[a2], bt]);
@@ -2142,7 +2093,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   
   this.chains.push(currentChain);
   
-  molmil.resetColors(null, this);
+  molmil.resetColors(struc, this);
   
   return struc;
   
@@ -2152,54 +2103,66 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
 // ** loads MDL MOL data **
 molmil.viewer.prototype.load_mdl = function(data, filename) {
   data = data.split("\n");
-  var name = data[0].trim() || filename;
-  
-  var nfo = data[3].trim().split(/\s/);
-  var noa = parseInt(nfo[0]), nob = parseInt(nfo[1]), i, struc, currentChain, currentMol, x, y, z, Xpos, element, a1, a2, bt;
-  
+  var name = data[0].trim() || filename, offset = 0, struc;
   this.structures.push(struc = new molmil.entryObject({id: filename}));
-  struc.chains.push(currentChain = new molmil.chainObject("", struc));
-  currentChain.CID = this.CID++;
   
-  currentChain.molecules.push(currentMol = new molmil.molObject(name, 1, currentChain));
-  currentMol.MID = this.MID++;
-  
-  var atomList = {};
-  
-  for (i=4; i<noa+4; i++) {
-    x = parseFloat(data[i].substring(0, 11).trim())
-    y = parseFloat(data[i].substring(11, 21).trim())
-    z = parseFloat(data[i].substring(21, 31).trim())
-    element = data[i].substring(31, 35).trim();
-    
-    if (atomList[element] === undefined) atomList[element] = 1;
-    else atomList[element]++
-    
-    Xpos = currentChain.modelsXYZ[0].length;
-    currentChain.modelsXYZ[0].push(x, y, z);
-    currentMol.atoms.push(atom=new molmil.atomObject(Xpos, element+atomList[element], element, currentMol, currentChain));
-    currentChain.atoms.push(atom);
+  while (true) {
+    if (offset+3 >= data.length) break;
 
-    atom.status = true;
+    var nfo = data[offset+3].match(/\S+/g);
+    var noa = parseInt(nfo[0]), nob = parseInt(nfo[1]), i, struc, currentChain, currentMol, x, y, z, Xpos, element, a1, a2, bt;
+  
+    struc.chains.push(currentChain = new molmil.chainObject("", struc));
+    currentChain.CID = this.CID++;
+  
+    currentChain.molecules.push(currentMol = new molmil.molObject(name, 1, currentChain));
+    currentMol.MID = this.MID++;
+  
+    var atomList = {};
+  
+    for (i=4; i<noa+4; i++) {
+      x = parseFloat(data[offset+i].substring(0, 11).trim())
+      y = parseFloat(data[offset+i].substring(11, 21).trim())
+      z = parseFloat(data[offset+i].substring(21, 31).trim())
+      element = data[offset+i].substring(31, 35).trim();
     
-    atom.AID = this.AID++;
-    this.atomRef[atom.AID] = atom;
+      if (atomList[element] === undefined) atomList[element] = 1;
+      else atomList[element]++
+    
+      Xpos = currentChain.modelsXYZ[0].length;
+      currentChain.modelsXYZ[0].push(x, y, z);
+      currentMol.atoms.push(atom=new molmil.atomObject(Xpos, element+atomList[element], element, currentMol, currentChain));
+      currentChain.atoms.push(atom);
+
+      atom.display = true;
+    
+      atom.AID = this.AID++;
+      this.atomRef[atom.AID] = atom;
+    }
+  
+    for (i=noa+4; i<noa+4+nob; i++) {
+      nfo = data[offset+i].trim().split(/[ ,]+/);
+      a1 = parseInt(nfo[0])-1;
+      a2 = parseInt(nfo[1])-1;
+      bt = parseInt(nfo[2]);
+      currentChain.bonds.push([currentMol.atoms[a1], currentMol.atoms[a2], bt]);
+    }
+    currentChain.bondsOK = true;
+  
+    this.chains.push(currentChain);
+
+    offset += 4+noa+nob;
+    while (true) {
+      offset++;
+      try {if (data[offset].trim() == "M  END") break;}
+      catch (e) {break;}
+    }
+    offset+=2;
   }
   
   this.calculateCOG();
   
-  for (i=noa+4; i<noa+4+nob; i++) {
-    nfo = data[i].trim().split(/[ ,]+/);
-    a1 = parseInt(nfo[0])-1;
-    a2 = parseInt(nfo[1])-1;
-    bt = parseInt(nfo[2]);
-    currentChain.bonds.push([currentMol.atoms[a1], currentMol.atoms[a2], bt]);
-  }
-  currentChain.bondsOK = true;
-  
-  this.chains.push(currentChain);
-  
-  molmil.resetColors(null, this);
+  molmil.resetColors(struc, this);
   
   return struc;
   
@@ -2239,7 +2202,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       currentChain.molecules.push(currentMol = new molmil.molObject(molName, molID, currentChain));
       currentMol.MID = this.MID++;
       cmid = molID;
-      //if (molName = "SOL" || molName == "WAT") currentMol.status = false;
+      //if (molName = "SOL" || molName == "WAT") currentMol.display = false;
     }
     
     for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
@@ -2251,7 +2214,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
    
     if (! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-      if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.status = false;}
+      if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.display = false;}
       //do special stuff for dna/rna
       else if (atom.atomName == "P") {currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
@@ -2263,7 +2226,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       else if (atom.atomName == "C") {currentChain.isHet = false; currentMol.C = atom; currentMol.ligand = false;}
       else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = false;}
     }
-    if (atom.element == "H" || atom.element == "D") atom.status = false;
+    if (atom.element == "H" || atom.element == "D") atom.display = false;
     currentChain.atoms.push(atom);
     atom.AID = this.AID++;
     this.atomRef[atom.AID] = atom;
@@ -2334,7 +2297,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
   
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   
-  molmil.resetColors(null, this);
+  molmil.resetColors(struc, this);
   
   return struc;
 };
@@ -2389,7 +2352,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
 
       if (data[i].substr(0, 4) != "ATOM" || ! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-        if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.status = false;}
+        if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.display = false;}
         //do special stuff for dna/rna
         else if (atom.atomName == "P") {currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
         else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
@@ -2401,7 +2364,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         else if (atom.atomName == "C") {currentChain.isHet = false; currentMol.C = atom; currentMol.ligand = false;}
         else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = false;}
       }
-      if (atom.element == "H" || atom.element == "D") atom.status = false;
+      if (atom.element == "H" || atom.element == "D") atom.display = false;
       currentChain.atoms.push(atom);
       atom.AID = this.AID++;
       this.atomRef[atom.AID] = atom;
@@ -2498,7 +2461,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   
-  molmil.resetColors(null, this);
+  molmil.resetColors(struc, this);
   
   return struc;
 };
@@ -2574,7 +2537,7 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
   var i, j, vP, vP8, vertex, iP, vertexMap = {};
 
   var alpha = settings.alpha || 255;
-  
+
   if (nov_l) {
     var lineVertexData = new Float32Array(nov_l*4), lineVertexData8 = new Uint8Array(lineVertexData.buffer);
     if (molmil.configBox.OES_element_index_uint) var lineIndexData = new Uint32Array(noi_l*2);
@@ -2604,6 +2567,7 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
     
     program = molmil.geometry.build_simple_render_program(lineVertexData, lineIndexData, this.renderer, {lines_render: true});
     this.renderer.programs.push(program);
+    struct.programs.push(program);
   }
   
   if (nov_t) {
@@ -2648,6 +2612,7 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
     }
     program = molmil.geometry.build_simple_render_program(triangleVertexData, triangleIndexData, this.renderer, {solid: true, alphaMode: alpha != 255});
     this.renderer.programs.push(program);
+    struct.programs.push(program);
   }
   
   this.renderer.initBD = true;
@@ -2893,7 +2858,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       
     
       atom.label_alt_id = label_alt_id[a];
-      if (atom.label_alt_id && atom.label_alt_id != "A") atom.status = false;
+      if (atom.label_alt_id && atom.label_alt_id != "A") atom.display = false;
       if (isCC || ! polyTypes.hasOwnProperty(currentMol.name)) {
         if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT") {currentMol.water = true; currentMol.ligand = false;}
       }
@@ -3136,7 +3101,7 @@ molmil.viewer.prototype.calculateCOG = function() {
         xyzRef = chain.modelsXYZ[0];
       
         for (m=0; m<chain.molecules.length; m++) {
-          if (! chain.molecules[m].status) continue;
+          if (! chain.molecules[m].display) continue;
           if (chain.molecules[m].ligand || chain.molecules[m].water) {
             for (a=0; a<chain.molecules[m].atoms.length; a++) {
               Xpos = chain.molecules[m].atoms[a].xyz;
@@ -3776,6 +3741,91 @@ molmil.geometry = {
   onGenerate: null
 };
 
+molmil.geometry.generator = function(objects, soup, name, programOptions) {
+  programOptions = programOptions || {};
+  var detail_lv = molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].SPHERE_TESS_LV;
+  var CB_NOI = molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].CB_NOI;
+  var CB_NOVPR = molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].CB_NOVPR;
+  
+  var o, object;
+  
+  var cylinder = molmil.geometry.getCylinder(detail_lv);
+  var nov = 0, noi = 0;
+  
+  for (var o=0; o<objects.length; o++) {
+    object = objects[o];
+    if (object.type == "sphere") {
+      // create a sphere with radius object.radius on object.coords[0]
+    }
+    if (object.type == "cylinder") {
+      // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
+      nov += (cylinder.vertices.length/3);
+      noi += cylinder.indices.length;
+      // for now, no capping...
+    }
+  }
+  
+  var vBuffer = new Float32Array(nov * 7); // x, y, z, nx, ny, nz, rgba
+  var vBuffer8 = new Uint8Array(vBuffer.buffer);
+  var iBuffer = new Uint32Array(noi);
+  
+  var rotationMatrix = mat4.create();
+  var vertex = [0, 0, 0, 0], normal = [0, 0, 0, 0];
+  var r = 4.0, rgba, v=0, vP8=0, vP=0, p=0, iP = 0, v, dx, dy, dz, dij, angle;
+  
+  for (var o=0; o<objects.length; o++) {
+    object = objects[o];
+    rgba = object.rgba;
+    if (object.type == "sphere") {
+      // create a sphere with radius object.radius on object.coords[0]
+    }
+    if (object.type == "cylinder") {
+      // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
+      r = object.radius;
+      dx = object.coords[1][0]-object.coords[0][0];
+      dy = object.coords[1][1]-object.coords[0][1];
+      dz = object.coords[1][2]-object.coords[0][2];
+      dij = Math.sqrt((dx*dx) + (dy*dy) + (dz*dz));
+      dx /= dij; dy /= dij; dz /= dij;
+      angle = Math.acos(-dz);
+      mat4.identity(rotationMatrix);
+      mat4.rotate(rotationMatrix, rotationMatrix, angle, [dy, -dx, 0.0]);
+      for (v=0; v<cylinder.indices.length; v++, iP++) iBuffer[iP] = cylinder.indices[v]+p; // a2
+      
+      for (v=0; v<cylinder.vertices.length; v+=3, vP8+=28) {
+        vec3.transformMat4(vertex, [cylinder.vertices[v]*r, cylinder.vertices[v+1]*r, cylinder.vertices[v+2]*dij*2], rotationMatrix);
+        //vec3.transformMat4(vertex, [(cylinder.vertices[v]*r)+offsetX, (cylinder.vertices[v+1]*r)+offsetY, (cylinder.vertices[v+2]+offsetZ)*dij], rotationMatrix);
+        vec3.transformMat4(normal, [cylinder.normals[v], cylinder.normals[v+1], cylinder.normals[v+2]], rotationMatrix);
+
+        vBuffer[vP++] = vertex[0]+object.coords[1][0];
+        vBuffer[vP++] = vertex[1]+object.coords[1][1];
+        vBuffer[vP++] = vertex[2]+object.coords[1][2];
+        
+        
+        
+        vBuffer[vP++] = normal[0];
+        vBuffer[vP++] = normal[1];
+        vBuffer[vP++] = normal[2];
+    
+        vBuffer8[vP8+24] = rgba[0];
+        vBuffer8[vP8+25] = rgba[1];
+        vBuffer8[vP8+26] = rgba[2];
+        vBuffer8[vP8+27] = rgba[3];
+        vP++
+      } 
+          
+      p += cylinder.vertices.length / 3;
+      
+    }
+  }
+
+  var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, programOptions);
+  soup.renderer.programs.push(program);
+  soup.renderer.initBuffers();
+  soup.canvas.update = true;
+  return program;
+}
+
 molmil.geometry.getSphere = function(r, detail_lv) {
   if (r in this.templates.sphere) return this.templates.sphere[r][detail_lv];
   else return this.generateSphere(r)[detail_lv];
@@ -3848,8 +3898,9 @@ molmil.geometry.generate = function(structures, render, detail_or) {
   this.reset();
   var chains = [], cchains = [];
   for (var s=0, c; s<structures.length; s++) {
-    if (! (structures[s] instanceof molmil.entryObject)) continue;
+    if (! (structures[s] instanceof molmil.entryObject) || structures[s].display == false) continue;
     for (var c=0; c<structures[s].chains.length; c++) {
+      if (! structures[s].chains[c]) continue;
       if (structures[s].chains[c].display && structures[s].chains[c].molecules.length > 0 && ! structures[s].chains[c].isHet && ! structures[s].chains[c].molecules[0].water) cchains.push(structures[s].chains[c]);
       chains.push(structures[s].chains[c]);
     }
@@ -3857,14 +3908,15 @@ molmil.geometry.generate = function(structures, render, detail_or) {
 
   this.initChains(chains, render, detail_or);
   this.initCartoon(cchains);
-
-  this.generateAtoms();
+  
+  if (molmil.configBox.EXT_frag_depth) this.generateAtomsImposters();
+  else this.generateAtoms();
   this.generateBonds();
   this.generateWireframe();
   this.generateCartoon();
   //this.generateRockets();
   
-  this.generateSurfaces(cchains);
+  this.generateSurfaces(cchains, render.soup);
   
   this.registerPrograms(render);
   
@@ -3893,21 +3945,91 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   };
   if (vertices_ && indices_) program.setBuffers(vertices_, indices_);
   
-  
   program.angle = renderer.angle;
+  
+  program.point_shader = renderer.shaders.points;
+  if (program.point_shader) program.point_attributes = program.point_shader.attributes;
   
   if (settings.uniform_color) {
     program.standard_shader = renderer.shaders.standard_uniform_color;
     program.wireframe_shader = renderer.shaders.lines_uniform_color;
+    program.point_shader = renderer.shaders.points_uniform_color;
   }
   else {
-    program.standard_shader = renderer.shaders.standard_alpha;
+    if (settings.alphaMode) program.standard_shader = renderer.shaders.standard_alpha;
+    else program.standard_shader = renderer.shaders.standard;
     program.wireframe_shader = renderer.shaders.lines;
+    program.point_shader = renderer.shaders.points;
   }
   program.standard_attributes = program.standard_shader.attributes;
   program.wireframe_attributes = program.wireframe_shader.attributes;
+  
+  //program.point_attributes = program.point_shader.attributes;
       
-  program.status = true;   
+  program.status = true; 
+  
+  program.point_render = function(modelViewMatrix, COR, i) {
+    if (! this.status) return;
+    
+    this.gl.activeTexture(this.gl.TEXTURE0);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, renderer.textures.atom_imposter);
+    
+    var normalMatrix = mat3.create();
+    this.gl.useProgram(this.point_shader.program);
+    this.gl.uniformMatrix4fv(this.point_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.gl.uniformMatrix4fv(this.point_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.gl.uniform3f(this.point_shader.uniforms.COR, COR[0], COR[1], COR[2]);
+    this.gl.uniform1f(this.point_shader.uniforms.focus, this.renderer.fogStart);
+    this.gl.uniform1f(this.point_shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
+    
+    this.gl.uniform1f(this.point_shader.uniforms.zFar, molmil.configBox.zFar);
+    this.gl.uniform1f(this.point_shader.uniforms.zNear, molmil.configBox.zNear);    
+    this.gl.uniform1i(this.point_shader.uniforms.textureMap, 0);
+    
+    this.gl.uniform1f(this.point_shader.uniforms.zInvDiff, 1./((1./molmil.configBox.zFar) - (1./molmil.configBox.zNear)));
+    this.gl.uniform1f(this.point_shader.uniforms.zNearInv, 1./molmil.configBox.zNear); 
+    
+    
+    this.gl.enable(this.gl.DEPTH_TEST);
+   
+    if (this.settings.uniform_color) this.gl.uniform3f(this.point_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
+    
+    if (this.renderer.settings.slab) {
+      this.gl.uniform1f(this.point_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
+      this.gl.uniform1f(this.point_shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
+    }
+    
+    this.gl.uniform4f(this.point_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
+  
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+    
+    molmil.resetAttributes();
+    if (this.settings.has_ID) {
+      molmil.bindAttribute(this.gl, this.point_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_radius, 1, this.gl.FLOAT, false, 28, 12);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 16);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_ScreenSpaceOffset, 2, this.gl.SHORT, false, 28, 20);
+      //molmil.bindAttribute(this.gl, this.point_attributes.in_ID, 1, this.gl.FLOAT, false, 28, 24);
+    }
+    else {
+      molmil.bindAttribute(this.gl, this.point_attributes.in_Position, 3, this.gl.FLOAT, false, 24, 0);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_radius, 1, this.gl.FLOAT, false, 24, 12);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 24, 16);
+      molmil.bindAttribute(this.gl, this.point_attributes.in_ScreenSpaceOffset, 2, this.gl.SHORT, false, 24, 20);
+    }
+    molmil.clearAttributes(this.gl);
+    
+    
+
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+    
+    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+      var dv = 0, vtd;
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.gl.drawElements(this.gl.TRIANGLES, vtd, gl.INDEXINT, dv*4); dv += vtd;}
+    }
+    else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.INDEXINT, 0);
+
+  };
   
   program.wireframe_render = function(modelViewMatrix, COR, i) {
     if (! this.status) return;
@@ -3928,34 +4050,33 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     this.gl.uniform4f(this.wireframe_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
   
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-    
-    try {this.gl.vertexAttribPointer(2, 1, this.gl.FLOAT, false, 20, 16);} // for some VERY strange reason this weirdo needs something bound @ attr #2.....
-    catch (e) {}
-    
+
+    molmil.resetAttributes();
     if (this.settings.lines_render) {      
       if (this.settings.has_ID) {
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-        if (! this.settings.uniform_color) this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
-        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
+        if (! this.settings.uniform_color) molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 20, 12);
+        //molmil.bindAttribute(this.gl, this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
       }
       else {
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 16, 0);
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 16, 12);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 16, 0);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 16, 12);
       }
     }
     else {
       if (this.settings.has_ID) {
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+        //molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
+        //molmil.bindAttribute(this.gl, this.wireframe_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
       }
       else {
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-        //this.gl.vertexAttribPointer(this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-        this.gl.vertexAttribPointer(this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+        //molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
+        molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
       }
     }
+    molmil.clearAttributes(this.gl);
     
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 
@@ -3988,18 +4109,20 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   
         
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
-
+    
+    molmil.resetAttributes();
     if (this.settings.has_ID) {
-      this.gl.vertexAttribPointer(this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-      this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
-      if (! this.settings.uniform_color) this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
-      //this.gl.vertexAttribPointer(this.standard_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+      molmil.bindAttribute(this.gl, this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+      molmil.bindAttribute(this.gl, this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
+      if (! this.settings.uniform_color) molmil.bindAttribute(this.gl, this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 32, 24);
+      //molmil.bindAttribute(this.gl, this.standard_attributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
     }
     else {
-      this.gl.vertexAttribPointer(this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
-      this.gl.vertexAttribPointer(this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
-      this.gl.vertexAttribPointer(this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
+      molmil.bindAttribute(this.gl, this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
+      molmil.bindAttribute(this.gl, this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
+      molmil.bindAttribute(this.gl, this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
     }
+    molmil.clearAttributes(this.gl);
 
     // in yasara only the "outside" is transparent, while the "inside" is opaque...
     
@@ -4010,7 +4133,6 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
       this.gl.disable(this.gl.DEPTH);
     }
-    
     
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         
@@ -4029,7 +4151,8 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   };
 
   if (! settings.multiMatrix) {
-    if (! settings.solid) program.render = program.wireframe_render;
+    if (settings.imposterPoints) program.render = program.point_render;
+    else if (! settings.solid) program.render = program.wireframe_render;
     else program.render = program.standard_render;
   }
   else {
@@ -4058,9 +4181,12 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
         this.gl.uniform3f(this.pickingShader.uniforms.COR, COR[0], COR[1], COR[2]);
       
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
+        
+        molmil.resetAttributes();
+        molmil.bindAttribute(this.gl, this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
+        molmil.bindAttribute(this.gl, this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
+        molmil.clearAttributes(this.gl);
 
-        this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
-        this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
           var dv = 0, vtd;
@@ -4082,8 +4208,10 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
 
-        this.gl.vertexAttribPointer(this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-        this.gl.vertexAttribPointer(this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+        molmil.resetAttributes();
+        molmil.bindAttribute(this.gl, this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+        molmil.bindAttribute(this.gl, this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
+        molmil.clearAttributes(this.gl);
       
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
@@ -4116,8 +4244,17 @@ molmil.geometry.registerPrograms = function(renderer)  {
     renderer.programs.push(renderer.program3);
   }
   if (! renderer.program4) {
-    renderer.program4 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.program4 = this.build_simple_render_program(null, null, renderer, {has_ID: false, solid: true});
     renderer.programs.push(renderer.program4);
+  }
+  
+  if (molmil.configBox.EXT_frag_depth) {
+  
+    if (! renderer.program5) {
+      renderer.program5 = this.build_simple_render_program(null, null, renderer, {has_ID: true, imposterPoints: true});
+      renderer.programs.push(renderer.program5);
+    }
+    renderer.program5.setBuffers(this.buffer5.vertexBuffer, this.buffer5.indexBuffer);
   }
   
   renderer.program1.setBuffers(this.buffer1.vertexBuffer, this.buffer1.indexBuffer);
@@ -4143,6 +4280,7 @@ molmil.geometry.reset = function() {
   this.buffer2 = {vP: 0, iP: 0}; // wireframe
   this.buffer3 = {vP: 0, iP: 0}; // cartoon
   this.buffer4 = {vP: 0, iP: 0}; // surfaces
+  this.buffer5 = {vP: 0, iP: 0}; // points
 }
 
 // ** calculates and initiates buffer sizes **
@@ -4165,7 +4303,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     
     
     for (var a=0; a<chain.atoms.length; a++) {
-      if (chain.atoms[a].displayMode == 0 || ! chain.atoms[a].status) continue; // don't display
+      if (chain.atoms[a].displayMode == 0 || ! chain.atoms[a].display) continue; // don't display
       else if (chain.atoms[a].displayMode == 4) wfatoms2draw.push(chain.atoms[a]); // wireframe (for wireframe use gl_lines)
       else atoms2draw.push(chain.atoms[a]);
       stat = true;
@@ -4174,7 +4312,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     if (stat && ! chain.bondsOK) render.soup.buildBondList(chain, false);
     
     for (var b=0; b<chain.bonds.length; b++) {
-      if (chain.bonds[b][0].displayMode < 2 || chain.bonds[b][1].displayMode < 2 || ! chain.bonds[b][0].status || ! chain.bonds[b][1].status) continue;
+      if (chain.bonds[b][0].displayMode < 2 || chain.bonds[b][1].displayMode < 2 || ! chain.bonds[b][0].display || ! chain.bonds[b][1].display) continue;
       if (chain.bonds[b][0].displayMode == 4 || chain.bonds[b][1].displayMode == 4) lines2draw.push(chain.bonds[b]);
       else {
         bonds2draw.push(chain.bonds[b]);
@@ -4200,7 +4338,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
       }
     }
     
-    if (chain.displayMode > 1 && chain.displayMode != molmil.displayMode_ChainSurfaceCG) {
+    if (chain.displayMode > 1 && (chain.displayMode != molmil.displayMode_ChainSurfaceCG || chain.displayMode != molmil.displayMode_ChainSurfaceSimple)) {
       if (! chain.twoDcache || this.reInitChains) molmil.prepare2DRepr(chain, this.modelId || 0);
       nor += chain.molecules.length;
     }    
@@ -4212,7 +4350,14 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   var CB_NOI = molmil.configBox.QLV_SETTINGS[render.QLV].CB_NOI;
   var CB_NOVPR = molmil.configBox.QLV_SETTINGS[render.QLV].CB_NOVPR;
   
-  var vs = atoms2draw.length*(6*Math.pow(4, detail_lv+1));
+  
+  if (molmil.configBox.EXT_frag_depth) {
+    var vs = 0;
+  }
+  else {
+    var vs = atoms2draw.length*(6*Math.pow(4, detail_lv+1));
+  }
+
   vs += bonds2draw.length*(detail_lv+1)*4*2;
   vs += nor*CB_NOI*CB_NOVPR;
 
@@ -4236,9 +4381,16 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   
   var vs = 0, is = 0;
   
-  var sphere = this.getSphere(1, detail_lv);
-  vs += (sphere.vertices.length/3)*atoms2draw.length;
-  is += sphere.indices.length*atoms2draw.length;
+  if (molmil.configBox.EXT_frag_depth) {
+    this.buffer5.vertexBuffer = new Float32Array(atoms2draw.length*4*7); // x, y, z, r, ss_offset (4x gl.BYTE), rgba, aid
+    if (molmil.configBox.OES_element_index_uint) this.buffer5.indexBuffer = new Uint32Array(atoms2draw.length*6);
+    else this.buffer5.indexBuffer = new Uint16Array(atoms2draw.length*4);
+  }
+  else {
+    var sphere = this.getSphere(1, detail_lv);
+    vs += (sphere.vertices.length/3)*atoms2draw.length;
+    is += sphere.indices.length*atoms2draw.length;
+  }
   
   var cylinder = this.getCylinder(detail_lv);
   vs += (cylinder.vertices.length/3)*nob;
@@ -4249,7 +4401,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   if (molmil.configBox.OES_element_index_uint) buffer1.indexBuffer = new Uint32Array(is);
   else buffer1.indexBuffer = new Uint16Array(is);
   
-  buffer2.vertexBuffer = new Float32Array(wfatoms2draw.length*5); // x, y, z, rgba, aid
+  buffer2.vertexBuffer = new Float32Array(wfatoms2draw.length*5); // x, y, z, r, rgba, aid
   buffer2.vertexBuffer8 = new Uint8Array(buffer2.vertexBuffer.buffer);
   if (molmil.configBox.OES_element_index_uint) buffer2.indexBuffer = new Uint32Array(lines2draw.length*2);
   else buffer2.indexBuffer = new Uint16Array(lines2draw.length*2);
@@ -4304,7 +4456,7 @@ molmil.geometry.initCartoon = function(chains) {
   for (c=0; c<chains.length; c++) {
     
     chain = chains[c];
-    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG) continue;
+    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG || chain.displayMode == molmil.displayMode_ChainSurfaceSimple) continue;
     nowp = 0;
     cartoonChains.push(chain);
 
@@ -4370,6 +4522,71 @@ molmil.geometry.initCartoon = function(chains) {
   buffer3.vertexBuffer8 = new Uint8Array(buffer3.vertexBuffer.buffer);
   if (molmil.configBox.OES_element_index_uint) buffer3.indexBuffer = new Uint32Array(is*3);
   else buffer3.indexBuffer = new Uint16Array(is*3);
+};
+
+molmil.geometry.generateAtomsImposters = function() {
+  var atoms2draw = this.atoms2draw, vdwR = molmil.configBox.vdwR, r, sphere, a, v, rgba
+  vBuffer = this.buffer5.vertexBuffer, vP = this.buffer5.vP, iP = this.buffer5.iP,
+  vP8 = vP*4, vP16 = vP*2;
+  
+  var vBuffer8 = new Uint8Array(this.buffer5.vertexBuffer.buffer);
+  var vBuffer16 = new Uint16Array(this.buffer5.vertexBuffer.buffer);
+  
+  var iBuffer = this.buffer5.indexBuffer;
+
+  var mdl = this.modelId || 0, tmp;
+
+  var x, y, z, n;
+  
+  var ssOffset = [[-1, +1], [+1, +1], [+1, -1], [-1, -1]];
+
+  
+  var p = vP/7;
+  
+  for (a=0; a<atoms2draw.length; a++) {
+    if (atoms2draw[a].displayMode == 1) r = molmil_dep.getKeyFromObject(vdwR, atoms2draw[a].element, vdwR.DUMMY);
+    else if (atoms2draw[a].displayMode == 2) r = .33;
+    else r = .15;
+
+    tmp = mdl;
+    if (atoms2draw[a].chain.modelsXYZ.length <= mdl) mdl = 0;
+    
+    x = atoms2draw[a].chain.modelsXYZ[mdl][atoms2draw[a].xyz];
+    y = atoms2draw[a].chain.modelsXYZ[mdl][atoms2draw[a].xyz+1];
+    z = atoms2draw[a].chain.modelsXYZ[mdl][atoms2draw[a].xyz+2];
+    rgba = atoms2draw[a].rgba;
+    
+    for (n=0; n<4; n++) {
+      vBuffer[vP++] = x;
+      vBuffer[vP++] = y;
+      vBuffer[vP++] = z;
+      vBuffer[vP++] = r;
+    
+      vBuffer8[vP8+16] = rgba[0];
+      vBuffer8[vP8+17] = rgba[1];
+      vBuffer8[vP8+18] = rgba[2];
+      vBuffer8[vP8+19] = rgba[3];
+      vP++
+      
+      vBuffer16[vP16+10] = ssOffset[n][0];
+      vBuffer16[vP16+11] = ssOffset[n][1];      
+      vP++
+    
+      vBuffer[vP++] = atoms2draw[a].AID; // ID
+      vP8 += 28; vP16 += 14;
+    }
+    
+    iBuffer[iP++] = 3+p;
+    iBuffer[iP++] = 2+p;
+    iBuffer[iP++] = 1+p;
+    iBuffer[iP++] = 3+p;
+    iBuffer[iP++] = 1+p;
+    iBuffer[iP++] = 0+p;
+    p += 4;
+  }
+
+  this.buffer5.vP = vP;
+  this.buffer5.iP = iP;
 };
 
 // ** build atoms representation (spheres) **
@@ -4646,27 +4863,37 @@ molmil.geometry.generateWireframe = function() {
 };
 
 // ** build coarse surface representation **
-molmil.geometry.generateSurfaces = function(chains) {
+molmil.geometry.generateSurfaces = function(chains, soup) {
   
-  var c, surf, surfaces = [], verts = 0, faces = 0;
+  var c, surf, surfaces = [], surfaces2 = [], verts = 0, idcs = 0, settings;
   
   for (c=0; c<chains.length; c++) {
-    if (chains[c].displayMode != molmil.displayMode_ChainSurfaceCG) continue;
-    if (chains[c].HQsurface) surf = molmil.coarseSurface(chains[c], molmil.configBox.HQsurface_gridSpacing, 1.4);
-    else surf = molmil.coarseSurface(chains[c], 7.5, 7.5*.75);
-    surf.rgba = chains[c].rgba;
-    surfaces.push(surf);
-    verts += surf.vertices.length;
-    faces += surf.faces.length;
+    if (chains[c].displayMode == molmil.displayMode_ChainSurfaceCG) {
+      if (chains[c].HQsurface) surf = molmil.coarseSurface(chains[c], molmil.configBox.HQsurface_gridSpacing, 1.4);
+      else surf = molmil.coarseSurface(chains[c], 7.5, 7.5*.75, {deproj: true});
+      surf.rgba = chains[c].rgba;
+      surfaces.push(surf);
+      verts += surf.vertices.length;
+      idcs += surf.faces.length*3;
+    }
+    else if (chains[c].displayMode == molmil.displayMode_ChainSurfaceSimple) {
+      settings = chains[c].displaySettings || {};
+      settings.skipProgram = true;
+      surf = molmil.tubeSurface(chains[c], settings, soup);
+      verts += surf.vBuffer.length;
+      idcs += surf.iBuffer.length;
+      surf.rgba = chains[c].rgba;
+      surfaces2.push(surf);
+    }
   }
-    
-  var vertices = new Float32Array(verts*8); // x, y, z, nx, ny, nz, rgba, none
+
+  var vertices = new Float32Array(verts*7); // x, y, z, nx, ny, nz, rgba
   var vertices8 = new Uint8Array(vertices.buffer);
-  var indices = new Uint32Array(faces*3);
+  var indices = new Uint32Array(idcs);
   var m=0, m8=0, s, rgba, offset = 0, i=0;
   for (s=0; s<surfaces.length; s++) {
     surf = surfaces[s]; rgba = surf.rgba;
-    for (c=0; c<surf.vertices.length; c++, m8 += 32) {
+    for (c=0; c<surf.vertices.length; c++, m8 += 28) {
       vertices[m++] = surf.vertices[c][0];
       vertices[m++] = surf.vertices[c][1];
       vertices[m++] = surf.vertices[c][2];
@@ -4681,8 +4908,6 @@ molmil.geometry.generateSurfaces = function(chains) {
       vertices8[m8+26] = rgba[2];
       vertices8[m8+27] = rgba[3];
       m++; // color
-            
-      m++; // AID
     }
           
     for (c=0; c<surf.faces.length; c++) {
@@ -4690,7 +4915,21 @@ molmil.geometry.generateSurfaces = function(chains) {
     }
     offset += surf.vertices.length;
   }
-          
+  
+  
+  
+  for (s=0; s<surfaces2.length; s++) {
+    surf = surfaces2[s];
+    
+    vertices.set(surf.vBuffer, m);
+    m += surf.vBuffer.length;
+    m8 += surf.vBuffer.length*4;
+    
+    for (c=0; c<surf.iBuffer.length; c++) indices[i++] = surf.iBuffer[c]+offset;
+    
+    offset += surf.vBuffer.length/7;
+  }
+  
   var buffer4 = this.buffer4;
   buffer4.vertexBuffer = vertices;
   buffer4.vertexBuffer8 = vertices8;
@@ -6299,8 +6538,6 @@ molmil.render = function (soup) { // render object
   this.buffers = {};
   this.gl = null;
   this.modelId = 0;
-
-  
   // new init...
   
 };
@@ -6312,9 +6549,8 @@ molmil.render.prototype.clear = function() {
     this.gl.deleteBuffer(this.programs[i].indexBuffer);
   }
   this.programs = [];
-  this.program1 = this.program2 = this.program3 = this.program4 = undefined;
+  this.program1 = this.program2 = this.program3 = this.program4 = this.program5 = undefined;
 };
-
 
 molmil.render.prototype.reloadSettings=function() {
   this.QLV = localStorage.getItem("molmil.settings_QLV");
@@ -6337,9 +6573,67 @@ molmil.render.prototype.selectDataContext=function() {
   this.gl = this.dataContext;
 };
 
+molmil.generateSphereImposterTexture = function(res, gl) {
+  var lightPos = [50.0, 50.0, 100.0+250.0], u, v, r, theta, phi, pos = [0., 0., 0.], lightDir = [0., 0., 0.], viewDir = [0., 0., 0.], reflectDir = [0., 0., 0.], lambertian, specular;
+  
+  var out = new Uint8Array(res*res*4); // RGB set to lambertian, specular, boolean
+  
+  for (var i=0; i<res; i++) {
+    u = ((i/res)*2.0)-1.;
+    for (var j=0; j<res; j++) {
+      v = ((j/res)*2.0)-1.;
+      r = Math.sqrt(Math.pow(u, 2.0)+Math.pow(v, 2.0));
+      if (r < 1.0) {
+        pos[0] = u;
+        pos[1] = v;
+        pos[2] = Math.sqrt(1-pos[0]*pos[0]-pos[1]*pos[1]);
+        
+        lightDir[0] = lightPos[0]-pos[0]; lightDir[1] = lightPos[1]-pos[1]; lightDir[2] = lightPos[2]-pos[2]; vec3.normalize(lightDir, lightDir);
+      
+        lambertian = Math.min(Math.max(vec3.dot(pos, lightDir), 0.0), 1.0);
+        
+        specular = vec3.dot(pos, lightDir);
+        reflectDir[0] = lightDir[0] - 2.0 * specular * pos[0];
+        reflectDir[1] = lightDir[1] - 2.0 * specular * pos[1];
+        reflectDir[2] = lightDir[2] - 2.0 * specular * pos[2];
+        vec3.negate(viewDir, pos); vec3.normalize(viewDir, viewDir);
+        specular = Math.pow(Math.max(vec3.dot(reflectDir, viewDir), 0.0), 64.0)*.5;
+
+        out[((j*(res*4)) + (i*4)) + 0] = lambertian*255.;
+        out[((j*(res*4)) + (i*4)) + 1] = specular*255.; // specular doesn't work properly...
+        out[((j*(res*4)) + (i*4)) + 2] = pos[2]*255.;
+        out[((j*(res*4)) + (i*4)) + 3] = 255.;
+      }
+      else {
+        out[((j*(res*4)) + (i*4)) + 0] = 0.0;
+        out[((j*(res*4)) + (i*4)) + 1] = 0.0;
+        out[((j*(res*4)) + (i*4)) + 2] = 0.0;
+        out[((j*(res*4)) + (i*4)) + 3] = 0.0;
+      }
+    }
+  }
+
+  var texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, res, res, 0, gl.RGBA, gl.UNSIGNED_BYTE, out);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  texture.loaded = true;
+
+  return texture;
+}
+
 // ** initiates the WebGL context **
 molmil.render.prototype.initGL = function(canvas, width, height) {
-  this.defaultContext = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  if (window.WebGL2RenderingContext && molmil.configBox.webGL2) {
+    this.defaultContext = canvas.getContext("webgl2") || canvas.getContext("experimental-webgl2");
+    if (this.defaultContext) molmil.configBox.webGL2 = true;
+  }
+  this.defaultContext = this.defaultContext || canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
   canvas.renderer = this;
   if (! this.defaultContext) {
     this.altCanvas = molmil.__webglNotSupported__(canvas);
@@ -6348,6 +6642,9 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   this.gl = this.defaultContext;
   
   molmil.configBox.OES_element_index_uint = this.gl.getExtension('OES_element_index_uint');
+  
+  this.textures.atom_imposter = molmil.generateSphereImposterTexture(128, this.gl);
+  
   this.gl.INDEXINT = molmil.configBox.OES_element_index_uint ? this.gl.UNSIGNED_INT : this.gl.UNSIGNED_SHORT;
   
 
@@ -6406,10 +6703,24 @@ molmil.shaderEngine.recompile = function(renderer) {
 molmil.render.prototype.initShaders = function(programs) {
   var renderer = this;
   
-  var name, fragmentShader, vertexShader, e, ploc, programs = molmil.configBox.glsl_shaders;
+  /*
+  
+  //molmil.configBox.EXT_frag_depth = this.gl.getExtension('EXT_frag_depth');
+  //molmil.configBox.EXT_frag_depth = true;
+  
+  ["shaders/imposterPoints.glsl", "points", "", ["EXT_frag_depth"]],
+  */
+  
+  var name, fragmentShader, vertexShader, e, ploc, programs = molmil.configBox.glsl_shaders, exts, bad;
   for (var p=0; p<programs.length; p++) {
     ploc = programs[p][0];
     name = programs[p][1] || ploc.replace(/\\/g,'/').replace( /.*\//, '' ).split(".")[0];
+    exts = programs[p].length > 3 ? programs[p][3] : []; bad = false;
+    for (var i=0; i<exts.length; i++) {
+      if (! molmil.configBox[exts[i]]) molmil.configBox[exts[i]] = this.gl.getExtension(exts[i]);
+      bad = bad || ! molmil.configBox[exts[i]];
+    }
+    if (bad) continue;
     
     if (! molmil.shaderEngine.code.hasOwnProperty(molmil.settings.src+ploc)) {
       var request = new molmil_dep.CallRemote("GET"); request.ASYNC = false;
@@ -6417,19 +6728,18 @@ molmil.render.prototype.initShaders = function(programs) {
       molmil.shaderEngine.code[molmil.settings.src+ploc] = request.request.responseText;
     }
   }
-  
 
   var name, fragmentShader, vertexShader, e, ploc, defines, programs = molmil.configBox.glsl_shaders, program;
   for (var p=0; p<programs.length; p++) {
     ploc = programs[p][0];
     name = programs[p][1] || ploc.replace(/\\/g,'/').replace( /.*\//, '' ).split(".")[0];
-    
-    source = molmil.shaderEngine.code[molmil.settings.src+ploc].split("//#");
+    e = molmil.shaderEngine.code[molmil.settings.src+ploc];
+    if (! e) continue;
+    source = e.split("//#");
     program = JSON.parse(source[0]);
     program.name = name;
     program.vertexShader = source[1].substr(7);
     program.fragmentShader = source[2].substr(9);
-      
     program.defines = programs[p][2] || "";
     program.compile = function(global_defines) {
       this.program = renderer.gl.createProgram();
@@ -6440,7 +6750,6 @@ molmil.render.prototype.initShaders = function(programs) {
       renderer.gl.useProgram(this.program);
       for (e in this.attributes) {
         this.attributes[e] = renderer.gl.getAttribLocation(this.program, e);
-        if (this.attributes[e] != -1) renderer.gl.enableVertexAttribArray(this.attributes[e]);
       }
       for (e in this.uniforms) {this.uniforms[e] = renderer.gl.getUniformLocation(this.program, e);}
     };
@@ -6584,6 +6893,8 @@ molmil.render.prototype.render = function() {
 
   // rendering
   
+  var BGCOLOR = molmil.configBox.BGCOLOR.slice();
+  if (BGCOLOR[3] == 0) BGCOLOR[0] = BGCOLOR[1] = BGCOLOR[2] = 0;
   
   var COR = [0, 0, 0];
   var tmp = mat3.create(); mat3.fromMat4(tmp, this.modelViewMatrix);
@@ -6613,14 +6924,14 @@ molmil.render.prototype.render = function() {
     
     if (molmil.configBox.stereoMode == 1) { // anaglyph
       this.FBOs.stereoLeft.bind();
-      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      this.gl.clearColor.apply(this.gl, BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
       this.FBOs.stereoLeft.unbind();
     }
     else if (molmil.configBox.stereoMode == 2) { // VR
       this.gl.viewport(this.width, 0, this.width, this.height);
       this.gl.scissor(this.width, 0, this.width, this.height);
-      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      this.gl.clearColor.apply(this.gl, BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
     }
     
@@ -6633,7 +6944,7 @@ molmil.render.prototype.render = function() {
     
     if (molmil.configBox.stereoMode == 1) { // anaglyph
       this.FBOs.stereoRight.bind();
-      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      this.gl.clearColor.apply(this.gl, BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
       this.FBOs.stereoRight.unbind();
     }
@@ -6646,7 +6957,7 @@ molmil.render.prototype.render = function() {
     if (molmil.configBox.stereoMode == 1) {
       var shader = this.shaders.anaglyph;
     
-      this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+      this.gl.clearColor.apply(this.gl, BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     
       this.gl.useProgram(shader.program);
       
@@ -6656,7 +6967,11 @@ molmil.render.prototype.render = function() {
       var buffer = this.gl.createBuffer();
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
       this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0,  1.0, -1.0,  1.0, 1.0, -1.0, 1.0,  1.0]), this.gl.STATIC_DRAW);
-      this.gl.vertexAttribPointer(shader.attributes.in_Position, 2, this.gl.FLOAT, false, 0, 0);
+      
+      molmil.resetAttributes();
+      molmil.bindAttribute(this.gl, shader.attributes.in_Position, 2, this.gl.FLOAT, false, 0, 0);
+      molmil.clearAttributes(this.gl);
+      
       this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
     }
     
@@ -6664,10 +6979,15 @@ molmil.render.prototype.render = function() {
     this.modelViewMatrix[12] = tmpVal;
   }
   else {
-    this.gl.clearColor.apply(this.gl, molmil.configBox.BGCOLOR);
+    this.gl.clearColor.apply(this.gl, BGCOLOR);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     
-    for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
+    for (var p=0; p<this.programs.length; p++) {
+      if (this.programs[p].nElements) {
+        this.programs[p].render(this.modelViewMatrix, COR);
+      }
+      
+    }
   }
   
   if (this.buffers.atomSelectionBuffer) { // this doesn't work properly with stereoscopy...
@@ -6726,11 +7046,14 @@ molmil.render.prototype.renderAtomSelection = function(modelViewMatrix, COR) {
   this.gl.uniform3f(this.shaders.atomSelection.uniforms.COR, COR[0], COR[1], COR[2]);
   this.gl.uniformMatrix4fv(this.shaders.atomSelection.uniforms.modelViewMatrix, false, modelViewMatrix);
   this.gl.uniformMatrix4fv(this.shaders.atomSelection.uniforms.projectionMatrix, false, this.projectionMatrix);
-
+    
   this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffers.atomSelectionBuffer);
-  this.gl.vertexAttribPointer(this.shaders.atomSelection.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
-  this.gl.vertexAttribPointer(this.shaders.atomSelection.attributes.in_Colour, 3, this.gl.FLOAT, false, 32, 12);
-  this.gl.vertexAttribPointer(this.shaders.atomSelection.attributes.in_ScreenSpaceOffset, 2, this.gl.FLOAT, false, 32, 24);
+
+  molmil.resetAttributes();
+  molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
+  molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_Colour, 3, this.gl.FLOAT, false, 32, 12);
+  molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_ScreenSpaceOffset, 2, this.gl.FLOAT, false, 32, 24);
+  molmil.clearAttributes(this.gl);
   
   this.gl.enable(this.gl.BLEND); if (molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
   this.gl.blendEquation(this.gl.FUNC_ADD); this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -7395,7 +7718,11 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
     else item.addEventListener("touchstart", function() {this.onclick();}, false);
   };
   
-  addEntry("None", function() {this.UI.displayEntry(entry, 0);});
+//  if (entry.mtype == 1 || entry.mtype == 2) {
+    if (entry.ref[0].display) addEntry("Hidden", function() {this.UI.displayEntry(entry, 0.0);});
+    else addEntry("Visible", function() {this.UI.displayEntry(entry, 0.5);});
+  //}
+  //else addEntry("None", function() {this.UI.displayEntry(entry, 0);});
   if (entry.mtype != 3) addEntry("Default", function() {this.UI.displayEntry(entry, 1);});
   
   if (entry.mtype != 10) {
@@ -7457,6 +7784,7 @@ molmil.UI.prototype.showDisplayMenu=function(ref, entry) {
       addEntry("Cartoon", function() {this.UI.displayEntry(entry, 8);});
       addEntry("Rocket", function() {this.UI.displayEntry(entry, 8.5);});
       addEntry("CG Surface", function() {this.UI.displayEntry(entry, molmil.displayMode_ChainSurfaceCG);});
+      addEntry("Simple Surface", function() {this.UI.displayEntry(entry, molmil.displayMode_ChainSurfaceSimple);});
     }
   }
 
@@ -8698,6 +9026,12 @@ molmil.UI.prototype.videoRenderer=function() {
 
 
   popup.record.onclick = function() {
+    // make sure that both the width & height are divisible by 2 (ffmpeg issue)
+    var w = this.canvas.width, h = this.canvas.height;
+    if (w%2 == 1) w--;
+    if (h%2 == 1) h--;
+    if (w != this.canvas.width || h != this.canvas.height) this.canvas.renderer.resizeViewPort();
+    
     var req = new molmil_dep.CallRemote("GET");
     req.AddParameter("w", this.canvas.width);
     req.AddParameter("h", this.canvas.height);
@@ -8731,23 +9065,23 @@ molmil.toggleEntry = function (obj, dm, rebuildGeometry, soup) {
   if (obj instanceof molmil.entryObject) {
     for (m=0; m<obj.molecules.length; m++) {
       mol = obj.molecules[m];
-      if (! mol.ligand && ! mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].status = dm;}
-      mol.status = dm;
+      if (! mol.ligand && ! mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].display = dm;}
+      mol.display = dm;
     }
   }
   else if (obj instanceof molmil.chainObject) {
     for (m=0; m<obj.molecules.length; m++) {
       mol = obj.molecules[m];
-      for (a=0; a<mol.atoms.length; a++) mol.atoms[a].status = dm;
-      mol.status = dm;
+      for (a=0; a<mol.atoms.length; a++) mol.atoms[a].display = dm;
+      mol.display = dm;
     }
   }
   else if (obj instanceof molmil.molObject) {
-    for (a=0; a<obj.atoms.length; a++) obj.atoms[a].status = dm;
-    obj.status = dm;
+    for (a=0; a<obj.atoms.length; a++) obj.atoms[a].display = dm;
+    obj.display = dm;
   }
   else if (obj instanceof molmil.atomObject) {  
-    obj.status = false;
+    obj.display = false;
   }
   else if (obj instanceof polygonObject) obj.display = dm;
   else {return;}
@@ -8760,10 +9094,10 @@ molmil.toggleEntry = function (obj, dm, rebuildGeometry, soup) {
 
 
 // ** change display mode of a system/chain/molecule/atom **
-molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
+molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
   soup = soup || molmil.cli_soup;
   if (obj instanceof Array) {
-    for (var i=0; i<obj.length; i++) molmil.displayEntry(obj[i], dm);
+    for (var i=0; i<obj.length; i++) molmil.displayEntry(obj[i], dm, null, null, settings);
     if (rebuildGeometry) {
       soup.renderer.initBuffers();
       soup.renderer.canvas.update = true;  
@@ -8772,10 +9106,18 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
   }
 
   if (soup && ((soup.SCstuff && dm%1 == 0) || (! soup.SCstuff && dm%1 != 0))) molmil.geometry.reInitChains = true;
-  
+
   var m, a, c, chain, mol, backboneAtoms = molmil.configBox.backboneAtoms4Display, backboneAtomsXNA = molmil.configBox.backboneAtoms4DisplayXNA, xna_atoms = molmil.configBox.xna_simple_base_atoms, backboneAtomsRef;
+  
+  
   if (obj instanceof molmil.entryObject) {
-    if (dm == molmil.displayMode_None) {
+    if (dm == molmil.displayMode_None) { // new none function...
+      obj.display = false;
+    }
+    else if (dm == molmil.displayMode_Visible) {
+      obj.display = true;
+    }
+    else if (dm == molmil.displayMode_None) {
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
         chain.displayMode = 0;
@@ -8972,9 +9314,22 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
         chain.HQsurface = true;
       }
     }
+    else if (dm == molmil.displayMode_ChainSurfaceSimple) {
+      for (c=0; c<obj.chains.length; c++) {
+        chain = obj.chains[c];
+        chain.displayMode = molmil.displayMode_ChainSurfaceSimple;
+        chain.displaySettings = settings;
+      }
+    }
   }
   else if (obj instanceof molmil.chainObject) {
     if (dm == molmil.displayMode_None) {
+      obj.display = false;
+    }
+    else if (dm == molmil.displayMode_Visible) {
+      obj.display = true;
+    }
+    else if (dm == molmil.displayMode_None) {
       obj.display = false;
       obj.displayMode = 0;
       for (m=0; m<obj.molecules.length; m++) {
@@ -9129,9 +9484,25 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
     else if (dm == molmil.displayMode_ChainSurfaceCG) {
       obj.displayMode = molmil.displayMode_ChainSurfaceCG;
     }
+    else if (dm == molmil.displayMode_ChainSurfaceCG+0.5) {
+      obj.displayMode = molmil.displayMode_ChainSurfaceCG;
+      obj.HQsurface = true;
+    }
+    else if (dm == molmil.displayMode_ChainSurfaceSimple) {
+      obj.displayMode = molmil.displayMode_ChainSurfaceSimple;
+      obj.displaySettings = settings;
+    }
   }
   else if (obj instanceof molmil.molObject) {
     if (dm == molmil.displayMode_None) {
+      obj.display = false;
+      for (a=0; a<obj.atoms.length; a++) obj.atoms[a].display = false;
+    }
+    else if (dm == molmil.displayMode_Visible) {
+      obj.display = true;
+      for (a=0; a<obj.atoms.length; a++) obj.atoms[a].display = true;
+    }
+    else if (dm == molmil.displayMode_None) {
       for (a=0; a<obj.atoms.length; a++) obj.atoms[a].displayMode = 0;
     }
     else if (dm == molmil.displayMode_Default) {
@@ -9223,7 +9594,13 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup) {
     }
   }
   else if (obj instanceof molmil.atomObject) {  
-    if (dm == molmil.displayMode_Spacefill) {
+    if (dm == molmil.displayMode_None) {
+      obj.display = false;
+    }
+    else if (dm == molmil.displayMode_Visible) {
+      obj.display = true;
+    }
+    else if (dm == molmil.displayMode_Spacefill) {
       obj.displayMode = 1;
     }
     else if (dm == molmil.displayMode_BallStick) {
@@ -9482,6 +9859,7 @@ molmil.getAtomFromMolecule = function (molecule, atomName) {
 }
 
 molmil.resetColors = function (struc, soup) {
+  if (soup) struc.soup = soup;
   soup = soup || molmil.cli_soup;
   for (var m=0, a, c, M, chain; m<soup.structures.length; m++) {
     if (struc && soup.structures[m] != struc) continue;
@@ -9540,6 +9918,14 @@ molmil.getProteinChains = function(obj) {
   return out
 }
 
+molmil.getResiduesForChain = function(chain, first, last) {
+  var out = [];
+  for (var m=0; m<chain.molecules.length; m++) {
+    if (chain.molecules[m].RSID >= first && chain.molecules[m].RSID <= last) out.push(chain.molecules[m]);
+  }
+  return out;
+}
+
 molmil.setCanvas = function (soupObject, canvas) {
   soupObject.canvas = canvas;
   if (! canvas.renderer) {
@@ -9547,26 +9933,42 @@ molmil.setCanvas = function (soupObject, canvas) {
   }
 }
 
-
-molmil.initTexture = function (src) { // maybe deprecated
-  var texture = this.gl.createTexture(); texture.image = new Image(); texture.image.texture = texture;
+molmil.initTexture = function (src, gl) { // maybe deprecated
+  var texture = gl.createTexture(); texture.image = new Image(); texture.image.texture = texture;
   texture.loaded = false;
-  texture.image.onload = function() {molmil.handleLoadedTexture(this.texture)}
+  texture.image.onload = function() {molmil.handleLoadedTexture(this.texture, gl)}
   texture.image.src = src;
   return texture;
 }
 
-molmil.handleLoadedTexture = function (texture) { // maybe deprecated
-  this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-  this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true); // ?? needed???????????
-  this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, texture.image);
-  this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
-  this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
-  this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
-  this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
-  this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+molmil.handleLoadedTexture = function (texture, gl) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // ?? needed???????????
+  //gl.pixelStorei(gl.UNPACK_FLIP_X_WEBGL, true); // ?? needed???????????
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindTexture(gl.TEXTURE_2D, null);
   texture.loaded = true;
 }
+
+molmil.boundAttributes = {};
+molmil.resetAttributes = function() {
+  for (var e in this.boundAttributes) if (this.boundAttributes[e] != 0) this.boundAttributes[e] = -1;
+}
+
+molmil.bindAttribute = function(gl, index, size, type, normalized, stride, offset) {
+  if (! this.boundAttributes[index]) {gl.enableVertexAttribArray(index); this.boundAttributes[index] = 1;}
+  else if (this.boundAttributes[index] == -1) this.boundAttributes[index] = 1;
+  gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
+}
+
+molmil.clearAttributes = function(gl) {
+  for (var e in this.boundAttributes) if (this.boundAttributes[e] == -1) {gl.disableVertexAttribArray(e); this.boundAttributes[e] = 0;}
+}
+
 
 // ** waits until all requirements are loaded, then starts the renderer **
 molmil.safeStartViewer = function (canvas) {
@@ -9575,8 +9977,8 @@ molmil.safeStartViewer = function (canvas) {
     canvas.renderer.camera.z_set = true;
   }
   if (canvas.initialized) return;
-  for (var t in canvas.textures) {
-    if (! canvas.textures[t].loaded) return molmil_dep.asyncStart(molmil.safeStartViewer, [canvas], null, 100);
+  for (var t in canvas.renderer.textures) {
+    if (! canvas.renderer.textures[t].loaded) return molmil_dep.asyncStart(molmil.safeStartViewer, [canvas], null, 100);
   }
   canvas.renderer.resizeViewPort();
   molmil.canvasList.push(canvas); canvas.initialized = true;
@@ -9743,10 +10145,10 @@ molmil.createViewer = function (target, width, height, soupObject, noUI) {
   else canvas = target.pushNode("canvas");
   width = width || canvas.width; height = height || canvas.height;
   canvas.width = width*dpr; canvas.height = height*dpr; canvas.defaultSize = [width, height];
-  
+
   canvas.style.width = width+"px";
   canvas.style.height = height+"px";
-  
+
   canvas.setSize = function(w, h) {
     var dpr = window.devicePixelRatio || 1;
     this.renderer.width = this.width = w * dpr;
@@ -9882,6 +10284,341 @@ molmil.clear = function(canvas) {
   if (document.body.classList !== undefined) document.body.classList.remove("entryLoaded");
 };
 
+molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't draw simple tubes, it adds volume (radii at different positions along the tube) to the tube
+  if (chains instanceof molmil.chainObject) chains = [chains];
+  if (! chains.length) return;
+  
+  soup = soup || molmil.cli_soup;
+  settings = settings || {};
+  var rgba;
+
+  var CB_NOI = molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].CB_NOI/32; // NOI per A
+  
+  var chainRepr = [], c, radii = [];
+  
+  for (c=0; c<chains.length; c++) {
+    chain = chains[c];
+    rgba = settings.rgba || chain.rgba;
+    var xyzs = [], modelsXYZ = chain.modelsXYZ[0]; // set correct ID
+    var COG = [0.0, 0.0, 0.0, 0]
+    for (var m=0; m<chain.molecules.length; m++) {
+      if (! chain.molecules[m].CA) continue;
+      xyzs.push([modelsXYZ[chain.molecules[m].CA.xyz], modelsXYZ[chain.molecules[m].CA.xyz+1], modelsXYZ[chain.molecules[m].CA.xyz+2]]);
+    
+      COG[0] += modelsXYZ[chain.molecules[m].CA.xyz];
+      COG[1] += modelsXYZ[chain.molecules[m].CA.xyz+1];
+      COG[2] += modelsXYZ[chain.molecules[m].CA.xyz+2]
+      COG[3] += 1;
+    }
+    if (COG[3] < 2) continue;
+    COG[0] /= COG[3]; COG[1] /= COG[3]; COG[2] /= COG[3];
+  
+    var n, i, j, C_ij = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], x, y, z;
+    
+    for (n=0; n<xyzs.length; n++) {
+      x = xyzs[n][0] - COG[0]; y = xyzs[n][1] - COG[1]; z = xyzs[n][2] - COG[2];
+      C_ij[0][0] += x * x; C_ij[1][1] += y * y; C_ij[2][2] += z * z;
+      C_ij[0][1] += x * y; C_ij[0][2] += x * z; C_ij[1][2] += y * z;
+    }
+  
+    var Ninv = 1./xyzs.length;
+    C_ij[0][0] *= Ninv; C_ij[1][1] *= Ninv; C_ij[2][2] *= Ninv;
+    C_ij[0][1] = C_ij[1][0] = C_ij[0][1] * Ninv; C_ij[0][2] = C_ij[2][0] = C_ij[0][2] * Ninv; C_ij[1][2] = C_ij[2][1] = C_ij[1][2] * Ninv; 
+  
+    // the downside of this method is that we don't know what the other PCs...
+  
+    var v1 = [1, 1, 1];
+    var A = new Float64Array(9);
+    A[0] = C_ij[0][0]; A[1] = C_ij[0][1]; A[2] = C_ij[0][2];
+    A[3] = C_ij[1][0]; A[4] = C_ij[1][1]; A[5] = C_ij[1][2];
+    A[6] = C_ij[2][0]; A[7] = C_ij[2][1]; A[8] = C_ij[2][2];
+  
+  
+    var maxIter = 1e4;
+    var tolerance = 1e-9, i = 0, lambdaOld = 0, lambda = 0, z = new Float64Array(3);
+  
+    var powerIteration_vec3 = function(v) {
+      i = 0; lambdaOld = 0;
+      lambda = Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+      v[0] /= lambda; v[1] /= lambda; v[2] /= lambda;
+  
+      while (i <= maxIter) {
+        vec3.transformMat3(z, v, A);
+        lambda = Math.sqrt(z[0]*z[0] + z[1]*z[1] + z[2]*z[2]);
+        v[0] = z[0]/lambda; v[1] = z[1]/lambda; v[2] = z[2]/lambda;
+        if (Math.abs((lambda-lambdaOld)/lambda) < tolerance) break;
+        lambdaOld = lambda;
+        i++;
+      }
+     
+    }
+    
+    powerIteration_vec3(v1);
+
+    var sf = vec3.squaredLength(z)/lambda;
+    
+    var vvT = new Float64Array(9);
+    vvT[0] = v1[0]*v1[0]*sf; vvT[1] = v1[0]*v1[1]*sf; vvT[2] = v1[0]*v1[2]*sf;
+    vvT[3] = v1[1]*v1[0]*sf; vvT[4] = v1[1]*v1[1]*sf; vvT[5] = v1[1]*v1[2]*sf;
+    vvT[6] = v1[2]*v1[0]*sf; vvT[7] = v1[2]*v1[1]*sf; vvT[8] = v1[2]*v1[2]*sf;
+    
+    A[0] -= vvT[0]; A[1] -= vvT[1]; A[2] -= vvT[2]; A[3] -= vvT[3]; A[4] -= vvT[4]; A[5] -= vvT[5]; A[6] -= vvT[6]; A[7] -= vvT[7]; A[8] -= vvT[8];
+
+    var v2 = [1, 1, 1];
+    
+    powerIteration_vec3(v2);
+    
+    var sf = vec3.squaredLength(z)/lambda;
+    
+    var vvT = new Float64Array(9);
+    vvT[0] = v2[0]*v2[0]*sf; vvT[1] = v2[0]*v2[1]*sf; vvT[2] = v2[0]*v2[2]*sf;
+    vvT[3] = v2[1]*v2[0]*sf; vvT[4] = v2[1]*v2[1]*sf; vvT[5] = v2[1]*v2[2]*sf;
+    vvT[6] = v2[2]*v2[0]*sf; vvT[7] = v2[2]*v2[1]*sf; vvT[8] = v2[2]*v2[2]*sf;
+    
+    A[0] -= vvT[0]; A[1] -= vvT[1]; A[2] -= vvT[2]; A[3] -= vvT[3]; A[4] -= vvT[4]; A[5] -= vvT[5]; A[6] -= vvT[6]; A[7] -= vvT[7]; A[8] -= vvT[8];
+    
+    var v3 = [1, 1, 1];
+    powerIteration_vec3(v3);
+    
+    // v1T is what???
+  
+    var PC1 = [], minVal = [1e99, -1], maxVal = [-1e99, -1], PC2 = [], PC3 = [];
+    for (n=0; n<xyzs.length; n++) {
+      x = (xyzs[n][0]-COG[0]) * v1[0] + (xyzs[n][1]-COG[1]) * v1[1] + (xyzs[n][2]-COG[2]) * v1[2];
+      y = (xyzs[n][0]-COG[0]) * v2[0] + (xyzs[n][1]-COG[1]) * v2[1] + (xyzs[n][2]-COG[2]) * v2[2];
+      z = (xyzs[n][0]-COG[0]) * v3[0] + (xyzs[n][1]-COG[1]) * v3[1] + (xyzs[n][2]-COG[2]) * v3[2];
+      PC1.push(x); PC2.push(Math.abs(y)); PC3.push(Math.abs(z));
+      if (x < minVal[0]) {minVal[0] = x; minVal[1] = n;}
+      if (x > maxVal[0]) {maxVal[0] = x; maxVal[1] = n;}
+    }
+
+    x = [xyzs[minVal[1]][0], COG[0], xyzs[maxVal[1]][0]];
+    y = [xyzs[minVal[1]][1], COG[1], xyzs[maxVal[1]][1]];
+    z = [xyzs[minVal[1]][2], COG[2], xyzs[maxVal[1]][2]];
+  
+    var base = [0, 0, 0];
+    base[1] = Math.sqrt(Math.pow(x[1] - x[0], 2) + Math.pow(y[1] - y[0], 2) + Math.pow(z[1] - z[0], 2));
+    base[2] = base[1] + Math.sqrt(Math.pow(x[2] - x[1], 2) + Math.pow(y[2] - y[1], 2) + Math.pow(z[2] - z[1], 2));
+
+    x = molmil.polynomialFit(base, x, 2); y = molmil.polynomialFit(base, y, 2); z = molmil.polynomialFit(base, z, 2);
+  
+    var NOI = Math.ceil(base[2]*CB_NOI);
+    var dbi = base[2] / NOI;
+    
+    var PC1_ = [];
+    for (i=0; i<PC1.length; i++) PC1_.push(PC1[i]-minVal[0]);
+    PC1_.push(0.0); PC1_.push(maxVal[0]-minVal[0]);
+    PC2.push(0); PC2.push(0); PC3.push(0); PC3.push(0);
+    
+    var PC2_r = molmil.polynomialFit(PC1_, PC2, 3); 
+    var PC3_r = molmil.polynomialFit(PC1_, PC3, 3);
+
+    var waypoints = [[molmil.polynomialCalc(0.0, x), molmil.polynomialCalc(0.0, y), molmil.polynomialCalc(0.0, z)]], lambda = 0.0;
+    var radius = [[settings.radius || molmil.polynomialCalc(0.0, PC2_r), settings.radius || molmil.polynomialCalc(0.0, PC3_r)]];
+    
+    waypoints.push(waypoints[0]);
+    radius.push(radius[0]);
+    
+    for (i=1; i<NOI+1; i++) {
+      lambda += dbi;
+      waypoints.push([molmil.polynomialCalc(lambda, x), molmil.polynomialCalc(lambda, y), molmil.polynomialCalc(lambda, z)]);
+      radius.push([settings.radius || Math.max(molmil.polynomialCalc(lambda, PC2_r)*2, 0.0), settings.radius || Math.max(molmil.polynomialCalc(lambda, PC3_r)*2, 0.0)]);
+      //radius.push([settings.radius || Math.max(molmil.polynomialCalc(lambda, PC3_r)*2, 0.0), settings.radius || Math.max(molmil.polynomialCalc(lambda, PC2_r)*2, 0.0)]);
+    }    
+    waypoints.push(waypoints[waypoints.length-1]);
+    radius.push(radius[radius.length-1]);
+    
+    radius[0][0] = radius[1][0] = (radius[0][0]+radius[2][0])*.5;
+    radius[0][1] = radius[0][1] = (radius[0][1]+radius[2][1])*.5;
+    radius[radius.length-1][0] = radius[radius.length-2][0] = (radius[radius.length-1][0]+radius[radius.length-3][0])*.5;
+    radius[radius.length-1][1] = radius[radius.length-2][1] = (radius[radius.length-1][1]+radius[radius.length-3][1])*.5;
+
+    chainRepr.push(waypoints);
+    radii.push(radius);
+  }
+  var avgR = [0.0, 0]
+  
+  for (c=0; c<chainRepr.length; c++) {
+    for (n=1; n<chainRepr[c].length-1; n++) {
+      avgR[0] += radii[c][n][0] + radii[c][n][1];
+      avgR[1] += 2;
+    }
+  }
+
+  avgR = avgR[0]/avgR[1];
+
+  var CB_NOVPR = Math.max(Math.ceil(molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].CB_NOVPR * .125 * avgR), 6);
+  
+  // now draw an ellipsoid from waypoints & r
+  // at the 1st and last waypoints, also draw an extra point in the center of the ring to 
+  
+  var theta = 0.0, rad = 2.0/CB_NOVPR, ringTemplate = [];
+  for (i=0; i<CB_NOVPR; i++) {
+    x = Math.cos(theta*Math.PI);
+    y = Math.sin(theta*Math.PI);
+    ringTemplate.push([x, y, 0]);
+    theta += rad;
+  }
+  
+  var wpl = 0;
+  for (c=0; c<chainRepr.length; c++) wpl += chainRepr[c].length;
+
+  var vBuffer = new Float32Array(((wpl*CB_NOVPR)+(2*chainRepr.length))*7);
+  var vBuffer8 = new Uint8Array(vBuffer.buffer);
+  if (molmil.configBox.OES_element_index_uint) var iBuffer = new Uint32Array((((wpl-1)*CB_NOVPR*2) + (CB_NOVPR*2))*3);
+  else var iBuffer = new Uint16Array(((wpl*CB_NOVPR*2) + (CB_NOVPR*2))*3);
+  
+  var vP = 0, iP = 0, vP8 = 0;
+  
+  var Nx, Ny, Nz, Bx, By, Bz, Px, Py, Pz; // in the future add scaling so that a more volumetric ellipsoid can be created
+
+  var identityMatrix = mat4.create(), rotationMatrix = mat4.create(), smallest, tangents = [], vec, normal = new Float32Array(3), binormal = new Float32Array(3), delta = 0.0001;
+  
+  var p = 0, p_pre = 0;
+  for (c=0; c<chainRepr.length; c++) {
+    waypoints = chainRepr[c];
+    radius = radii[c];
+    
+    tangents = [];
+  
+    vec = new Float32Array(3); vec3.subtract(vec, waypoints[1], waypoints[0]); vec3.normalize(vec, vec); tangents.push(vec);
+    for (n=1; n<waypoints.length-1; n++) {vec = new Float32Array(3); vec3.subtract(vec, waypoints[n+1], waypoints[n-1]); vec3.normalize(vec, vec); tangents.push(vec);}
+    tangents.push(vec);
+    vec = new Float32Array(3); 
+    
+    tangents[0][0] += tangents[1][0]; tangents[0][1] += tangents[1][1]; tangents[0][2] += tangents[1][2];
+    vec3.normalize(tangents[0], tangents[0]);
+    
+    vBuffer[vP++] = waypoints[0][0]; vBuffer[vP++] = waypoints[0][1]; vBuffer[vP++] = waypoints[0][2];
+    vBuffer[vP++] = -tangents[0][0]; vBuffer[vP++] = -tangents[0][1]; vBuffer[vP++] = -tangents[0][2];
+    vBuffer8[vP8+24] = rgba[0]; vBuffer8[vP8+25] = rgba[1]; vBuffer8[vP8+26] = rgba[2]; vBuffer8[vP8+27] = rgba[3]; vP++; vP8 += 28;
+
+    
+    tangents[0] = tangents[1];
+    
+    for (i=0; i<ringTemplate.length; i++) {
+      iBuffer[iP++] = p+i+2;
+      iBuffer[iP++] = p+i+1;
+      iBuffer[iP++] = p;
+    }
+    iBuffer[iP-3] = p+1;
+  
+    p += ringTemplate.length+1;
+    p_pre = p-CB_NOVPR;
+
+    for (n=0; n<waypoints.length; n++) {
+    
+      if (n == 0) {
+        smallest = Number.MAX_VALUE;
+        if (tangents[0][0] <= smallest) {smallest = tangents[0][0]; normal = [1, 0, 0];}
+        if (tangents[0][1] <= smallest) {smallest = tangents[0][1]; normal = [0, 1, 0];}
+        if (tangents[0][2] <= smallest) {smallest = tangents[0][2]; normal = [0, 0, 1];}
+        vec3.cross(vec, tangents[0], normal); vec3.normalize(vec, vec);
+        vec3.cross(normal, tangents[0], vec); vec3.cross(binormal=[0, 0, 0], tangents[0], normal);
+      }
+      else {
+        vec3.cross(vec, tangents[n-1], tangents[n]);
+        if (vec3.length(vec) > delta) {
+          vec3.normalize(vec, vec);
+          theta = Math.acos(Math.max(-1, Math.min(1, vec3.dot(tangents[n-1], tangents[n]))));
+          mat4.rotate(rotationMatrix, identityMatrix, theta, vec);
+          vec3.transformMat4(normal, normal, rotationMatrix);
+        }
+        vec3.cross(binormal, tangents[n], normal);
+      }
+    
+      // define Nx, Bx, Px
+      Px = waypoints[n][0]; Py = waypoints[n][1]; Pz = waypoints[n][2];
+      Bx = binormal[0]; By = binormal[1]; Bz = binormal[2];
+      Nx = normal[0]; Ny = normal[1]; Nz = normal[2];
+
+      for (i=0; i<ringTemplate.length; i++, vP8+=28) {
+        //vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Nx + radius[n][3]*ringTemplate[i][1] * Bx + Px;
+        //vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Ny + radius[n][2]*ringTemplate[i][1] * By + Py;
+        //vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Nz + radius[n][1]*ringTemplate[i][1] * Bz + Pz;
+        
+        //radius[n][0] = 4.0;
+        //radius[n][1] = 4.0;
+        
+        vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Nx + radius[n][1]*ringTemplate[i][1] * Bx + Px;
+        vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Ny + radius[n][1]*ringTemplate[i][1] * By + Py;
+        vBuffer[vP++] = radius[n][0]*ringTemplate[i][0] * Nz + radius[n][1]*ringTemplate[i][1] * Bz + Pz;
+      
+        if (n == 0) {
+          vBuffer[vP++] = -tangents[0][0];
+          vBuffer[vP++] = -tangents[0][1];
+          vBuffer[vP++] = -tangents[0][2];
+        }
+        else if (n == waypoints.length-1) {
+          vBuffer[vP++] = tangents[n][0];
+          vBuffer[vP++] = tangents[n][1];
+          vBuffer[vP++] = tangents[n][2];
+        }
+        else {
+          vBuffer[vP++] = ringTemplate[i][0] * Nx + ringTemplate[i][1] * Bx;
+          vBuffer[vP++] = ringTemplate[i][0] * Ny + ringTemplate[i][1] * By;
+          vBuffer[vP++] = ringTemplate[i][0] * Nz + ringTemplate[i][1] * Bz;
+        }
+
+        vBuffer8[vP8+24] = rgba[0];
+        vBuffer8[vP8+25] = rgba[1];
+        vBuffer8[vP8+26] = rgba[2];
+        vBuffer8[vP8+27] = rgba[3];
+        vP++;
+      }
+
+      if (n < waypoints.length-1) {
+      
+        for (i=0; i<(CB_NOVPR*2)-2; i+=2, p+=1, p_pre+=1) {
+          iBuffer[iP++] = p;
+          iBuffer[iP++] = p_pre;
+          iBuffer[iP++] = p_pre+1;
+   
+          iBuffer[iP++] = p_pre+1;
+          iBuffer[iP++] = p+1;
+          iBuffer[iP++] = p;
+        }
+        iBuffer[iP++] = p;
+        iBuffer[iP++] = p_pre;
+        iBuffer[iP++] = p_pre-(CB_NOVPR-1);
+
+        iBuffer[iP++] = p_pre-(CB_NOVPR-1);
+        iBuffer[iP++] = p-(CB_NOVPR-1);
+        iBuffer[iP++] = p;
+
+        p++; p_pre++;
+      }
+    }
+
+    n--;
+    vBuffer[vP++] = waypoints[n][0]; vBuffer[vP++] = waypoints[n][1]; vBuffer[vP++] = waypoints[n][2];
+    vBuffer[vP++] = tangents[n][0]; vBuffer[vP++] = tangents[n][1]; vBuffer[vP++] = tangents[n][2];
+    vBuffer8[vP8+24] = rgba[0]; vBuffer8[vP8+25] = rgba[1]; vBuffer8[vP8+26] = rgba[2]; vBuffer8[vP8+27] = rgba[3]; vP++; vP8 += 28;
+
+    for (i=0; i<ringTemplate.length; i++) {
+      iBuffer[iP++] = p;
+      iBuffer[iP++] = p+i-ringTemplate.length;
+      iBuffer[iP++] = p+i+1-ringTemplate.length;
+    }
+    iBuffer[iP-1] -= ringTemplate.length;
+  
+    p++; p_pre++;
+  }
+  
+  if (settings.skipProgram) return {vBuffer: vBuffer, iBuffer: iBuffer};
+
+  if (typeof(settings.solid) == "undefined") settings.solid = true;
+  var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, settings);
+  
+  soup.renderer.programs.push(program);
+  
+  soup.calculateCOG();
+  
+  soup.renderer.initBuffers();
+  soup.canvas.update = true;
+  
+}
+
 // use an alternate way of generating the isosurface...
 // 1) use a coarse grid (e.g. 4x lower density) to calculate the nearest point on the isosurface (vdw+probeR)
 // 2) throw away everything that wasn't mapped
@@ -9892,10 +10629,11 @@ molmil.clear = function(canvas) {
 //}
 
 // ** generates a coarse surface for a chain **
-molmil.coarseSurface = function(chain, res, probeR) {
-  //res = 1.0; probeR = 1.4;
-  var hres = res*.5;
+molmil.coarseSurface = function(chain, res, probeR, settings) {
+  settings = settings || {};
+
   var inv_res = 1 / res;
+  // make this also work with res not being a number, but an array of integers, so Nx, Ny, Nz, where this represents the number of voxels...
   
   var atoms = chain.atoms;
   var modelsXYZ = chain.modelsXYZ[0];
@@ -9965,7 +10703,7 @@ molmil.coarseSurface = function(chain, res, probeR) {
           dx = aX-xb; dy = aY-yb; dz = aZ-zb;
           tmp1 = dx*dx + dy*dy + dz*dz;
           if (tmp1 < gr[mp]) {
-            gr[mp] = tmp1; ga[mp] = [dx, dy, dz, r, aX, aY, aZ];
+            gr[mp] = tmp1; ga[mp] = r;
           }
         }
       }
@@ -9976,98 +10714,531 @@ molmil.coarseSurface = function(chain, res, probeR) {
   // now that for each grid point & element the nearest atom is calculated --> map it back to the surface...
       
   grid_x = new Float32Array(gs);
-  grid_y = new Float32Array(gs*3);
       
   for (xi=0; xi<gs; xi++) {
     mp = 1e99;
-    aX = aY = aZ = null;
-        
     for (a in elements) {
-      r = Math.sqrt(grid_r[a][xi]); // distance from point - grid
-      tmp1 = r;
-      r -= probeR + grid_a[a][xi][3];
-
-      if (r < mp) {
-        tmp1 = 1.0 / tmp1;
-        aX = grid_a[a][xi][0] * tmp1 * r * inv_res;
-        aY = grid_a[a][xi][1] * tmp1 * r * inv_res;
-        aZ = grid_a[a][xi][2] * tmp1 * r * inv_res;
-        mp = r;
-      }
+      r = Math.sqrt(grid_r[a][xi]) - (probeR + grid_a[a][xi]); // distance from point - grid
+      if (r < mp) mp = r;
     }
-        
-    r = xi*3;
     grid_x[xi] = mp * inv_res;
-    grid_y[r] = aX;
-    grid_y[r+1] = aY;
-    grid_y[r+2] = aZ;
   }
-
-  var potentialFunction = function(x, y, z) {
-    var idx = x + rX * (y + rY * z);
-    return grid_x[idx];
-  };
-      
-  var gradientFunction = function(x, y, z) {
-    var idx = x + rX * (y + rY * z);
-    idx *= 3;
-    return [grid_y[idx], grid_y[idx+1], grid_y[idx+2]];
-  };
-      
-  var surf = molmil.surfaceNets([rX, rY, rZ], potentialFunction, gradientFunction);
-      
-  var face_normals = [], face_pointers = [], i, j, a = [0, 0, 0], b = [0, 0, 0], c;
-  for (i=0; i<surf.vertices.length; i++) face_pointers.push([]);
-      
-  for (i=0; i<surf.faces.length; i++) {
-    // for every face, calculate the normal...
-    a[0] = surf.vertices[surf.faces[i][1]][0]-surf.vertices[surf.faces[i][0]][0];
-    a[1] = surf.vertices[surf.faces[i][1]][1]-surf.vertices[surf.faces[i][0]][1];
-    a[2] = surf.vertices[surf.faces[i][1]][2]-surf.vertices[surf.faces[i][0]][2];
-       
-    b[0] = surf.vertices[surf.faces[i][2]][0]-surf.vertices[surf.faces[i][0]][0];
-    b[1] = surf.vertices[surf.faces[i][2]][1]-surf.vertices[surf.faces[i][0]][1];
-    b[2] = surf.vertices[surf.faces[i][2]][2]-surf.vertices[surf.faces[i][0]][2];
-        
-        
-    face_normals.push([a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]);
-    face_pointers[surf.faces[i][0]].push(i);
-    face_pointers[surf.faces[i][1]].push(i);
-    face_pointers[surf.faces[i][2]].push(i);
-  }
-      
-      
-  var normals = [];
-      
-  for (i=0; i<surf.vertices.length; i++) {
-    a = [0, 0, 0];
-    for (j=0; j<face_pointers[i].length; j++) {
-      a[0] += face_normals[face_pointers[i][j]][0];
-      a[1] += face_normals[face_pointers[i][j]][1];
-      a[2] += face_normals[face_pointers[i][j]][2];
-    }
-        
-    vec3.normalize(a, a);
-    normals.push(a);
-  }
-      
-  molmil.taubinSmoothing(normals, surf.faces, .33, -.331, 20);
-  for (i=0; i<normals.length; i++) vec3.normalize(normals[i], normals[i]);
-
-  var sf = 1./res;
   
-  for (i=0; i<normals.length; i++) {
-    surf.vertices[i][0] = ((surf.vertices[i][0] - normals[i][0] * probeR * sf) * res) - dX;
-    surf.vertices[i][1] = ((surf.vertices[i][1] - normals[i][1] * probeR * sf) * res) - dY;
-    surf.vertices[i][2] = ((surf.vertices[i][2] - normals[i][2] * probeR * sf) * res) - dZ;
+  if (! settings.deproj && ! settings.sas) {
+    var probeR_alt = probeR/res;
+    for (xi=0; xi<gs; xi++) grid_x[xi] += probeR_alt;
   }
-      
-  molmil.taubinSmoothing(surf.vertices, surf.faces, .33, -.331, 20);
-      
+  
+  var surf = polygonize([rX, rY, rZ], grid_x, 0.0);
+  
+  molmil.taubinSmoothing(surf.vertices, surf.faces, .5, -.53, 10);
+
+  var i, faces, f, normals = [], normal;
+  for (i=0; i<surf.vertices.length; i++) normals.push([0, 0, 0]);
+  
+  for (i in surf.vertexIndex) {
+    normal = normals[surf.vertexIndex[i][0]];
+    faces = surf.vertexIndex[i][1];
+    for (f=0; f<faces.length; f++) vec3.add(normal, normal, surf.face_normals[faces[f]]);
+    vec3.normalize(normal, normal);
+  }
   surf.normals = normals;
-      
+  
+  molmil.taubinSmoothing(surf.normals, surf.faces, .5, -.53, 10);
+  
+  if (settings.deproj) {
+    
+    var sf = 1./res;
+  
+    for (i=0; i<normals.length; i++) {
+      surf.vertices[i][0] = ((surf.vertices[i][0] - normals[i][0] * probeR * sf) * res) - dX;
+      surf.vertices[i][1] = ((surf.vertices[i][1] - normals[i][1] * probeR * sf) * res) - dY;
+      surf.vertices[i][2] = ((surf.vertices[i][2] - normals[i][2] * probeR * sf) * res) - dZ;
+    }
+    
+  }
+  else {
+    
+    for (i=0; i<normals.length; i++) {
+      surf.vertices[i][0] = ((surf.vertices[i][0]) * res) - dX;
+      surf.vertices[i][1] = ((surf.vertices[i][1]) * res) - dY;
+      surf.vertices[i][2] = ((surf.vertices[i][2]) * res) - dZ;
+    }
+    
+  }
+  
   return surf;
 }
+
+var edgeTable = new Int32Array([
+		0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
+		0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
+		0x190, 0x99, 0x393, 0x29a, 0x596, 0x49f, 0x795, 0x69c,
+		0x99c, 0x895, 0xb9f, 0xa96, 0xd9a, 0xc93, 0xf99, 0xe90,
+		0x230, 0x339, 0x33, 0x13a, 0x636, 0x73f, 0x435, 0x53c,
+		0xa3c, 0xb35, 0x83f, 0x936, 0xe3a, 0xf33, 0xc39, 0xd30,
+		0x3a0, 0x2a9, 0x1a3, 0xaa, 0x7a6, 0x6af, 0x5a5, 0x4ac,
+		0xbac, 0xaa5, 0x9af, 0x8a6, 0xfaa, 0xea3, 0xda9, 0xca0,
+		0x460, 0x569, 0x663, 0x76a, 0x66, 0x16f, 0x265, 0x36c,
+		0xc6c, 0xd65, 0xe6f, 0xf66, 0x86a, 0x963, 0xa69, 0xb60,
+		0x5f0, 0x4f9, 0x7f3, 0x6fa, 0x1f6, 0xff, 0x3f5, 0x2fc,
+		0xdfc, 0xcf5, 0xfff, 0xef6, 0x9fa, 0x8f3, 0xbf9, 0xaf0,
+		0x650, 0x759, 0x453, 0x55a, 0x256, 0x35f, 0x55, 0x15c,
+		0xe5c, 0xf55, 0xc5f, 0xd56, 0xa5a, 0xb53, 0x859, 0x950,
+		0x7c0, 0x6c9, 0x5c3, 0x4ca, 0x3c6, 0x2cf, 0x1c5, 0xcc,
+		0xfcc, 0xec5, 0xdcf, 0xcc6, 0xbca, 0xac3, 0x9c9, 0x8c0,
+		0x8c0, 0x9c9, 0xac3, 0xbca, 0xcc6, 0xdcf, 0xec5, 0xfcc,
+		0xcc, 0x1c5, 0x2cf, 0x3c6, 0x4ca, 0x5c3, 0x6c9, 0x7c0,
+		0x950, 0x859, 0xb53, 0xa5a, 0xd56, 0xc5f, 0xf55, 0xe5c,
+		0x15c, 0x55, 0x35f, 0x256, 0x55a, 0x453, 0x759, 0x650,
+		0xaf0, 0xbf9, 0x8f3, 0x9fa, 0xef6, 0xfff, 0xcf5, 0xdfc,
+		0x2fc, 0x3f5, 0xff, 0x1f6, 0x6fa, 0x7f3, 0x4f9, 0x5f0,
+		0xb60, 0xa69, 0x963, 0x86a, 0xf66, 0xe6f, 0xd65, 0xc6c,
+		0x36c, 0x265, 0x16f, 0x66, 0x76a, 0x663, 0x569, 0x460,
+		0xca0, 0xda9, 0xea3, 0xfaa, 0x8a6, 0x9af, 0xaa5, 0xbac,
+		0x4ac, 0x5a5, 0x6af, 0x7a6, 0xaa, 0x1a3, 0x2a9, 0x3a0,
+		0xd30, 0xc39, 0xf33, 0xe3a, 0x936, 0x83f, 0xb35, 0xa3c,
+		0x53c, 0x435, 0x73f, 0x636, 0x13a, 0x33, 0x339, 0x230,
+		0xe90, 0xf99, 0xc93, 0xd9a, 0xa96, 0xb9f, 0x895, 0x99c,
+		0x69c, 0x795, 0x49f, 0x596, 0x29a, 0x393, 0x99, 0x190,
+		0xf00, 0xe09, 0xd03, 0xc0a, 0xb06, 0xa0f, 0x905, 0x80c,
+		0x70c, 0x605, 0x50f, 0x406, 0x30a, 0x203, 0x109, 0x0 ]);
+
+var triTable = new Int32Array([
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 1, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 8, 3, 9, 8, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, 1, 2, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 2, 10, 0, 2, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		2, 8, 3, 2, 10, 8, 10, 9, 8, -1, -1, -1, -1, -1, -1, -1,
+		3, 11, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 11, 2, 8, 11, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 9, 0, 2, 3, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 11, 2, 1, 9, 11, 9, 8, 11, -1, -1, -1, -1, -1, -1, -1,
+		3, 10, 1, 11, 10, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 10, 1, 0, 8, 10, 8, 11, 10, -1, -1, -1, -1, -1, -1, -1,
+		3, 9, 0, 3, 11, 9, 11, 10, 9, -1, -1, -1, -1, -1, -1, -1,
+		9, 8, 10, 10, 8, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 7, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 3, 0, 7, 3, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 1, 9, 8, 4, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 1, 9, 4, 7, 1, 7, 3, 1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, 8, 4, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 4, 7, 3, 0, 4, 1, 2, 10, -1, -1, -1, -1, -1, -1, -1,
+		9, 2, 10, 9, 0, 2, 8, 4, 7, -1, -1, -1, -1, -1, -1, -1,
+		2, 10, 9, 2, 9, 7, 2, 7, 3, 7, 9, 4, -1, -1, -1, -1,
+		8, 4, 7, 3, 11, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		11, 4, 7, 11, 2, 4, 2, 0, 4, -1, -1, -1, -1, -1, -1, -1,
+		9, 0, 1, 8, 4, 7, 2, 3, 11, -1, -1, -1, -1, -1, -1, -1,
+		4, 7, 11, 9, 4, 11, 9, 11, 2, 9, 2, 1, -1, -1, -1, -1,
+		3, 10, 1, 3, 11, 10, 7, 8, 4, -1, -1, -1, -1, -1, -1, -1,
+		1, 11, 10, 1, 4, 11, 1, 0, 4, 7, 11, 4, -1, -1, -1, -1,
+		4, 7, 8, 9, 0, 11, 9, 11, 10, 11, 0, 3, -1, -1, -1, -1,
+		4, 7, 11, 4, 11, 9, 9, 11, 10, -1, -1, -1, -1, -1, -1, -1,
+		9, 5, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 5, 4, 0, 8, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 5, 4, 1, 5, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		8, 5, 4, 8, 3, 5, 3, 1, 5, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, 9, 5, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 0, 8, 1, 2, 10, 4, 9, 5, -1, -1, -1, -1, -1, -1, -1,
+		5, 2, 10, 5, 4, 2, 4, 0, 2, -1, -1, -1, -1, -1, -1, -1,
+		2, 10, 5, 3, 2, 5, 3, 5, 4, 3, 4, 8, -1, -1, -1, -1,
+		9, 5, 4, 2, 3, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 11, 2, 0, 8, 11, 4, 9, 5, -1, -1, -1, -1, -1, -1, -1,
+		0, 5, 4, 0, 1, 5, 2, 3, 11, -1, -1, -1, -1, -1, -1, -1,
+		2, 1, 5, 2, 5, 8, 2, 8, 11, 4, 8, 5, -1, -1, -1, -1,
+		10, 3, 11, 10, 1, 3, 9, 5, 4, -1, -1, -1, -1, -1, -1, -1,
+		4, 9, 5, 0, 8, 1, 8, 10, 1, 8, 11, 10, -1, -1, -1, -1,
+		5, 4, 0, 5, 0, 11, 5, 11, 10, 11, 0, 3, -1, -1, -1, -1,
+		5, 4, 8, 5, 8, 10, 10, 8, 11, -1, -1, -1, -1, -1, -1, -1,
+		9, 7, 8, 5, 7, 9, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 3, 0, 9, 5, 3, 5, 7, 3, -1, -1, -1, -1, -1, -1, -1,
+		0, 7, 8, 0, 1, 7, 1, 5, 7, -1, -1, -1, -1, -1, -1, -1,
+		1, 5, 3, 3, 5, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 7, 8, 9, 5, 7, 10, 1, 2, -1, -1, -1, -1, -1, -1, -1,
+		10, 1, 2, 9, 5, 0, 5, 3, 0, 5, 7, 3, -1, -1, -1, -1,
+		8, 0, 2, 8, 2, 5, 8, 5, 7, 10, 5, 2, -1, -1, -1, -1,
+		2, 10, 5, 2, 5, 3, 3, 5, 7, -1, -1, -1, -1, -1, -1, -1,
+		7, 9, 5, 7, 8, 9, 3, 11, 2, -1, -1, -1, -1, -1, -1, -1,
+		9, 5, 7, 9, 7, 2, 9, 2, 0, 2, 7, 11, -1, -1, -1, -1,
+		2, 3, 11, 0, 1, 8, 1, 7, 8, 1, 5, 7, -1, -1, -1, -1,
+		11, 2, 1, 11, 1, 7, 7, 1, 5, -1, -1, -1, -1, -1, -1, -1,
+		9, 5, 8, 8, 5, 7, 10, 1, 3, 10, 3, 11, -1, -1, -1, -1,
+		5, 7, 0, 5, 0, 9, 7, 11, 0, 1, 0, 10, 11, 10, 0, -1,
+		11, 10, 0, 11, 0, 3, 10, 5, 0, 8, 0, 7, 5, 7, 0, -1,
+		11, 10, 5, 7, 11, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		10, 6, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, 5, 10, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 0, 1, 5, 10, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 8, 3, 1, 9, 8, 5, 10, 6, -1, -1, -1, -1, -1, -1, -1,
+		1, 6, 5, 2, 6, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 6, 5, 1, 2, 6, 3, 0, 8, -1, -1, -1, -1, -1, -1, -1,
+		9, 6, 5, 9, 0, 6, 0, 2, 6, -1, -1, -1, -1, -1, -1, -1,
+		5, 9, 8, 5, 8, 2, 5, 2, 6, 3, 2, 8, -1, -1, -1, -1,
+		2, 3, 11, 10, 6, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		11, 0, 8, 11, 2, 0, 10, 6, 5, -1, -1, -1, -1, -1, -1, -1,
+		0, 1, 9, 2, 3, 11, 5, 10, 6, -1, -1, -1, -1, -1, -1, -1,
+		5, 10, 6, 1, 9, 2, 9, 11, 2, 9, 8, 11, -1, -1, -1, -1,
+		6, 3, 11, 6, 5, 3, 5, 1, 3, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 11, 0, 11, 5, 0, 5, 1, 5, 11, 6, -1, -1, -1, -1,
+		3, 11, 6, 0, 3, 6, 0, 6, 5, 0, 5, 9, -1, -1, -1, -1,
+		6, 5, 9, 6, 9, 11, 11, 9, 8, -1, -1, -1, -1, -1, -1, -1,
+		5, 10, 6, 4, 7, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 3, 0, 4, 7, 3, 6, 5, 10, -1, -1, -1, -1, -1, -1, -1,
+		1, 9, 0, 5, 10, 6, 8, 4, 7, -1, -1, -1, -1, -1, -1, -1,
+		10, 6, 5, 1, 9, 7, 1, 7, 3, 7, 9, 4, -1, -1, -1, -1,
+		6, 1, 2, 6, 5, 1, 4, 7, 8, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 5, 5, 2, 6, 3, 0, 4, 3, 4, 7, -1, -1, -1, -1,
+		8, 4, 7, 9, 0, 5, 0, 6, 5, 0, 2, 6, -1, -1, -1, -1,
+		7, 3, 9, 7, 9, 4, 3, 2, 9, 5, 9, 6, 2, 6, 9, -1,
+		3, 11, 2, 7, 8, 4, 10, 6, 5, -1, -1, -1, -1, -1, -1, -1,
+		5, 10, 6, 4, 7, 2, 4, 2, 0, 2, 7, 11, -1, -1, -1, -1,
+		0, 1, 9, 4, 7, 8, 2, 3, 11, 5, 10, 6, -1, -1, -1, -1,
+		9, 2, 1, 9, 11, 2, 9, 4, 11, 7, 11, 4, 5, 10, 6, -1,
+		8, 4, 7, 3, 11, 5, 3, 5, 1, 5, 11, 6, -1, -1, -1, -1,
+		5, 1, 11, 5, 11, 6, 1, 0, 11, 7, 11, 4, 0, 4, 11, -1,
+		0, 5, 9, 0, 6, 5, 0, 3, 6, 11, 6, 3, 8, 4, 7, -1,
+		6, 5, 9, 6, 9, 11, 4, 7, 9, 7, 11, 9, -1, -1, -1, -1,
+		10, 4, 9, 6, 4, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 10, 6, 4, 9, 10, 0, 8, 3, -1, -1, -1, -1, -1, -1, -1,
+		10, 0, 1, 10, 6, 0, 6, 4, 0, -1, -1, -1, -1, -1, -1, -1,
+		8, 3, 1, 8, 1, 6, 8, 6, 4, 6, 1, 10, -1, -1, -1, -1,
+		1, 4, 9, 1, 2, 4, 2, 6, 4, -1, -1, -1, -1, -1, -1, -1,
+		3, 0, 8, 1, 2, 9, 2, 4, 9, 2, 6, 4, -1, -1, -1, -1,
+		0, 2, 4, 4, 2, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		8, 3, 2, 8, 2, 4, 4, 2, 6, -1, -1, -1, -1, -1, -1, -1,
+		10, 4, 9, 10, 6, 4, 11, 2, 3, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 2, 2, 8, 11, 4, 9, 10, 4, 10, 6, -1, -1, -1, -1,
+		3, 11, 2, 0, 1, 6, 0, 6, 4, 6, 1, 10, -1, -1, -1, -1,
+		6, 4, 1, 6, 1, 10, 4, 8, 1, 2, 1, 11, 8, 11, 1, -1,
+		9, 6, 4, 9, 3, 6, 9, 1, 3, 11, 6, 3, -1, -1, -1, -1,
+		8, 11, 1, 8, 1, 0, 11, 6, 1, 9, 1, 4, 6, 4, 1, -1,
+		3, 11, 6, 3, 6, 0, 0, 6, 4, -1, -1, -1, -1, -1, -1, -1,
+		6, 4, 8, 11, 6, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		7, 10, 6, 7, 8, 10, 8, 9, 10, -1, -1, -1, -1, -1, -1, -1,
+		0, 7, 3, 0, 10, 7, 0, 9, 10, 6, 7, 10, -1, -1, -1, -1,
+		10, 6, 7, 1, 10, 7, 1, 7, 8, 1, 8, 0, -1, -1, -1, -1,
+		10, 6, 7, 10, 7, 1, 1, 7, 3, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 6, 1, 6, 8, 1, 8, 9, 8, 6, 7, -1, -1, -1, -1,
+		2, 6, 9, 2, 9, 1, 6, 7, 9, 0, 9, 3, 7, 3, 9, -1,
+		7, 8, 0, 7, 0, 6, 6, 0, 2, -1, -1, -1, -1, -1, -1, -1,
+		7, 3, 2, 6, 7, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		2, 3, 11, 10, 6, 8, 10, 8, 9, 8, 6, 7, -1, -1, -1, -1,
+		2, 0, 7, 2, 7, 11, 0, 9, 7, 6, 7, 10, 9, 10, 7, -1,
+		1, 8, 0, 1, 7, 8, 1, 10, 7, 6, 7, 10, 2, 3, 11, -1,
+		11, 2, 1, 11, 1, 7, 10, 6, 1, 6, 7, 1, -1, -1, -1, -1,
+		8, 9, 6, 8, 6, 7, 9, 1, 6, 11, 6, 3, 1, 3, 6, -1,
+		0, 9, 1, 11, 6, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		7, 8, 0, 7, 0, 6, 3, 11, 0, 11, 6, 0, -1, -1, -1, -1,
+		7, 11, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		7, 6, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 0, 8, 11, 7, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 1, 9, 11, 7, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		8, 1, 9, 8, 3, 1, 11, 7, 6, -1, -1, -1, -1, -1, -1, -1,
+		10, 1, 2, 6, 11, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, 3, 0, 8, 6, 11, 7, -1, -1, -1, -1, -1, -1, -1,
+		2, 9, 0, 2, 10, 9, 6, 11, 7, -1, -1, -1, -1, -1, -1, -1,
+		6, 11, 7, 2, 10, 3, 10, 8, 3, 10, 9, 8, -1, -1, -1, -1,
+		7, 2, 3, 6, 2, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		7, 0, 8, 7, 6, 0, 6, 2, 0, -1, -1, -1, -1, -1, -1, -1,
+		2, 7, 6, 2, 3, 7, 0, 1, 9, -1, -1, -1, -1, -1, -1, -1,
+		1, 6, 2, 1, 8, 6, 1, 9, 8, 8, 7, 6, -1, -1, -1, -1,
+		10, 7, 6, 10, 1, 7, 1, 3, 7, -1, -1, -1, -1, -1, -1, -1,
+		10, 7, 6, 1, 7, 10, 1, 8, 7, 1, 0, 8, -1, -1, -1, -1,
+		0, 3, 7, 0, 7, 10, 0, 10, 9, 6, 10, 7, -1, -1, -1, -1,
+		7, 6, 10, 7, 10, 8, 8, 10, 9, -1, -1, -1, -1, -1, -1, -1,
+		6, 8, 4, 11, 8, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 6, 11, 3, 0, 6, 0, 4, 6, -1, -1, -1, -1, -1, -1, -1,
+		8, 6, 11, 8, 4, 6, 9, 0, 1, -1, -1, -1, -1, -1, -1, -1,
+		9, 4, 6, 9, 6, 3, 9, 3, 1, 11, 3, 6, -1, -1, -1, -1,
+		6, 8, 4, 6, 11, 8, 2, 10, 1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, 3, 0, 11, 0, 6, 11, 0, 4, 6, -1, -1, -1, -1,
+		4, 11, 8, 4, 6, 11, 0, 2, 9, 2, 10, 9, -1, -1, -1, -1,
+		10, 9, 3, 10, 3, 2, 9, 4, 3, 11, 3, 6, 4, 6, 3, -1,
+		8, 2, 3, 8, 4, 2, 4, 6, 2, -1, -1, -1, -1, -1, -1, -1,
+		0, 4, 2, 4, 6, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 9, 0, 2, 3, 4, 2, 4, 6, 4, 3, 8, -1, -1, -1, -1,
+		1, 9, 4, 1, 4, 2, 2, 4, 6, -1, -1, -1, -1, -1, -1, -1,
+		8, 1, 3, 8, 6, 1, 8, 4, 6, 6, 10, 1, -1, -1, -1, -1,
+		10, 1, 0, 10, 0, 6, 6, 0, 4, -1, -1, -1, -1, -1, -1, -1,
+		4, 6, 3, 4, 3, 8, 6, 10, 3, 0, 3, 9, 10, 9, 3, -1,
+		10, 9, 4, 6, 10, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 9, 5, 7, 6, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, 4, 9, 5, 11, 7, 6, -1, -1, -1, -1, -1, -1, -1,
+		5, 0, 1, 5, 4, 0, 7, 6, 11, -1, -1, -1, -1, -1, -1, -1,
+		11, 7, 6, 8, 3, 4, 3, 5, 4, 3, 1, 5, -1, -1, -1, -1,
+		9, 5, 4, 10, 1, 2, 7, 6, 11, -1, -1, -1, -1, -1, -1, -1,
+		6, 11, 7, 1, 2, 10, 0, 8, 3, 4, 9, 5, -1, -1, -1, -1,
+		7, 6, 11, 5, 4, 10, 4, 2, 10, 4, 0, 2, -1, -1, -1, -1,
+		3, 4, 8, 3, 5, 4, 3, 2, 5, 10, 5, 2, 11, 7, 6, -1,
+		7, 2, 3, 7, 6, 2, 5, 4, 9, -1, -1, -1, -1, -1, -1, -1,
+		9, 5, 4, 0, 8, 6, 0, 6, 2, 6, 8, 7, -1, -1, -1, -1,
+		3, 6, 2, 3, 7, 6, 1, 5, 0, 5, 4, 0, -1, -1, -1, -1,
+		6, 2, 8, 6, 8, 7, 2, 1, 8, 4, 8, 5, 1, 5, 8, -1,
+		9, 5, 4, 10, 1, 6, 1, 7, 6, 1, 3, 7, -1, -1, -1, -1,
+		1, 6, 10, 1, 7, 6, 1, 0, 7, 8, 7, 0, 9, 5, 4, -1,
+		4, 0, 10, 4, 10, 5, 0, 3, 10, 6, 10, 7, 3, 7, 10, -1,
+		7, 6, 10, 7, 10, 8, 5, 4, 10, 4, 8, 10, -1, -1, -1, -1,
+		6, 9, 5, 6, 11, 9, 11, 8, 9, -1, -1, -1, -1, -1, -1, -1,
+		3, 6, 11, 0, 6, 3, 0, 5, 6, 0, 9, 5, -1, -1, -1, -1,
+		0, 11, 8, 0, 5, 11, 0, 1, 5, 5, 6, 11, -1, -1, -1, -1,
+		6, 11, 3, 6, 3, 5, 5, 3, 1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 10, 9, 5, 11, 9, 11, 8, 11, 5, 6, -1, -1, -1, -1,
+		0, 11, 3, 0, 6, 11, 0, 9, 6, 5, 6, 9, 1, 2, 10, -1,
+		11, 8, 5, 11, 5, 6, 8, 0, 5, 10, 5, 2, 0, 2, 5, -1,
+		6, 11, 3, 6, 3, 5, 2, 10, 3, 10, 5, 3, -1, -1, -1, -1,
+		5, 8, 9, 5, 2, 8, 5, 6, 2, 3, 8, 2, -1, -1, -1, -1,
+		9, 5, 6, 9, 6, 0, 0, 6, 2, -1, -1, -1, -1, -1, -1, -1,
+		1, 5, 8, 1, 8, 0, 5, 6, 8, 3, 8, 2, 6, 2, 8, -1,
+		1, 5, 6, 2, 1, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 3, 6, 1, 6, 10, 3, 8, 6, 5, 6, 9, 8, 9, 6, -1,
+		10, 1, 0, 10, 0, 6, 9, 5, 0, 5, 6, 0, -1, -1, -1, -1,
+		0, 3, 8, 5, 6, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		10, 5, 6, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		11, 5, 10, 7, 5, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		11, 5, 10, 11, 7, 5, 8, 3, 0, -1, -1, -1, -1, -1, -1, -1,
+		5, 11, 7, 5, 10, 11, 1, 9, 0, -1, -1, -1, -1, -1, -1, -1,
+		10, 7, 5, 10, 11, 7, 9, 8, 1, 8, 3, 1, -1, -1, -1, -1,
+		11, 1, 2, 11, 7, 1, 7, 5, 1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, 1, 2, 7, 1, 7, 5, 7, 2, 11, -1, -1, -1, -1,
+		9, 7, 5, 9, 2, 7, 9, 0, 2, 2, 11, 7, -1, -1, -1, -1,
+		7, 5, 2, 7, 2, 11, 5, 9, 2, 3, 2, 8, 9, 8, 2, -1,
+		2, 5, 10, 2, 3, 5, 3, 7, 5, -1, -1, -1, -1, -1, -1, -1,
+		8, 2, 0, 8, 5, 2, 8, 7, 5, 10, 2, 5, -1, -1, -1, -1,
+		9, 0, 1, 5, 10, 3, 5, 3, 7, 3, 10, 2, -1, -1, -1, -1,
+		9, 8, 2, 9, 2, 1, 8, 7, 2, 10, 2, 5, 7, 5, 2, -1,
+		1, 3, 5, 3, 7, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 7, 0, 7, 1, 1, 7, 5, -1, -1, -1, -1, -1, -1, -1,
+		9, 0, 3, 9, 3, 5, 5, 3, 7, -1, -1, -1, -1, -1, -1, -1,
+		9, 8, 7, 5, 9, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		5, 8, 4, 5, 10, 8, 10, 11, 8, -1, -1, -1, -1, -1, -1, -1,
+		5, 0, 4, 5, 11, 0, 5, 10, 11, 11, 3, 0, -1, -1, -1, -1,
+		0, 1, 9, 8, 4, 10, 8, 10, 11, 10, 4, 5, -1, -1, -1, -1,
+		10, 11, 4, 10, 4, 5, 11, 3, 4, 9, 4, 1, 3, 1, 4, -1,
+		2, 5, 1, 2, 8, 5, 2, 11, 8, 4, 5, 8, -1, -1, -1, -1,
+		0, 4, 11, 0, 11, 3, 4, 5, 11, 2, 11, 1, 5, 1, 11, -1,
+		0, 2, 5, 0, 5, 9, 2, 11, 5, 4, 5, 8, 11, 8, 5, -1,
+		9, 4, 5, 2, 11, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		2, 5, 10, 3, 5, 2, 3, 4, 5, 3, 8, 4, -1, -1, -1, -1,
+		5, 10, 2, 5, 2, 4, 4, 2, 0, -1, -1, -1, -1, -1, -1, -1,
+		3, 10, 2, 3, 5, 10, 3, 8, 5, 4, 5, 8, 0, 1, 9, -1,
+		5, 10, 2, 5, 2, 4, 1, 9, 2, 9, 4, 2, -1, -1, -1, -1,
+		8, 4, 5, 8, 5, 3, 3, 5, 1, -1, -1, -1, -1, -1, -1, -1,
+		0, 4, 5, 1, 0, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		8, 4, 5, 8, 5, 3, 9, 0, 5, 0, 3, 5, -1, -1, -1, -1,
+		9, 4, 5, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 11, 7, 4, 9, 11, 9, 10, 11, -1, -1, -1, -1, -1, -1, -1,
+		0, 8, 3, 4, 9, 7, 9, 11, 7, 9, 10, 11, -1, -1, -1, -1,
+		1, 10, 11, 1, 11, 4, 1, 4, 0, 7, 4, 11, -1, -1, -1, -1,
+		3, 1, 4, 3, 4, 8, 1, 10, 4, 7, 4, 11, 10, 11, 4, -1,
+		4, 11, 7, 9, 11, 4, 9, 2, 11, 9, 1, 2, -1, -1, -1, -1,
+		9, 7, 4, 9, 11, 7, 9, 1, 11, 2, 11, 1, 0, 8, 3, -1,
+		11, 7, 4, 11, 4, 2, 2, 4, 0, -1, -1, -1, -1, -1, -1, -1,
+		11, 7, 4, 11, 4, 2, 8, 3, 4, 3, 2, 4, -1, -1, -1, -1,
+		2, 9, 10, 2, 7, 9, 2, 3, 7, 7, 4, 9, -1, -1, -1, -1,
+		9, 10, 7, 9, 7, 4, 10, 2, 7, 8, 7, 0, 2, 0, 7, -1,
+		3, 7, 10, 3, 10, 2, 7, 4, 10, 1, 10, 0, 4, 0, 10, -1,
+		1, 10, 2, 8, 7, 4, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 9, 1, 4, 1, 7, 7, 1, 3, -1, -1, -1, -1, -1, -1, -1,
+		4, 9, 1, 4, 1, 7, 0, 8, 1, 8, 7, 1, -1, -1, -1, -1,
+		4, 0, 3, 7, 4, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		4, 8, 7, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		9, 10, 8, 10, 11, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 0, 9, 3, 9, 11, 11, 9, 10, -1, -1, -1, -1, -1, -1, -1,
+		0, 1, 10, 0, 10, 8, 8, 10, 11, -1, -1, -1, -1, -1, -1, -1,
+		3, 1, 10, 11, 3, 10, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 2, 11, 1, 11, 9, 9, 11, 8, -1, -1, -1, -1, -1, -1, -1,
+		3, 0, 9, 3, 9, 11, 1, 2, 9, 2, 11, 9, -1, -1, -1, -1,
+		0, 2, 11, 8, 0, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		3, 2, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		2, 3, 8, 2, 8, 10, 10, 8, 9, -1, -1, -1, -1, -1, -1, -1,
+		9, 10, 2, 0, 9, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		2, 3, 8, 2, 8, 10, 0, 1, 8, 1, 10, 8, -1, -1, -1, -1,
+		1, 10, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		1, 3, 8, 9, 1, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 9, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 ]);
+
+// size indicates the size of the 3D array (x, y, z)
+// gridCoords is a 3D array
+// gridVals is a 1D array
+// isolevel indicates the value at which to generate the mesh
+function polygonize(size, gridVals, isolevel, selectFunc) {
+	var cubeIndex = 0, vertlist = [], i, x, y, z, v0 = [0, 0, 0], v1 = [0, 0, 0], iv = 0, faces = [], vertexIndex = {}, vertices = [], face_normals = [], idx, vert1, vert2, vert3;
+  
+  for (i=0; i<12; i++) vertlist.push([0.0, 0.0, 0.0]);
+  
+  for (z=0; z<size[2]-1; z++) {
+    for (y=0; y<size[1]-1; y++) {
+      for (x=0; x<size[0]-1; x++) {
+
+        if (selectFunc) {
+          grid0 = selectFunc(x,   y,   z);
+          grid1 = selectFunc(x+1, y,   z);
+          grid2 = selectFunc(x+1, y,   z+1);
+          grid3 = selectFunc(x,   y,   z+1);
+          grid4 = selectFunc(x,   y+1, z);
+          grid5 = selectFunc(x+1, y+1, z);
+          grid6 = selectFunc(x+1, y+1, z+1);
+          grid7 = selectFunc(x,   y+1, z+1);
+        }
+        else {
+          grid0 = x + size[0] * (y + size[1] * z);
+          grid1 = (x+1) + size[0] * (y + size[1] * z);
+          grid2 = (x+1) + size[0] * (y + size[1] * (z+1));
+          grid3 = x + size[0] * (y + size[1] * (z+1));
+          grid4 = x + size[0] * ((y+1) + size[1] * z);
+          grid5 = (x+1) + size[0] * ((y+1) + size[1] * z);
+          grid6 = (x+1) + size[0] * ((y+1) + size[1] * (z+1));
+          grid7 = x + size[0] * ((y+1) + size[1] * (z+1));
+        }
+        
+        cubeIndex = 0;
+        if (gridVals[grid0] < isolevel) cubeIndex |= 1;
+      	if (gridVals[grid1] < isolevel) cubeIndex |= 2;
+	      if (gridVals[grid2] < isolevel) cubeIndex |= 4;
+	      if (gridVals[grid3] < isolevel) cubeIndex |= 8;
+	      if (gridVals[grid4] < isolevel) cubeIndex |= 16;
+	      if (gridVals[grid5] < isolevel) cubeIndex |= 32;
+	      if (gridVals[grid6] < isolevel) cubeIndex |= 64;
+	      if (gridVals[grid7] < isolevel) cubeIndex |= 128;
+
+        
+	      if (edgeTable[cubeIndex] === 0) continue;
+  
+	      if (edgeTable[cubeIndex] & 1) {
+          v0[0] = x; v0[1] = y; v0[2] = z; // grid0
+          v1[0] = x+1; v1[1] = y; v1[2] = z; // grid1
+          iv = (isolevel-gridVals[grid0]) / (gridVals[grid1]-gridVals[grid0]);
+          vec3.lerp(vertlist[0], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 2) {
+          v0[0] = x+1; v0[1] = y; v0[2] = z; // grid1
+          v1[0] = x+1; v1[1] = y; v1[2] = z+1; // grid2
+          iv = (isolevel-gridVals[grid1]) / (gridVals[grid2]-gridVals[grid1]);
+          vec3.lerp(vertlist[1], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 4) {
+          v0[0] = x+1; v0[1] = y; v0[2] = z+1; // grid2
+          v1[0] = x; v1[1] = y; v1[2] = z+1; // grid3
+          iv = (isolevel-gridVals[grid2]) / (gridVals[grid3]-gridVals[grid2]);
+          vec3.lerp(vertlist[2], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 8) {
+          v0[0] = x; v0[1] = y; v0[2] = z+1; // grid3
+          v1[0] = x; v1[1] = y; v1[2] = z; // grid0
+          iv = (isolevel-gridVals[grid3]) / (gridVals[grid0]-gridVals[grid3]);
+          vec3.lerp(vertlist[3], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 16) {
+          v0[0] = x; v0[1] = y+1; v0[2] = z; // grid4
+          v1[0] = x+1; v1[1] = y+1; v1[2] = z; // grid5
+          iv = (isolevel-gridVals[grid4]) / (gridVals[grid5]-gridVals[grid4]);
+          vec3.lerp(vertlist[4], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 32) {
+          v0[0] = x+1; v0[1] = y+1; v0[2] = z; // grid5
+          v1[0] = x+1; v1[1] = y+1; v1[2] = z+1; // grid6
+          iv = (isolevel-gridVals[grid5]) / (gridVals[grid6]-gridVals[grid5]);
+          vec3.lerp(vertlist[5], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 64) {
+          v0[0] = x+1; v0[1] = y+1; v0[2] = z+1; // grid6
+          v1[0] = x; v1[1] = y+1; v1[2] = z+1; // grid7
+          iv = (isolevel-gridVals[grid6]) / (gridVals[grid7]-gridVals[grid6]);
+          vec3.lerp(vertlist[6], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 128) {
+          v0[0] = x; v0[1] = y+1; v0[2] = z+1; // grid7
+          v1[0] = x; v1[1] = y+1; v1[2] = z; // grid4
+          iv = (isolevel-gridVals[grid7]) / (gridVals[grid4]-gridVals[grid7]);
+          vec3.lerp(vertlist[7], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 256) {
+          v0[0] = x; v0[1] = y; v0[2] = z; // grid0
+          v1[0] = x; v1[1] = y+1; v1[2] = z; // grid4
+          iv = (isolevel-gridVals[grid0]) / (gridVals[grid4]-gridVals[grid0]);
+          vec3.lerp(vertlist[8], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 512) {
+          v0[0] = x+1; v0[1] = y; v0[2] = z; // grid1
+          v1[0] = x+1; v1[1] = y+1; v1[2] = z; // grid5
+          iv = (isolevel-gridVals[grid1]) / (gridVals[grid5]-gridVals[grid1]);
+          vec3.lerp(vertlist[9], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 1024) {
+          v0[0] = x+1; v0[1] = y; v0[2] = z+1; // grid2
+          v1[0] = x+1; v1[1] = y+1; v1[2] = z+1; // grid6
+          iv = (isolevel-gridVals[grid2]) / (gridVals[grid6]-gridVals[grid2]);
+          vec3.lerp(vertlist[10], v0, v1, iv);
+        }
+	      if (edgeTable[cubeIndex] & 2048) {
+          v0[0] = x; v0[1] = y; v0[2] = z+1; // grid3
+          v1[0] = x; v1[1] = y+1; v1[2] = z+1; // grid7
+          iv = (isolevel-gridVals[grid3]) / (gridVals[grid7]-gridVals[grid3]);
+          vec3.lerp(vertlist[11], v0, v1, iv);
+        }
+
+	      for (i=0; triTable[16 * cubeIndex + i] != -1; i+=3) {
+          vert1 = vertlist[triTable[16 * cubeIndex + i + 1]];
+          vert2 = vertlist[triTable[16 * cubeIndex + i + 2]];
+          vert3 = vertlist[triTable[16 * cubeIndex + i]];
+
+          // represent the position as an index with respect to the grid size
+          idx1 = (vert1[0] | 0) + size[0] * ((vert1[1] | 0) + size[1] * (vert1[2] | 0));
+          idx2 = (vert2[0] | 0) + size[0] * ((vert2[1] | 0) + size[1] * (vert2[2] | 0));
+          idx3 = (vert3[0] | 0) + size[0] * ((vert3[1] | 0) + size[1] * (vert3[2] | 0));
+
+          var triangle = [-1, -1, -1];
+          
+          // vertices that map to the same index (i.e. have the same or have virtually the same position), are not added again, but are instead referenced (i.e. via indexed buffers)
+          
+          if (! vertexIndex[idx1]) {
+            vertexIndex[idx1] = [vertices.length, []];
+            vertices.push([vert1[0], vert1[1], vert1[2]]);
+          }
+          vertexIndex[idx1][1].push(faces.length);
+          
+          if (! vertexIndex[idx2]) {
+            vertexIndex[idx2] = [vertices.length, []];
+            vertices.push([vert2[0], vert2[1], vert2[2]]);
+          }
+          vertexIndex[idx2][1].push(faces.length);
+          
+          if (! vertexIndex[idx3]) {
+            vertexIndex[idx3] = [vertices.length, []];
+            vertices.push([vert3[0], vert3[1], vert3[2]]);
+          }
+          vertexIndex[idx3][1].push(faces.length);
+
+          
+          if (selectFunc) {
+            triangle[0] = vertexIndex[idx3][0];
+            triangle[1] = vertexIndex[idx2][0];
+            triangle[2] = vertexIndex[idx1][0];
+            vec3.sub(v0, vert2, vert1); vec3.sub(v1, vert3, vert1); var normal = [0.0, 0.0, 0.0]; vec3.cross(normal, v1, v0);
+          }
+          else {
+            triangle[0] = vertexIndex[idx1][0];
+            triangle[1] = vertexIndex[idx2][0];
+            triangle[2] = vertexIndex[idx3][0];
+            vec3.sub(v0, vert2, vert1); vec3.sub(v1, vert3, vert1); var normal = [0.0, 0.0, 0.0]; vec3.cross(normal, v0, v1);
+          }
+          
+          faces.push(triangle);
+          face_normals.push(normal);
+        }
+      }
+    }
+  }
+  
+  return {vertices: vertices, faces: faces, vertexIndex: vertexIndex, face_normals: face_normals};
+};
+
+
 
 // ** performs taubin smoothing for geometry (such as coarse/ccp4 surface) **
 molmil.taubinSmoothing = function(vertices, faces, lambda, mu, iter) {
@@ -10111,322 +11282,7 @@ molmil.taubinSmoothing = function(vertices, faces, lambda, mu, iter) {
     for (v=0; v<vertices.length; v++) {vertices[v][0] = vertexTemp[v][0]; vertices[v][1] = vertexTemp[v][1]; vertices[v][2] = vertexTemp[v][2];}
   }
 }
-    
-// ** surface nets implementation **
-// ** based on https://github.com/mikolalysenko/isosurface/blob/master/lib/surfacenets.js **
-    
-var sn_cube_edges = new Int32Array(24)
-  , sn_edge_table = new Int32Array(256);
-(function() {
 
-  //Initialize the cube_edges table
-  // This is just the vertex number of each cube
-  var k = 0;
-  for(var i=0; i<8; ++i) {
-    for(var j=1; j<=4; j<<=1) {
-      var p = i^j;
-      if(i <= p) {
-        sn_cube_edges[k++] = i;
-        sn_cube_edges[k++] = p;
-      }
-    }
-  }
-
-  //Initialize the intersection table.
-  //  This is a 2^(cube configuration) ->  2^(edge configuration) map
-  //  There is one entry for each possible cube configuration, and the output is a 12-bit vector enumerating all edges crossing the 0-level.
-  for(var i=0; i<256; ++i) {
-    var em = 0;
-    for(var j=0; j<24; j+=2) {
-      var a = !!(i & (1<<sn_cube_edges[j]))
-        , b = !!(i & (1<<sn_cube_edges[j+1]));
-      em |= a !== b ? (1 << (j >> 1)) : 0;
-    }
-    sn_edge_table[i] = em;
-  }
-})();
-
-//Internal buffer, this may get resized at run time
-var sn_buffer = new Array(4096);
-(function() {
-  for(var i=0; i<sn_buffer.length; ++i) {
-    sn_buffer[i] = 0;
-  }
-})();
-
-molmil.surfaceNets = function(dims, potentialFunction, gradientFunction, bounds) {
-  if (! bounds) bounds = [[0,0,0],dims];
-  
-  var scale     = [0,0,0];
-  var shift     = [0,0,0];
-  for(var i=0; i<3; ++i) {
-    scale[i] = (bounds[1][i] - bounds[0][i]) / dims[i];
-    shift[i] = bounds[0][i];
-  }
-
-  var vertices = []
-    , faces = []
-    , n = 0
-    , x = [0, 0, 0]
-    , R = [1, (dims[0]+1), (dims[0]+1)*(dims[1]+1)]
-    , grid = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    , gridCoord = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
-    , buf_no = 1;
-  
-   
-  //Resize buffer if necessary 
-  if(R[2] * 2 > sn_buffer.length) {
-    var ol = sn_buffer.length;
-    sn_buffer.length = R[2] * 2;
-    while(ol < sn_buffer.length) {
-      sn_buffer[ol++] = 0;
-    }
-  }
-
-  //March over the voxel grid
-  for(x[2]=0; x[2]<dims[2]-1; ++x[2], n+=dims[0], buf_no ^= 1, R[2]=-R[2]) {
-  
-    //m is the pointer into the buffer we are going to use.  
-    //This is slightly obtuse because javascript does not have good support for packed data structures, so we must use typed arrays :(
-    //The contents of the buffer will be the indices of the vertices on the previous x/y slice of the volume
-    var m = 1 + (dims[0]+1) * (1 + buf_no * (dims[1]+1));
-    
-    for(x[1]=0; x[1]<dims[1]-1; ++x[1], ++n, m+=2)
-    for(x[0]=0; x[0]<dims[0]-1; ++x[0], ++n, ++m) {
-    
-      //Read in 8 field values around this vertex and store them in an array
-      //Also calculate 8-bit mask, like in marching cubes, so we can speed up sign checks later
-      var mask = 0, g = 0;
-      for(var k=0; k<2; ++k)
-      for(var j=0; j<2; ++j)      
-      for(var i=0; i<2; ++i, ++g) {
-        var p = potentialFunction(x[0]+i, x[1]+j, x[2]+k);
-        grid[g] = p;
-        gridCoord[g][0] = x[0]+i; gridCoord[g][1] = x[1]+j; gridCoord[g][2] = x[2]+k;
-        mask |= (p < 0) ? (1<<g) : 0;
-      }
-      
-      //Check for early termination if cell does not intersect boundary
-      if(mask === 0 || mask === 0xff) {
-        continue;
-      }
-      
-      //Sum up edge intersections
-      var edge_mask = sn_edge_table[mask];
-
-      var avgPoint = [0, 0, 0], nPoints = 0, tmp;
-      
-      
-      //For every edge of the cube...
-      for(var i=0; i<12; ++i) {
-      
-        //Use edge mask to check if it is crossed
-        if(!(edge_mask & (1<<i))) continue;
-
-        //Now find the point of intersection
-        var e0 = sn_cube_edges[ i<<1 ], e1 = sn_cube_edges[(i<<1)+1]; //Unpack vertices
-          
-        tmp = gradientFunction(gridCoord[e0][0], gridCoord[e0][1], gridCoord[e0][2]);
-        avgPoint[0] += gridCoord[e0][0]+tmp[0]; avgPoint[1] += gridCoord[e0][1]+tmp[1]; avgPoint[2] += gridCoord[e0][2]+tmp[2];
-            
-        tmp = gradientFunction(gridCoord[e1][0], gridCoord[e1][1], gridCoord[e1][2]);
-        avgPoint[0] += gridCoord[e1][0]+tmp[0]; avgPoint[1] += gridCoord[e1][1]+tmp[1]; avgPoint[2] += gridCoord[e1][2]+tmp[2];
-        
-        nPoints += 2;
-      }
-      
-      avgPoint[0] /= nPoints; avgPoint[1] /= nPoints; avgPoint[2] /= nPoints;
-
-      var v = [0, 0, 0];
-      for(var i=0; i<3; ++i) v[i] = scale[i] * avgPoint[i] + shift[i];
-      
-      //Add vertex to buffer, store pointer to vertex index in buffer
-      sn_buffer[m] = vertices.length;
-      vertices.push(v);
-      
-      //Now we need to add faces together, to do this we just loop over 3 basis components
-      for(var i=0; i<3; ++i) {
-        //The first three entries of the edge_mask count the crossings along the edge
-        if(!(edge_mask & (1<<i)) ) {
-          continue;
-        }
-        
-        // i = axes we are point along.  iu, iv = orthogonal axes
-        var iu = (i+1)%3
-          , iv = (i+2)%3;
-          
-        //If we are on a boundary, skip it
-        if(x[iu] === 0 || x[iv] === 0) {
-          continue;
-        }
-        
-        //Otherwise, look up adjacent edges in buffer
-        var du = R[iu]
-          , dv = R[iv];
-
-        //Remember to flip orientation depending on the sign of the corner.
-        if(mask & 1) {
-          faces.push([sn_buffer[m],    sn_buffer[m-du],    sn_buffer[m-dv]]);
-          faces.push([sn_buffer[m-dv], sn_buffer[m-du],    sn_buffer[m-du-dv]]);
-        } else {
-          faces.push([sn_buffer[m],    sn_buffer[m-dv],    sn_buffer[m-du]]);
-          faces.push([sn_buffer[m-du], sn_buffer[m-dv],    sn_buffer[m-du-dv]]);
-        }
-        
-
-      }
-    }
-  }
-  
-  //All done!  Return the result
-  return { vertices: vertices, faces: faces};
-};
-  
-molmil.surfaceNets2 = function(dims, potentialFunction, bounds) {
-  if (! bounds) bounds = [[0,0,0],dims];
-  
-  var scale     = [0,0,0];
-  var shift     = [0,0,0];
-  for(var i=0; i<3; ++i) {
-    scale[i] = (bounds[1][i] - bounds[0][i]) / dims[i];
-    shift[i] = bounds[0][i];
-  }
-  
-  var vertices = []
-    , faces = []
-    , n = 0
-    , x = [0, 0, 0]
-    , R = [1, (dims[0]+1), (dims[0]+1)*(dims[1]+1)]
-    , grid = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    , gridCoord = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
-    , buf_no = 1;
-  
-   
-  //Resize buffer if necessary 
-  if(R[2] * 2 > sn_buffer.length) {
-    var ol = sn_buffer.length;
-    sn_buffer.length = R[2] * 2;
-    while(ol < sn_buffer.length) {
-      sn_buffer[ol++] = 0;
-    }
-  }
-
-  //March over the voxel grid
-  for(x[2]=0; x[2]<dims[2]-1; ++x[2], n+=dims[0], buf_no ^= 1, R[2]=-R[2]) {
-  
-    //m is the pointer into the buffer we are going to use.  
-    //This is slightly obtuse because javascript does not have good support for packed data structures, so we must use typed arrays :(
-    //The contents of the buffer will be the indices of the vertices on the previous x/y slice of the volume
-    var m = 1 + (dims[0]+1) * (1 + buf_no * (dims[1]+1));
-    
-    for(x[1]=0; x[1]<dims[1]-1; ++x[1], ++n, m+=2)
-    for(x[0]=0; x[0]<dims[0]-1; ++x[0], ++n, ++m) {
-    
-      //Read in 8 field values around this vertex and store them in an array
-      //Also calculate 8-bit mask, like in marching cubes, so we can speed up sign checks later
-      var mask = 0, g = 0;
-      for(var k=0; k<2; ++k)
-      for(var j=0; j<2; ++j)      
-      for(var i=0; i<2; ++i, ++g) {
-        var p = potentialFunction(x[0]+i, x[1]+j, x[2]+k);
-        grid[g] = p;
-        gridCoord[g][0] = x[0]+i; gridCoord[g][1] = x[1]+j; gridCoord[g][2] = x[2]+k;
-        mask |= (p < 0) ? (1<<g) : 0;
-      }
-      
-      //Check for early termination if cell does not intersect boundary
-      if(mask === 0 || mask === 0xff) {
-        continue;
-      }
-      
-      //Sum up edge intersections
-      var edge_mask = sn_edge_table[mask]
-        , v = [0.0,0.0,0.0]
-        , e_count = 0;
-        
-      //For every edge of the cube...
-      for(var i=0; i<12; ++i) {
-      
-        //Use edge mask to check if it is crossed
-        if(!(edge_mask & (1<<i))) {
-          continue;
-        }
-        
-        //If it did, increment number of edge crossings
-        ++e_count;
-        
-        //Now find the point of intersection
-        var e0 = sn_cube_edges[ i<<1 ]       //Unpack vertices
-          , e1 = sn_cube_edges[(i<<1)+1]
-          , g0 = grid[e0]                 //Unpack grid values
-          , g1 = grid[e1]
-          , t  = g0 - g1;                 //Compute point of intersection
-        if(Math.abs(t) > 1e-6) {
-          t = g0 / t;
-        } else {
-          continue;
-        }
-        
-        //Interpolate vertices and add up intersections (this can be done without multiplying)
-        for(var j=0, k=1; j<3; ++j, k<<=1) {
-          var a = e0 & k
-            , b = e1 & k;
-          if(a !== b) {
-            v[j] += a ? 1.0 - t : t;
-          } else {
-            v[j] += a ? 1.0 : 0;
-          }
-        }
-      }
-      
-      //Now we just average the edge intersections and add them to coordinate
-      var s = 1.0 / e_count;
-      for(var i=0; i<3; ++i) {
-        v[i] = scale[i] * (x[i] + s * v[i]) + shift[i];
-      }
-      
-      //Add vertex to buffer, store pointer to vertex index in buffer
-      sn_buffer[m] = vertices.length;
-      vertices.push(v);
-
-      //Now we need to add faces together, to do this we just loop over 3 basis components
-      for(var i=0; i<3; ++i) {
-        //The first three entries of the edge_mask count the crossings along the edge
-        if(!(edge_mask & (1<<i)) ) {
-          continue;
-        }
-        
-        // i = axes we are point along.  iu, iv = orthogonal axes
-        var iu = (i+1)%3
-          , iv = (i+2)%3;
-          
-        //If we are on a boundary, skip it
-        if(x[iu] === 0 || x[iv] === 0) {
-          continue;
-        }
-        
-        //Otherwise, look up adjacent edges in buffer
-        var du = R[iu]
-          , dv = R[iv];
-
-        //Remember to flip orientation depending on the sign of the corner.
-        if(mask & 1) {
-          faces.push([sn_buffer[m],    sn_buffer[m-du],    sn_buffer[m-dv]]);
-          faces.push([sn_buffer[m-dv], sn_buffer[m-du],    sn_buffer[m-du-dv]]);
-        } else {
-          faces.push([sn_buffer[m],    sn_buffer[m-dv],    sn_buffer[m-du]]);
-          faces.push([sn_buffer[m-du], sn_buffer[m-dv],    sn_buffer[m-du-dv]]);
-        }
-        
-
-      }
-    }
-  }
-  
-  //All done!  Return the result
-  return { vertices: vertices, faces: faces};
-};
- 
 molmil.lighterRGB = function(rgbIn, factor, nR) {
   var rgb = [rgbIn[0], rgbIn[1], rgbIn[2]];
   var total = rgb[0]+rgb[1]+rgb[2];
@@ -10585,8 +11441,7 @@ var buCheck = molmil.buCheck = function(assembly_id, displayMode, colorMode, str
 
   return sceneBU;
   
-}
- 
+} 
 
 // separate display & color modes...
 // displayModes:
@@ -10785,7 +11640,7 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
         for (c=0; c<struct.chains.length; c++) {
           if (struct.chains[c].molecules.length < 1 || struct.chains[c].isHet || struct.chains[c].molecules[0].water) continue;
           if (struct.chains[c].name != asym_ids[i]) continue;
-          surf = molmil.coarseSurface(struct.chains[c], 7.5, 7.5*.75);
+          surf = molmil.coarseSurface(struct.chains[c], 7.5, 7.5*.75, {deproj: true});
           
           // build vbuffer, ibuffer, COM, noe
           
@@ -11125,7 +11980,7 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
   for (c=0; c<struct.chains.length; c++) {
     if (struct.chains[c].display && struct.chains[c].isHet) {
       for (i=0; i<struct.chains[c].atoms.length; i++) {
-        if (! struct.chains[c].atoms[i].status) continue;
+        if (! struct.chains[c].atoms[i].display) continue;
         b = struct.chains[c].atoms[i].xyz;
         if (struct.chains[c].modelsXYZ[0][b] < xMin) xMin = struct.chains[c].modelsXYZ[0][b];
         if (struct.chains[c].modelsXYZ[0][b+1] < yMin) yMin = struct.chains[c].modelsXYZ[0][b+1];
@@ -11162,6 +12017,129 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
   
 }
 
+molmil.findContacts = function(atoms1, atoms2, r, soup) {
+  var modelId = soup.renderer.modelId, xyz1, xyz2, i, j, dx, dy, dz, r2 = r*r, contacts_ = {};
+  
+  for (i=0; i<atoms1.length; i++) {
+    xyz1 = [atoms1[i].chain.modelsXYZ[modelId][atoms1[i].xyz], atoms1[i].chain.modelsXYZ[modelId][atoms1[i].xyz+1], atoms1[i].chain.modelsXYZ[modelId][atoms1[i].xyz+2]];
+    for (j=0; j<atoms2.length; j++) {
+      xyz2 = [atoms2[j].chain.modelsXYZ[modelId][atoms2[j].xyz], atoms2[j].chain.modelsXYZ[modelId][atoms2[j].xyz+1], atoms2[j].chain.modelsXYZ[modelId][atoms2[j].xyz+2]];
+      
+      dx = xyz1[0]-xyz2[0];
+      dy = xyz1[1]-xyz2[1];
+      dz = xyz1[2]-xyz2[2];
+      
+      if (dx*dx + dy*dy + dz*dz < r2) contacts_[atoms2[j].AID] = atoms2[j];
+    }
+  }
+  var contacts = [];
+  for (i in contacts_) contacts.push(contacts_[i]);
+  
+  return contacts;
+}
+
+molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between group1 and group2
+  if (! (group1 instanceof Array)) group1 = [group1];
+  if (! (group2 instanceof Array)) group2 = [group2];
+    
+  // acceptors: list of acceptor atom
+  // donors: list of [donor atom, hydrogen atom]
+  var acceptors1 = [], acceptors2 = [], donors1 = [], donors2 = []; // first fetch all the possible acceptors and donors from each group...
+  var c, i, j, a, a2, hcon = {}, nbonds = {};
+    
+    
+    
+  var getAcceptors4Chain = function(chain, target) {
+    // oxygens with less than 3 bonds
+    // nitrogens with less than 4 bonds
+    for (a=0; a<chain.atoms.length; a++) {
+      if (chain.atoms[a].element == "O" && nbonds[chain.atoms[a].AID] < 3) target.push(chain.atoms[a]);
+      else if (chain.atoms[a].element == "N" && nbonds[chain.atoms[a].AID] < 4) target.push(chain.atoms[a]);
+    }
+  };
+    
+  var getDonors4Chain = function(chain, target) {
+    // oxygens with attached hydrogen
+    // nitogens with 3+ bonds (of which one is a hydrogen)
+    for (a=0; a<chain.atoms.length; a++) {
+      if ((chain.atoms[a].element == "O" || (chain.atoms[a].element == "N" && nbonds[chain.atoms[a].AID] > 2)) && hcon[chain.atoms[a].AID]) {
+        for (a2=0; a2<hcon[chain.atoms[a].AID].length; a2++) target.push([chain.atoms[a], hcon[chain.atoms[a].AID][a2]]);
+      }
+    }
+  };
+    
+  for (c=0; c<group1.length; c++) {
+    if (! group1[c].bondsOK) soup.buildBondList(group1[c], false);
+    for (a=0; a<group1[c].atoms.length; a++) nbonds[group1[c].atoms[a].AID] = 0;
+    for (a=0; a<group1[c].bonds.length; a++) {
+      if (group1[c].bonds[a][0].element == "H") {
+        if (! hcon[group1[c].bonds[a][1].AID]) hcon[group1[c].bonds[a][1].AID] = [];
+        hcon[group1[c].bonds[a][1].AID].push(group1[c].bonds[a][0]);
+      }
+      if (group1[c].bonds[a][1].element == "H") {
+        if (! hcon[group1[c].bonds[a][0].AID]) hcon[group1[c].bonds[a][0].AID] = [];
+        hcon[group1[c].bonds[a][0].AID].push(group1[c].bonds[a][1]);
+      }
+      nbonds[group1[c].bonds[a][0].AID]++;
+      nbonds[group1[c].bonds[a][1].AID]++;
+    }
+    getAcceptors4Chain(group1[c], acceptors1);
+    getDonors4Chain(group1[c], donors1);
+  }
+    
+  for (c=0; c<group2.length; c++) {
+    if (! group2[c].bondsOK) soup.buildBondList(group2[c], false);
+    for (a=0; a<group2[c].atoms.length; a++) nbonds[group2[c].atoms[a].AID] = 0;
+    for (a=0; a<group2[c].bonds.length; a++) {
+      if (group2[c].bonds[a][0].element == "H") {
+        if (! hcon[group2[c].bonds[a][1].AID]) hcon[group2[c].bonds[a][1].AID] = [];
+        hcon[group2[c].bonds[a][1].AID].push(group2[c].bonds[a][0]);
+      }
+      if (group2[c].bonds[a][1].element == "H") {
+        if (! hcon[group2[c].bonds[a][0].AID]) hcon[group2[c].bonds[a][0].AID] = [];
+        hcon[group2[c].bonds[a][0].AID].push(group2[c].bonds[a][1]);
+      }
+      nbonds[group2[c].bonds[a][0].AID]++;
+      nbonds[group2[c].bonds[a][1].AID]++;
+    }
+    getAcceptors4Chain(group2[c], acceptors2);
+    getDonors4Chain(group2[c], donors2);
+  }
+    
+  // now find matches between acceptors1-donors2 and acceptors2-donors1 (within 3A D-A and 20degrees D-H-A)
+    
+  var pairs = [];
+    
+  for (i=0; i<acceptors1.length; i++) {
+    for (j=0; j<donors2.length; j++) {
+      r = molmil.calcMMDistance(acceptors1[i], donors2[j][0], soup);
+      if (r < 3.25) {
+        theta = molmil.calcMMAngle(acceptors1[i], donors2[j][1], donors2[j][0], soup);
+        if (Math.abs(theta-180) < 30) pairs.push([acceptors1[i], donors2[j][1]]);
+      }
+    }
+  }
+    
+  for (i=0; i<acceptors2.length; i++) {
+    for (j=0; j<donors1.length; j++) {
+      r = molmil.calcMMDistance(acceptors2[i], donors1[j][0], soup);
+      if (r < 3.25) {
+        theta = molmil.calcMMAngle(acceptors2[i], donors1[j][1], donors1[j][0], soup);
+        if (Math.abs(theta-180) < 30) pairs.push([acceptors2[i], donors1[j][1]]);
+      }
+    }
+  }
+    
+  // now create some 3D graphics to depict these bonds...
+  var objects = [], object;
+  for (i=0; i<pairs.length; i++) objects.push({type: "cylinder", coords: [molmil.getAtomXYZ(pairs[i][0], soup), molmil.getAtomXYZ(pairs[i][1], soup)], rgba: [255, 255, 0, 255], radius: 0.05});
+    
+  molmil.geometry.generator(objects, soup, "Hydrogen bonds", {solid: true});
+    
+  return pairs;
+}
+  
+
 molmil.hslToRgb123 = function (h, s, l) {
   var r, g, b;
   if (s == 0) r = g = b = l; // achromatic
@@ -11184,6 +12162,11 @@ molmil.hslToRgb123 = function (h, s, l) {
 }
 
 // ** distance/angle/torsion calculation **
+
+molmil.getAtomXYZ = function (atom, soup) {
+  var modelId = soup.renderer.modelId;
+  return [atom.chain.modelsXYZ[modelId][atom.xyz], atom.chain.modelsXYZ[modelId][atom.xyz+1], atom.chain.modelsXYZ[modelId][atom.xyz+2]];
+}
 
 molmil.calcMMDistance = function (a1, a2, soup) {
   var modelId = soup.renderer.modelId, xyz1, xyz2;
@@ -11407,26 +12390,31 @@ molmil.commandLine = function(canvas) {
   this.environment.setTimeout = function(cb, tm) {window.setTimeout(cb, tm);}
   this.environment.clearTimeout = function() {window.clearTimeout();}
   this.environment.navigator = window.navigator;
+  this.environment.window = this;
   
   this.environment.console = {};
   this.environment.molmil = molmil;
+  this.environment.molmil_dep = molmil_dep;
   this.canvas = this.environment.cli_canvas = canvas; this.soup = this.environment.cli_soup = canvas.molmilViewer;
   canvas.commandLine = this;
   
   this.buildGUI();
   
   this.environment.console.log = function() {
+    if (this.debugMode) console.log.apply(console, arguments);
     arguments = Array.prototype.slice.call(arguments, 0);
     var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
     this.custom(tmp);
   };
   this.environment.console.warning = function() {
+    if (this.debugMode) console.warming.apply(console, arguments);
     arguments = Array.prototype.slice.call(arguments, 0);
     var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
     tmp.style.color = "yellow";
     this.custom(tmp);
   };
   this.environment.console.error = function() {
+    if (this.debugMode) console.error.apply(console, arguments);
     arguments = Array.prototype.slice.call(arguments, 0);
     //console.error.apply(console, arguments);
     var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
@@ -11434,6 +12422,7 @@ molmil.commandLine = function(canvas) {
     this.custom(tmp);
   };
   this.environment.console.logCommand = function() {
+    if (this.cli.environment.scriptUrl) return;
     arguments = Array.prototype.slice.call(arguments, 0);
     var tmp = document.createElement("div"); tmp.textContent = arguments.join("\n");
     tmp.style.color = "#00BFFF";
@@ -11472,7 +12461,7 @@ molmil.commandLine = function(canvas) {
   
   this.environment.console.logBox = this.logBox; this.environment.console.cli = this;
   
-  this.environment.colors = {red: [255, 0, 0, 255], green: [0, 255, 0, 255], blue: [0, 0, 255, 255]};
+  this.environment.colors = {red: [255, 0, 0, 255], green: [0, 255, 0, 255], blue: [0, 0, 255, 255], grey: [100, 100, 100, 255]};
   
   
   //this.bindNullInterface();
@@ -11557,13 +12546,23 @@ molmil.commandLine.prototype.buildGUI = function() {
   };
 };
 
+molmil.loadScript = function(url) {
+  var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true;
+  var cli = this.cli_canvas.commandLine;
+  request.OnDone = function() {
+    cli.environment.scriptUrl = url.substr(0,url.lastIndexOf('/')) + "/";
+    cli.environment.console.runCommand(this.request.responseText);
+  }
+  request.Send(url);
+}
+
 molmil.commandLine.prototype.eval = function(command) {
   // instead of having two command lines (e.g. pymol & javascript), only have one command line (javascript), but rewrite the incoming /command/ from pymol --> javascript...
   
   if (! this.altCommandIF(this.environment, command)) this.runCommand.apply(this.environment, [command]);
 };
 
-molmil.commandLine.prototype.runCommand = function(command) {
+molmil.commandLine.prototype.runCommand = function(command) { // note the /this/ stuff will not work properly... if there are many functions and internal /var/s...
   molmil.cli_canvas = this.cli_canvas; molmil.cli_soup = this.cli_soup;
   command = (' '+command).replace(/(\s|;)var\s+(\w+)\s*=/g, "$1this.$2 ="); // make sure that variables are stored in /this/ and not in the local scope...
   command = command.replace(/(\s|;)function\s+(\w+)/g, "$1this.$2 = function"); // make sure that functions are stored in /this/ and not in the local scope...
@@ -11647,7 +12646,8 @@ molmil.commandLines.pyMol.colorCommand = function (env, command) {
     
 molmil.commandLines.pyMol.setColorCommand = function (env, command) {
   command = command.match(/set_color[\s]+([a-zA-Z0-9_]+)[\s]*,[\s]*(.*)/);
-  molmil.commandLines.pyMol.set_color(command[1], JSON.parse(command[2]));
+  try {molmil.commandLines.pyMol.set_color.apply(env, [command[1], JSON.parse(command[2])]);}
+  catch (e) {return false;}
   return true;
 }
     
@@ -11785,6 +12785,7 @@ molmil.commandLines.pyMol.color = function (clr, atoms, quiet) {
 }
     
 molmil.commandLines.pyMol.set_color = function (name, rgba) {
+  console.log(this);
   if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
   this.colors[name] = rgba;
 }
@@ -12021,7 +13022,7 @@ molmil.bindCanvasInputs = function(canvas) {
   
   // mdl
   canvas.inputFunctions.push(function(canvas, fr) {
-    if (fr.filename.indexOf(".mdl", fr.filename.length-4) !== -1) {
+    if (fr.filename.indexOf(".mdl", fr.filename.length-4) !== -1 || fr.filename.indexOf(".mol", fr.filename.length-4) !== -1, fr.filename.indexOf(".sdf", fr.filename.length-4) !== -1) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 'mdl', this.filename);
       }
@@ -12177,3 +13178,5 @@ if (! window.molmil_dep) {
 }
 
 molmil.initSettings();
+
+
