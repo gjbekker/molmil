@@ -237,7 +237,7 @@ molmil_dep.init = function() {
   var head = document.getElementsByTagName("head")[0];
   for (var i=0; i<deps.length; i++) {
     obj = molmil_dep.dcE("script");
-    obj.src = molmil.settings.src+deps[i];
+    obj.src = (molmil.settings.extSrc || molmil.settings.src)+deps[i];
     obj.onload = molmil_dep.initCheck;
     head.appendChild(obj);
   }
