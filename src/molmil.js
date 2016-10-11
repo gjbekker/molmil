@@ -19,12 +19,12 @@ molmil.ignoreBlackList = false;
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
   src: "/molmil/",
-  pdb_url: "http://ipr.pdbj.org/rest/displayPDBfile?format=mmjson-all&id=__ID__",
-  comp_url: "http://ipr.pdbj.org/rest/displayCOMPfile?format=mmjson&id=__ID__",
-  promodeE_check_url: "http://ipr.pdbj.org/rest/quick_search?fields=5&query=__ID__",
-  promodeE_base_structure_url: "http://ipr.pdbj.org/rest/displayPromodeEfile?format=min&id=__ID__",
-  promodeE_mode_vectors_url: "http://ipr.pdbj.org/rest/displayPromodeEfile?format=vec&id=__ID_____MODE__",
-  promodeE_animation_url: "http://ipr.pdbj.org/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
+  pdb_url: "//ipr.pdbj.org/rest/displayPDBfile?format=mmjson-all&id=__ID__",
+  comp_url: "//ipr.pdbj.org/rest/displayCOMPfile?format=mmjson&id=__ID__",
+  promodeE_check_url: "//ipr.pdbj.org/rest/quick_search?fields=5&query=__ID__",
+  promodeE_base_structure_url: "//ipr.pdbj.org/rest/displayPromodeEfile?format=min&id=__ID__",
+  promodeE_mode_vectors_url: "//ipr.pdbj.org/rest/displayPromodeEfile?format=vec&id=__ID_____MODE__",
+  promodeE_animation_url: "//ipr.pdbj.org/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
   
   molmil_video_url: "http://127.0.0.1:8080/app/",
 };
@@ -112,6 +112,7 @@ molmil.configBox = {
     ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
     //["shaders/imposterPoints.glsl", "points_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/anaglyph.glsl"], 
+    ["shaders/billboardShader.glsl"]
   ],
   glsl_fog: 0, // 0: off, 1: on
   skipClearGeometryBuffer: true,
@@ -299,7 +300,7 @@ molmil.molObject = function (name, id, chain) {
   this.showSC = false;
 }
 
-molmil.molObject.prototype.toString = function() {return " Residue";};
+molmil.molObject.prototype.toString = function() {var sgl = this.atoms.length > 1; return (sgl ? (this.name || "") + " " : "") + (this.RSID || "") + (this.chain.name ? " - Chain " + this.chain.name : "");};
 
 molmil.chainObject = function (name, entry) {
   this.name = name;
@@ -317,7 +318,7 @@ molmil.chainObject = function (name, entry) {
   this.display = true;
 }
 
-molmil.chainObject.prototype.toString = function() {return " Chain";};
+molmil.chainObject.prototype.toString = function() {return (this.name ? "Chain " + this.name : "");};
 
 molmil.entryObject = function (meta) { // this should become a structure object instead --> models should only be virtual; i.e. only the coordinates should be saved, the structure (chain->residue->atom) is determined by the initial model
   this.chains = [];
@@ -325,12 +326,22 @@ molmil.entryObject = function (meta) { // this should become a structure object 
   this.display = true;
 };
 
+molmil.entryObject.prototype.toString = function() {return "Entry "+(this.meta.id || "");};
+
 molmil.polygonObject = function (meta) {
   this.programs = [];
   this.meta = meta || {};
 };
 
-molmil.entryObject.prototype.toString = function() {return " Entry";};
+molmil.labelObject = function(soup) {
+  this.soup = soup;
+  this.texture = null;
+  this.settings = {dx: 0.0, dy: 0.0, dz: 0.0, color: [0, 255, 0], fontSize: 20};
+  this.xyz = [0.0, 0.0, 0.0];
+  this.display = true;
+  this.text = "";
+  this.status = false;
+}
 
 // ** object controlling animation (multiple models & trajectories) **
 
@@ -514,7 +525,9 @@ molmil.viewer.prototype.clear = function() {
   this.COR = [0, 0, 0];
   this.geomRanges = [0, 0, 0, 0, 0, 0];
   this.maxRange = 0;
-  
+
+  this.texturedBillBoards = [];
+ 
   //this.polygonData = [];
   this.atomRef = {};
   this.AID = 1;
@@ -1452,7 +1465,7 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
 
 // ** connects amino bonds within a chain object **
 molmil.viewer.prototype.buildAminoChain = function(chain) {
-  if (chain.isHet) return;
+  if (chain.isHet || (chain.molecules.length && chain.molecules[0].water)) return;
   if (chain.molecules.length == 1 && chain.molecules[0].xna) {
     chain.molecules[0].ligand = chain.isHet = true; chain.molecules[0].xna = false;
     delete chain.molecules[0].N;
@@ -1573,7 +1586,7 @@ molmil.viewer.prototype.getChainAuth = function(struc, cid) {
 }
 
 molmil.viewer.prototype.getMolObject4Chain = function(chain, id) {
-  if (! chain instanceof Array) chain = [chain];
+  if (! (chain instanceof Array)) chain = [chain];
   for (var c=0,m; c<chain.length; c++) {
     for (m=0; m<chain[c].molecules.length; m++) {
       if (chain[c].molecules[m].id == id) return chain[c].molecules[m];
@@ -1583,7 +1596,7 @@ molmil.viewer.prototype.getMolObject4Chain = function(chain, id) {
 }
 
 molmil.viewer.prototype.getMolObject4ChainAlt = function(chain, RSID) {
-  if (! chain instanceof Array) chain = [chain];
+  if (! (chain instanceof Array)) chain = [chain];
   for (var c=0,m; c<chain.length; c++) {
     for (m=0; m<chain[c].molecules.length; m++) {
       if (chain[c].molecules[m].RSID == RSID) return chain[c].molecules[m];
@@ -1916,7 +1929,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
     program.render_internal = function() {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
 
-      molmil.resetAttributes();
+      molmil.resetAttributes(this.gl);
       molmil.bindAttribute(this.gl, this.attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
       molmil.bindAttribute(this.gl, this.attributes.in_Normal, 3, this.gl.FLOAT, false, 28, 12);
       molmil.bindAttribute(this.gl, this.attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
@@ -1982,6 +1995,7 @@ molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
       this.chains.push(currentChain);
       currentChain.molecules.push(currentMol = new molmil.molObject("???", 0, currentChain));
       if (settings.skipBonds) currentChain.bondsOK = true;
+      i++;
       continue;
     }
 
@@ -1989,8 +2003,7 @@ molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
     x = parseFloat(data[i][1]);
     y = parseFloat(data[i][2]);
     z = parseFloat(data[i][3]);
-   
-   
+
     Xpos = currentChain.modelsXYZ[0].length;
     currentChain.modelsXYZ[0].push(x, y, z);
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomName, currentMol, currentChain));
@@ -2199,7 +2212,18 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     z = parseFloat(data[i].substring(36, 44).trim())*10;
     
     if (molID != cmid) {
-      currentChain.molecules.push(currentMol = new molmil.molObject(molName, molID, currentChain));
+      
+      currentMol = new molmil.molObject(molName, molID, currentChain);
+      if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {
+        currentMol.water = true; currentMol.ligand = false;
+        if (currentChain.molecules.length && ! currentChain.molecules[currentChain.molecules.length-1].water) {
+          struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
+          currentChain.water = true;
+        }
+      }
+      else if (currentChain.molecules.length && currentChain.molecules[currentChain.molecules.length-1].water) struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
+      currentMol.chain = currentChain;
+      currentChain.molecules.push(currentMol);
       currentMol.MID = this.MID++;
       cmid = molID;
       //if (molName = "SOL" || molName == "WAT") currentMol.display = false;
@@ -2214,9 +2238,9 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
    
     if (! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-      if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.display = false;}
+      if (currentMol.water) atom.display = false;
       //do special stuff for dna/rna
-      else if (atom.atomName == "P") {currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
+      else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
       else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
     }
@@ -2232,13 +2256,13 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     this.atomRef[atom.AID] = atom;
   }
   
-  this.calculateCOG();
-
+  var newChains = [], chainRef, rC, m1;
+  
   for (c=0; c<struc.chains.length; c++) this.buildAminoChain(struc.chains[c]);
   
-  var newChains = [], chainRef, rC, m1;
   for (c=0; c<struc.chains.length; c++) {
     currentChain = struc.chains[c];
+    if (currentChain.water) continue;
     chainRef = currentChain, rC = currentChain.molecules.length;
     for (m1=0; m1<rC; m1++) {
       currentChain.molecules[m1].chain_alt = currentChain.molecules[m1].chain;
@@ -2257,6 +2281,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     Array.prototype.push.apply(struc.chains, newChains);
     var tmp = [];
     for (c=0; c<struc.chains.length; c++) {
+      if (struc.chains[c].water) continue;
       struc.chains[c].name = (c+1)+"";
       Array.prototype.push.apply(tmp, struc.chains[c].molecules);
       struc.chains[c].molecules = [];
@@ -2292,6 +2317,8 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       }
     }
   }
+  
+  this.calculateCOG();
   
   for (c=0; c<struc.chains.length; c++) this.chains.push(struc.chains[c]);
   
@@ -2354,7 +2381,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       if (data[i].substr(0, 4) != "ATOM" || ! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
         if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {currentMol.water = true; currentMol.ligand = false; atom.display = false;}
         //do special stuff for dna/rna
-        else if (atom.atomName == "P") {currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
+        else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
         else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
         else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
       }
@@ -2869,7 +2896,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         else if (atom.atomName == "C") {currentMol.C = atom; currentMol.ligand = false;}
         else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = false; currentMol.xna = false; }
         //do special stuff for dna/rna
-        else if (atom.atomName == "P" && ! currentMol.O) {currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentMol.CA = atom;}}
+        else if (atom.atomName == "P" && ! currentMol.O) {currentMol.P = atom;currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentMol.CA = atom;}}
         else if (atom.atomName == "C1'" && ! currentMol.O) {currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
         else if (atom.atomName == "O3'" && ! currentMol.O) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
       }
@@ -3064,10 +3091,10 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     }
   
     molmil.resetColors(struc, this);
+    
+    this.pdbxData = pdb;
+    delete pdb.atom_site;
   }
-  
-  this.pdbxData = pdb;
-  delete pdb.atom_site;
   
   return structs[0];
 };
@@ -3099,6 +3126,7 @@ molmil.viewer.prototype.calculateCOG = function() {
       for (c=0; c<struct.chains.length; c++) {
         chain = struct.chains[c];
         xyzRef = chain.modelsXYZ[0];
+        if (chain.molecules.length && chain.molecules[0].water) continue;
       
         for (m=0; m<chain.molecules.length; m++) {
           if (! chain.molecules[m].display) continue;
@@ -3209,6 +3237,7 @@ molmil.viewer.prototype.calculateCOG = function() {
 
 // ** assigns the secondary structure elements of a chain object using DSSP or CA torsion angles**
 molmil.viewer.prototype.ssAssign = function(chainObj) {
+  if (chainObj.molecules.length && chainObj.molecules[0].water) return;
     // the below code doesn't work properly...
   
   var mol1, mol2, a = [0, 0, 0], b = [0, 0, 0], c = [0, 0, 0], d = [0, 0, 0], c1, c2;
@@ -4003,7 +4032,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
     
-    molmil.resetAttributes();
+    molmil.resetAttributes(this.gl);
     if (this.settings.has_ID) {
       molmil.bindAttribute(this.gl, this.point_attributes.in_Position, 3, this.gl.FLOAT, false, 28, 0);
       molmil.bindAttribute(this.gl, this.point_attributes.in_radius, 1, this.gl.FLOAT, false, 28, 12);
@@ -4051,7 +4080,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
 
-    molmil.resetAttributes();
+    molmil.resetAttributes(this.gl);
     if (this.settings.lines_render) {      
       if (this.settings.has_ID) {
         molmil.bindAttribute(this.gl, this.wireframe_attributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
@@ -4110,7 +4139,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
         
     this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
     
-    molmil.resetAttributes();
+    molmil.resetAttributes(this.gl);
     if (this.settings.has_ID) {
       molmil.bindAttribute(this.gl, this.standard_attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
       molmil.bindAttribute(this.gl, this.standard_attributes.in_Normal, 3, this.gl.FLOAT, false, 32, 12);
@@ -4125,7 +4154,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     molmil.clearAttributes(this.gl);
 
     // in yasara only the "outside" is transparent, while the "inside" is opaque...
-    
+
     if (this.settings.alphaMode) {
       if (molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
       this.gl.enable(this.gl.BLEND);
@@ -4182,7 +4211,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
         
-        molmil.resetAttributes();
+        molmil.resetAttributes(this.gl);
         molmil.bindAttribute(this.gl, this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 20, 0);
         molmil.bindAttribute(this.gl, this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 20, 16);
         molmil.clearAttributes(this.gl);
@@ -4208,7 +4237,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
 
-        molmil.resetAttributes();
+        molmil.resetAttributes(this.gl);
         molmil.bindAttribute(this.gl, this.pickingAttributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
         molmil.bindAttribute(this.gl, this.pickingAttributes.in_ID, 1, this.gl.FLOAT, false, 32, 28);
         molmil.clearAttributes(this.gl);
@@ -6190,7 +6219,32 @@ molmil.prepare2DRepr = function (chain, mdl) {
       twoDcache.push(currentBlock = {molecules: [], xyz: [], sndStruc: previous_sndStruc});
     }
     currentBlock.molecules.push(chain.molecules[m]);
-    m0 = chain.molecules[m].CA.xyz; m1 = [chain.modelsXYZ[mdl][m0], chain.modelsXYZ[mdl][m0+1], chain.modelsXYZ[mdl][m0+2]];
+    
+    /*if (chain.molecules[m].xna) {
+      if (chain.molecules[m].P) m0 = chain.molecules[m].P.xyz;
+      else {
+        if (m > 1 && chain.molecules[m-1].P) {
+          m0 = chain.molecules[m-1].P.xyz; m1 = [chain.modelsXYZ[mdl][m0], chain.modelsXYZ[mdl][m0+1], chain.modelsXYZ[mdl][m0+2]];
+          m0 = chain.molecules[m-2].P.xyz; m1[0] -= chain.modelsXYZ[mdl][m0]; m1[1] -= chain.modelsXYZ[mdl][m0+1]; m1[2] -= chain.modelsXYZ[mdl][m0+2];
+          m0 = chain.molecules[m-1].P.xyz; m1[0] += chain.modelsXYZ[mdl][m0]; m1[1] += chain.modelsXYZ[mdl][m0+1]; m1[2] += chain.modelsXYZ[mdl][m0+2];
+          currentBlock.xyz.push(m1);
+          temp.push(m1);
+          continue;
+        }
+        else if (m < chain.molecules.length-1 && chain.molecules[m+1].P) {
+          m0 = chain.molecules[m+1].P.xyz; m1 = [chain.modelsXYZ[mdl][m0], chain.modelsXYZ[mdl][m0+1], chain.modelsXYZ[mdl][m0+2]];
+          m0 = chain.molecules[m+2].P.xyz; m1[0] -= chain.modelsXYZ[mdl][m0]; m1[1] -= chain.modelsXYZ[mdl][m0+1]; m1[2] -= chain.modelsXYZ[mdl][m0+2];
+          m0 = chain.molecules[m+1].P.xyz; m1[0] += chain.modelsXYZ[mdl][m0]; m1[1] += chain.modelsXYZ[mdl][m0+1]; m1[2] += chain.modelsXYZ[mdl][m0+2];
+          currentBlock.xyz.push(m1);
+          temp.push(m1);
+          continue;
+        }
+        else m0 = chain.molecules[m].P.xyz;
+      }
+    }
+    else */
+      m0 = chain.molecules[m].CA.xyz;
+    m1 = [chain.modelsXYZ[mdl][m0], chain.modelsXYZ[mdl][m0+1], chain.modelsXYZ[mdl][m0+2]];
     currentBlock.xyz.push(m1);
     temp.push(m1);
   }
@@ -6550,6 +6604,7 @@ molmil.render.prototype.clear = function() {
   }
   this.programs = [];
   this.program1 = this.program2 = this.program3 = this.program4 = this.program5 = undefined;
+  
 };
 
 molmil.render.prototype.reloadSettings=function() {
@@ -6640,6 +6695,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     return false;
   }
   this.gl = this.defaultContext;
+	this.gl.boundAttributes = {};
   
   molmil.configBox.OES_element_index_uint = this.gl.getExtension('OES_element_index_uint');
   
@@ -6676,6 +6732,114 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   var h = this.gl.getParameter(this.gl.ALIASED_LINE_WIDTH_RANGE);
   this.angle = h && h.length == 2 && h[0] == 1 && h[1] == 1;
 
+
+  // add labels program here...
+  this.billboardProgram = {};
+  this.billboardProgram.data = this.soup.texturedBillBoards; this.billboardProgram.gl = this.gl; this.billboardProgram.renderer = this;
+  this.billboardProgram.render = function(modelViewMatrix, COR) {    
+    //first check for new/modified billboards (texturedBillBoards[i].status == false)
+    var N = [], i, status = true;
+    for (i=0; i<this.data.length; i++) {
+      if (! this.data[i].status) {this.data[i].status = true; status = false;}
+      if (! this.data[i].display) continue;
+      N.push(this.data[i]);
+    }
+    
+    if (! status) { // if the number of visible billboards has changed, rebuild the vertex array...
+      var ssOffset = [[-1, +1], [+1, +1], [+1, -1], [-1, -1]], n, p = 0, vP = 0, vP16 = 0, iP = 0;
+      var vBuffer = new Float32Array(N.length*4*4), iBuffer; // x, y, z, offset
+      if (molmil.configBox.OES_element_index_uint) iBuffer = new Uint32Array(N.length*2*3);
+      else iBuffer = new Uint16Array(N.length*2*3);
+      var vBuffer16 = new Uint16Array(vBuffer.buffer);
+      
+      for (i=0; i<N.length; i++) {
+        for (n=0; n<4; n++) {
+          vBuffer[vP++] = N[i].settings.xyz[0];
+          vBuffer[vP++] = N[i].settings.xyz[1];
+          vBuffer[vP++] = N[i].settings.xyz[2];
+      
+          vBuffer16[vP16+6] = ssOffset[n][0];
+          vBuffer16[vP16+7] = ssOffset[n][1];      
+          vP++
+    
+          vP16 += 8;
+        }
+        iBuffer[iP++] = 3+p;
+        iBuffer[iP++] = 2+p;
+        iBuffer[iP++] = 1+p;
+        iBuffer[iP++] = 3+p;
+        iBuffer[iP++] = 1+p;
+        iBuffer[iP++] = 0+p;
+        p += 4;
+      }
+      
+      var vbuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, vBuffer, this.gl.STATIC_DRAW);
+  
+      var ibuffer = this.gl.createBuffer();
+      this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, ibuffer);
+      this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, iBuffer, this.gl.STATIC_DRAW);
+  
+      this.nElements = iBuffer.length;
+      this.vertexBuffer = vbuffer;
+      this.indexBuffer = ibuffer;
+    }
+    if (N == 0) return;
+    
+    if (! this.shader) {
+      this.shader = this.renderer.shaders.billboardShader;
+      this.attributes = this.shader.attributes;
+    }
+    
+    // pre-render
+    
+    var normalMatrix = mat3.create();
+    mat3.normalFromMat4(normalMatrix, modelViewMatrix);
+      
+    this.gl.useProgram(this.shader.program);
+    this.gl.uniformMatrix4fv(this.shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.gl.uniformMatrix3fv(this.shader.uniforms.normalMatrix, false, normalMatrix);
+    this.gl.uniformMatrix4fv(this.shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
+    this.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
+    this.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogStart+(this.renderer.clearCut*2));
+      
+    this.gl.uniform4f(this.shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
+
+    // render
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer); 
+    this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+
+    molmil.resetAttributes(this.gl);
+    molmil.bindAttribute(this.gl, this.attributes.in_Position, 3, this.gl.FLOAT, false, 16, 0);
+    molmil.bindAttribute(this.gl, this.attributes.in_ScreenSpaceOffset, 2, this.gl.SHORT, false, 16, 12);
+    molmil.clearAttributes(this.gl);
+    
+    this.gl.enable(this.gl.BLEND);
+    this.gl.blendFunc(this.gl.ONE, this.gl.ONE_MINUS_SRC_ALPHA);
+    this.gl.uniform1f(this.shader.uniforms.scaleFactor, Math.sqrt(1000/this.renderer.width)*.000375 * (molmil.configBox.projectionMode == 2 ? 0.2 : 1.0));
+    this.gl.depthMask(false);
+    
+    for (i=0; i<N.length; i++) {
+      // set uniforms (e.g. screen-space translation...)
+      
+      this.gl.activeTexture(this.gl.TEXTURE0);
+      this.gl.bindTexture(this.gl.TEXTURE_2D, N[i].texture);
+      this.gl.uniform1i(this.shader.uniforms.textureMap, 0);
+      this.gl.uniform2f(this.shader.uniforms.sizeOffset, N[i].texture.renderWidth, N[i].texture.renderHeight);
+      this.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx, N[i].settings.dy, N[i].settings.dz);
+      this.gl.uniform3f(this.shader.uniforms.color, N[i].settings.color[0]/255, N[i].settings.color[1]/255, N[i].settings.color[2]/255);
+      
+      this.gl.drawElements(this.gl.TRIANGLES, 6, this.gl.INDEXINT, i*24);
+    }
+    
+    this.gl.disable(this.gl.BLEND);
+    this.gl.depthMask(true);
+    
+  };
+  this.billboardProgram.renderPicking = function() {};
+  
   return true;
 };
 
@@ -6853,7 +7017,9 @@ molmil.render.prototype.renderPicking = function() {
 molmil.render.prototype.render = function() {
   if (! this.canvas.update || ! this.initBD) return;
   if (this.canvas.update) {
-    for (var c=0; c<this.soup.canvases.length; c++) if (this.soup.canvases[c] != this.canvas) this.soup.canvases[c].update = -1;
+    if (this.canvas.update != -1) {
+      for (var c=0; c<this.soup.canvases.length; c++) if (this.soup.canvases[c] != this.canvas) this.soup.canvases[c].update = -1;
+    }
     this.canvas.update = false;
     this.camera.pitchAngle = this.pitchAngle || this.pitch*Math.min(Math.max((Math.pow(Math.abs(this.camera.z), .1)*.25), .5), 2.);
     this.camera.headingAngle = this.headingAngle || this.heading*Math.min(Math.max((Math.pow(Math.abs(this.camera.z), .1)*.25), .5), 2.);
@@ -6899,7 +7065,7 @@ molmil.render.prototype.render = function() {
   var COR = [0, 0, 0];
   var tmp = mat3.create(); mat3.fromMat4(tmp, this.modelViewMatrix);
   vec3.transformMat3(COR, this.soup.COR, tmp);
-  
+
   if (molmil.configBox.stereoMode) {
     if (! this.FBOs.hasOwnProperty("stereoLeft")) {
       this.FBOs.stereoLeft = new molmil.FBO(this.gl, this.width, this.height);
@@ -6968,7 +7134,7 @@ molmil.render.prototype.render = function() {
       this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
       this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array([-1.0, -1.0, 1.0, -1.0, -1.0,  1.0, -1.0,  1.0, 1.0, -1.0, 1.0,  1.0]), this.gl.STATIC_DRAW);
       
-      molmil.resetAttributes();
+      molmil.resetAttributes(this.gl);
       molmil.bindAttribute(this.gl, shader.attributes.in_Position, 2, this.gl.FLOAT, false, 0, 0);
       molmil.clearAttributes(this.gl);
       
@@ -6981,13 +7147,10 @@ molmil.render.prototype.render = function() {
   else {
     this.gl.clearColor.apply(this.gl, BGCOLOR);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-    
     for (var p=0; p<this.programs.length; p++) {
-      if (this.programs[p].nElements) {
-        this.programs[p].render(this.modelViewMatrix, COR);
-      }
-      
+      if (this.programs[p].nElements) this.programs[p].render(this.modelViewMatrix, COR);
     }
+    this.billboardProgram.render(this.modelViewMatrix, COR);
   }
   
   if (this.buffers.atomSelectionBuffer) { // this doesn't work properly with stereoscopy...
@@ -6995,7 +7158,6 @@ molmil.render.prototype.render = function() {
   }
   
   if (this.onRenderFinish) this.onRenderFinish();
-  
   
   this.gl.useProgram(null);
 }
@@ -7049,7 +7211,7 @@ molmil.render.prototype.renderAtomSelection = function(modelViewMatrix, COR) {
     
   this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.buffers.atomSelectionBuffer);
 
-  molmil.resetAttributes();
+  molmil.resetAttributes(this.gl);
   molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_Position, 3, this.gl.FLOAT, false, 32, 0);
   molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_Colour, 3, this.gl.FLOAT, false, 32, 12);
   molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_ScreenSpaceOffset, 2, this.gl.FLOAT, false, 32, 24);
@@ -7631,6 +7793,162 @@ molmil.UI.prototype.showDisplayMenuCM=function(ref) {
   ref.pushNode(menu);
 };
 
+
+
+molmil.UI.prototype.editLabel=function(settings) {
+  var obj=null, text;
+  
+  if (settings instanceof molmil.labelObject) {
+    obj = settings;
+    settings = obj.settings;
+    text = obj.text;
+  }
+  else {
+    text = settings.text;
+    settings.dx = settings.dx || 0.0; settings.dy = settings.dy || 0.0; settings.dz = settings.dz || 0.0;
+    settings.fontSize = settings.fontSize || 20;
+    settings.color = settings.color || [0, 255, 0];
+  }
+  
+  var infoBox = {xyz: settings.xyz};
+
+  var popup = molmil_dep.dcE("div");
+  popup.setClass("molmil_menu_popup");
+  
+  popup.pushNode("div", "Label");
+  popup.pushNode("hr");
+  
+  var tbl = popup.pushNode("table"), tr, td;
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Text:");
+  infoBox.text = td = tr.pushNode("td").pushNode("input");
+  td.value = text;
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Color:");
+  infoBox.color = td = tr.pushNode("td").pushNode("input");
+  td.type = "color";
+  td.value = molmil.rgb2hex(settings.color[0], settings.color[1], settings.color[2]);
+  
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Font-size:");
+  infoBox.fontSize = td = tr.pushNode("td").pushNode("input");
+  td.value = settings.fontSize;
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Offset-x");
+  infoBox.dx = td = tr.pushNode("td").pushNode("input");
+  td.value = settings.dx;
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Offset-y");
+  infoBox.dy = td = tr.pushNode("td").pushNode("input");
+  td.value = settings.dy;
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Offset-z");
+  infoBox.dz = td = tr.pushNode("td").pushNode("input");
+  td.value = settings.dz;
+  
+  if (obj == null) {
+    popup.add = popup.pushNode("button", "Add"); 
+    popup.add.onclick = function() {
+      var settings = {};
+      settings.color = molmil.hex2rgb(this.infoBox.color.value);
+      settings.fontSize = parseFloat(this.infoBox.fontSize.value);
+      settings.dx = parseFloat(this.infoBox.dx.value); settings.dy = parseFloat(this.infoBox.dy.value); settings.dz = parseFloat(this.infoBox.dz.value);
+      settings.xyz = this.infoBox.xyz;
+      molmil.addLabel(this.infoBox.text.value, settings, this.soup);
+      this.close.onclick();
+    };
+
+  }
+  else {
+    popup.add = popup.pushNode("button", "Apply");
+    popup.add.labelObject = obj;
+    popup.add.onclick = function() {
+      var settings = {};
+      settings.color = molmil.hex2rgb(this.infoBox.color.value);
+      settings.fontSize = parseFloat(this.infoBox.fontSize.value);
+      settings.dx = parseFloat(this.infoBox.dx.value); settings.dy = parseFloat(this.infoBox.dy.value); settings.dz = parseFloat(this.infoBox.dz.value);
+      settings.xyz = this.infoBox.xyz;
+      molmil.addLabel(this.infoBox.text.value, settings, this.labelObject);
+    };
+  }
+
+  popup.add.style.display = "inline-block"; popup.add.style.marginLeft = popup.add.style.marginRight = "1em";
+  popup.add.infoBox = infoBox;
+  popup.add.soup = this.soup;
+  popup.add.popup = popup;
+  
+  
+  popup.close = popup.pushNode("button", "Close"); popup.close.style.display = "inline-block"; popup.close.style.marginLeft = popup.close.style.marginRight = "auto";
+  popup.close.onclick = function() {this.popup.parentNode.removeChild(this.popup);};
+  popup.close.popup = popup;
+  
+  popup.add.close = popup.close;
+  
+  this.LM.parentNode.pushNode(popup);
+  
+  infoBox.text.focus();
+};
+
+molmil.UI.prototype.showLabelMenuCM=function(ref) {
+  var atoms = this.soup.atomSelection;
+  if (! atoms.length) return;
+  
+  if (ref.subMenu) {
+    ref.subMenu.style.zIndex = 9999;
+    clearTimeout(ref.subMenu.TID);
+    ref.subMenu.style.display = "";
+    return;
+  }
+
+  var pos = molmil_dep.findPos(ref);
+  var menu = ref.subMenu = molmil_dep.dcE("div");
+  if (ref.inv) {menu.style.left = "auto"; menu.style.right = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  else {menu.style.left = ((ref.parentNode.clientWidth/molmil_dep.fontSize)+1.8)+"em";}
+  
+  var pageX = pos[0]+(ref.inv ? -1 : 1)*(ref.parentNode.clientWidth+(2*molmil_dep.fontSize))
+  var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+  var inv = mw < pageX+(molmil_dep.fontSize*25);
+  
+  
+  menu.className = "contextMenu cM_sub";
+  var item, UI=this;
+
+  var addEntry=function(name, action, hover) {
+    item = menu.pushNode("div", name);
+    item.className = "contextMenu_E";
+    item.UI = UI; item.entry = null;
+    item.onclick = action;
+    if (hover) {
+      item.onmouseover = action;
+      item.next = item.pushNode("span", ">");
+    }
+    else item.addEventListener("touchstart", function() {this.onclick();}, false);
+  };
+  
+  var molecules = [];
+  var chains = [];
+  for (var a=0; a<atoms.length; a++) {
+    molecules.push(atoms[a].molecule);
+    chains.push(atoms[a].molecule.chain);
+  }
+
+  addEntry("Atom", function() {document.body.onmousedown(); var info = molmil.calcCenter(atoms); this.UI.editLabel({text: atoms[0].toString(), xyz: info[0], dz: info[1]+2.0});}, false);
+  addEntry("Residue", function() {document.body.onmousedown(); var info = molmil.calcCenter(molecules); this.UI.editLabel({text: molecules[0].toString(), xyz: info[0], dz: info[1]+2.0});}, false);
+  addEntry("Chain", function() {document.body.onmousedown(); var info = molmil.calcCenter(chains); this.UI.editLabel({text: chains[0].toString(), xyz: info[0], dz: info[1]+2.0});}, false);
+  
+  ref.onmouseout = function() {
+    this.subMenu.style.zIndex = 9998;
+    this.subMenu.TID = molmil_dep.asyncStart(function(){this.style.display = "none";}, [], ref.subMenu, 500);
+  };
+  ref.pushNode(menu);
+};
+
 molmil.UI.prototype.showColorMenuCM=function(ref) {
   var atoms = this.soup.atomSelection;
   if (! atoms.length) return;
@@ -7840,6 +8158,7 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y, pageX) {
   
   addEntry("Display", function() {this.UI.showDisplayMenuCM(this);}, true);
   addEntry("Color", function() {this.UI.showColorMenuCM(this);}, true);
+  addEntry("Label", function() {this.UI.showLabelMenuCM(this);}, true);
   
   document.body.pushNode(menu);
   document.body.onmousedown = function(ev) {
@@ -7851,6 +8170,57 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y, pageX) {
   };
   return false;
 };
+
+molmil.UI.prototype.showLabelCM=function(e, entry) {
+  if (document.body.onmousedown) document.body.onmousedown();
+  
+  var delta = 0;
+  var mw = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+  if (mw < e.pageX+(molmil_dep.fontSize*12)) delta = (e.pageX+(molmil_dep.fontSize*12))-mw;
+  entry.inv = mw < e.pageX+(molmil_dep.fontSize*25);
+  
+  var menu = molmil_dep.dcE("div");
+  menu.className = "contextMenu";
+  menu.style.left = e.pageX-delta+"px";
+  menu.style.top = e.pageY+"px";
+  var item, UI=this;
+  
+  // make sure that un-hover is not activated on e...
+  entry.setClass("contextMenu_E_sel");
+  
+  
+  var addEntry=function(name, action, hover) {
+    item = menu.pushNode("div", name);
+    item.className = "contextMenu_E";
+    item.UI = UI; item.entry = entry;
+    item.onclick = action;
+    if (hover) {
+      item.onmouseover = action;
+      item.next = item.pushNode("span", ">");
+    }
+    else item.addEventListener("touchstart", function() {this.onclick();}, false);
+  };
+
+  if (entry.label.display) {addEntry("Hidden", function() {this.entry.label.display = false; this.UI.soup.canvas.update = true; document.body.onmousedown();});}
+  else addEntry("Visible", function() {this.entry.label.display = true; this.UI.soup.canvas.update = true; document.body.onmousedown();});
+  
+  addEntry("Edit", function() {this.UI.editLabel(this.entry.label);});
+  
+  document.body.pushNode(menu);
+  document.body.onmousedown = function(ev) {
+    if (ev && ev.target.className.indexOf("contextMenu_E") != -1) return;
+    var cms = document.getElementsByClassName("contextMenu");
+    for (var e=0; e<cms.length; e++) cms[e].parentNode.removeChild(cms[e]);
+    cms = document.getElementsByClassName("contextMenu_E_sel")[0];
+    if (cms) entry.removeClass("contextMenu_E_sel")
+    document.body.onmousedown = null;
+  };
+  
+  try {e.preventDefault();}
+  catch (e) {}
+  return false;
+  
+}
 
 molmil.UI.prototype.showCM=function(e, entry) {
   if (document.body.onmousedown) document.body.onmousedown();
@@ -7892,6 +8262,12 @@ molmil.UI.prototype.showCM=function(e, entry) {
   
   addEntry("Display", function() {this.UI.showDisplayMenu(this, entry);}, true);
   if (entry.mtype != 10) addEntry("Color", function() {this.UI.showColorMenu(this, entry);}, true);
+  addEntry("Label", function() {
+    var info = molmil.calcCenter(entry.ref);
+    this.UI.editLabel({text: entry.ref.toString(), xyz: info[0], dz: info[1]+2.0});
+    document.body.onmousedown();
+  }, false);
+  
   
   document.body.pushNode(menu);
   document.body.onmousedown = function(ev) {
@@ -7957,6 +8333,19 @@ molmil.UI.prototype.showRM=function(icon) {
       item.mtype = 10;
       item.ref = [file.polygon];
     }
+  }
+  
+  menu.pushNode("hr");
+  menu.pushNode("span", "Labels:").className = "optCat_k";;
+  menu.pushNode("hr");
+  
+  var labels = this.canvas ? this.canvas.molmilViewer.texturedBillBoards : [];
+  for (var i=0; i<labels.length; i++) {
+    item = menu.pushNode("div", labels[i].text);
+    item.className = "optCat_n";
+    item.style.marginLeft = "1.25em";
+    item.UI = this; item.label = labels[i];
+    molmil.setOnContextMenu(item, function(e) {this.UI.showLabelCM(e, this);});
   }
   
 };
@@ -9954,19 +10343,18 @@ molmil.handleLoadedTexture = function (texture, gl) {
   texture.loaded = true;
 }
 
-molmil.boundAttributes = {};
-molmil.resetAttributes = function() {
-  for (var e in this.boundAttributes) if (this.boundAttributes[e] != 0) this.boundAttributes[e] = -1;
+molmil.resetAttributes = function(gl) {
+  for (var e in gl.boundAttributes) if (gl.boundAttributes[e] != 0) gl.boundAttributes[e] = -1;
 }
 
 molmil.bindAttribute = function(gl, index, size, type, normalized, stride, offset) {
-  if (! this.boundAttributes[index]) {gl.enableVertexAttribArray(index); this.boundAttributes[index] = 1;}
-  else if (this.boundAttributes[index] == -1) this.boundAttributes[index] = 1;
+  if (! gl.boundAttributes[index]) {gl.enableVertexAttribArray(index); gl.boundAttributes[index] = 1;}
+  else if (gl.boundAttributes[index] == -1) gl.boundAttributes[index] = 1;
   gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
 }
 
 molmil.clearAttributes = function(gl) {
-  for (var e in this.boundAttributes) if (this.boundAttributes[e] == -1) {gl.disableVertexAttribArray(e); this.boundAttributes[e] = 0;}
+  for (var e in gl.boundAttributes) if (gl.boundAttributes[e] == -1) {gl.disableVertexAttribArray(e); gl.boundAttributes[e] = 0;}
 }
 
 
@@ -10246,7 +10634,7 @@ molmil.loadPDBlite = function(pdbid, cb, async, soup) {
     if (this.requestA.error) return;
     if (! this.requestA.atom_data) return molmil_dep.asyncStart(this.OnDone, [], this, 100);
     var jso = JSON.parse(this.request.responseText);
-    jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"]
+    jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"];
     soup.loadStructureData(jso, "mmjson", pdbid+".json", cb || function(target, struc) { // later switch this to use the new lite mmjson files...
       delete target.pdbxData;
       molmil.displayEntry(struc, molmil.displayMode_Default);
@@ -12106,16 +12494,16 @@ molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between gr
     getDonors4Chain(group2[c], donors2);
   }
     
-  // now find matches between acceptors1-donors2 and acceptors2-donors1 (within 3A D-A and 20degrees D-H-A)
+  // now find matches between acceptors1-donors2 and acceptors2-donors1 (within 3A D-A and 45degrees D-H-A)
     
   var pairs = [];
     
   for (i=0; i<acceptors1.length; i++) {
     for (j=0; j<donors2.length; j++) {
       r = molmil.calcMMDistance(acceptors1[i], donors2[j][0], soup);
-      if (r < 3.25) {
+      if (r < 3.0) {
         theta = molmil.calcMMAngle(acceptors1[i], donors2[j][1], donors2[j][0], soup);
-        if (Math.abs(theta-180) < 30) pairs.push([acceptors1[i], donors2[j][1]]);
+        if (theta > 135) pairs.push([acceptors1[i], donors2[j][1]]);
       }
     }
   }
@@ -12123,9 +12511,9 @@ molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between gr
   for (i=0; i<acceptors2.length; i++) {
     for (j=0; j<donors1.length; j++) {
       r = molmil.calcMMDistance(acceptors2[i], donors1[j][0], soup);
-      if (r < 3.25) {
+      if (r < 3.0) {
         theta = molmil.calcMMAngle(acceptors2[i], donors1[j][1], donors1[j][0], soup);
-        if (Math.abs(theta-180) < 30) pairs.push([acceptors2[i], donors1[j][1]]);
+        if (theta > 135) pairs.push([acceptors2[i], donors1[j][1]]);
       }
     }
   }
@@ -12378,7 +12766,7 @@ molmil.EVpowerMethod = function (v, A, maxIter) {
 
 molmil.invertColor = function (hexTripletColor) {return "#"+("000000" + (0xFFFFFF ^ parseInt(hexTripletColor.substring(1), 16)).toString(16)).slice(-6);}
 molmil.componentToHex = function(c) {var hex = c.toString(16); return hex.length == 1 ? "0" + hex : hex;}
-molmil.rgbToHex = function (r, g, b) {return "#" + molmil.componentToHex(r) + molmil.componentToHex(g) + molmil.componentToHex(b);}
+molmil.rgb2hex = function (r, g, b) {return "#" + molmil.componentToHex(r) + molmil.componentToHex(g) + molmil.componentToHex(b);}
 molmil.hex2rgb = function(hex) {hex = (hex.charAt(0) == "#" ? hex.substr(1, 7) : hex); return [parseInt(hex.substring(0, 2), 16), parseInt(hex.substring(2, 4), 16), parseInt(hex.substring(4, 6), 16)];}
     
 molmil.commandLines = {};
@@ -12477,7 +12865,7 @@ molmil.commandLine.prototype.buildGUI = function() {
   this.logBox.icon = this.icon = this.consoleBox.pushNode("span");
   this.icon.innerHTML = "<"; this.icon.title = "Display command line";
   this.icon.className = "molmil_UI_cl_icon";
-  this.icon.style.color = molmil.invertColor(molmil.rgbToHex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
+  this.icon.style.color = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
   this.icon.onclick = function (mini) {
     if (mini == true) {
       if (this.inp.style.display != "") {
@@ -12485,7 +12873,7 @@ molmil.commandLine.prototype.buildGUI = function() {
         this.cli.consoleBox.style.height = "8em";
         this.cli.logBox.style.pointerEvents = "none";
         this.cli.logBox.style.overflow = "hidden";
-        var invC = molmil.invertColor(molmil.rgbToHex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
+        var invC = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
         this.cli.consoleBox.style.color = invC;
         this.logBox.scrollTop = this.logBox.scrollHeight;
       }
@@ -12497,7 +12885,7 @@ molmil.commandLine.prototype.buildGUI = function() {
     }
     else {
       this.innerHTML = ">"; this.title = "Hide command line";
-      var invC = molmil.invertColor(molmil.rgbToHex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
+      var invC = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
       this.cli.logBox.style.border = "1px solid "+invC;
       this.cli.logBox.style.borderBottom = "";
       this.cli.logBox.style.borderRadius = ".33em";
@@ -13095,8 +13483,50 @@ molmil.selectAtoms = function(atoms, append, soup) {
   for (var a=0; a<atoms.length; a++) soup.atomSelection.push(atoms[a]);
 };
 
-molmil.selectionFocus = function(soup) {
+// dna/rna cartoon through phosphor
+
+molmil.resetFocus = function(soup, t) {
+  t = t || 0;
+  soup = soup || molmil.cli_soup;  
+  
+  soup.atomSelection = [];
+  
+  soup.renderer.updateSelection();
+
+  molmil.zoomTo(soup.avgXYZ, soup.COR, [0.0, 0.0, soup.calcZ()], soup, t);
+}
+
+molmil.zoomTo = function(newCOR, oldCOR, newXYZ, soup, t) {
+  for (var i=0; i<soup.canvases.length; i++) soup.canvases[i].molmilViewer.COR = newCOR;
+  
+  var framerate = 50, nFrames = Math.round(t*(1000./framerate));
+  if (nFrames > 1) {
+    var CORvec = [soup.COR[0]-oldCOR[0], soup.COR[1]-oldCOR[1], soup.COR[2]-oldCOR[2]], xyzStart = [0., 0., 0.];
+    vec3.transformMat4(xyzStart, CORvec, soup.renderer.camera.generateMatrix());
+    
+    var dX = (xyzStart[0]-newXYZ[0])/nFrames, dY = (xyzStart[1]-newXYZ[1])/nFrames, dZ = (xyzStart[2]-newXYZ[2])/nFrames;
+    
+    clearTimeout(molmil.zoomTID);
+    var updateCamera = function(fid) {
+      soup.renderer.camera.x = xyzStart[0]-(dX*(fid+1));
+      soup.renderer.camera.y = xyzStart[1]-(dY*(fid+1));
+      soup.renderer.camera.z = xyzStart[2]-(dZ*(fid+1));
+      soup.renderer.modelViewMatrix = soup.renderer.camera.generateMatrix();
+      soup.canvas.update = true;
+      if (fid < nFrames-1) molmil.zoomTID = molmil_dep.asyncStart(updateCamera, [fid+1], null, framerate);
+    }
+    if (dX > 0.01 || dY > 0.01 || dZ > 0.01) return updateCamera(0);
+  }
+  
+  soup.renderer.camera.x = newXYZ[0]; soup.renderer.camera.y = newXYZ[1]; soup.renderer.camera.z = newXYZ[2];
+  soup.renderer.modelViewMatrix = soup.renderer.camera.generateMatrix();
+  soup.canvas.update = true;
+}
+
+molmil.selectionFocus = function(soup, t) {
+  t = t || 0;
   soup = soup || molmil.cli_soup;
+  
   // center & zoom on atomSelection
   
   var xyz, Xpos, xyzRef, modelId = soup.renderer.modelId, avgX = 0.0, avgY = 0.0, avgZ = 0.0;
@@ -13131,12 +13561,9 @@ molmil.selectionFocus = function(soup) {
     if (xyz[2] > geomRanges[5]) geomRanges[5] = xyz[2];
   }
 
-  soup.renderer.camera.z = soup.calcZ(geomRanges);
+  soup.renderer.updateSelection();
   
-  soup.setCOR([avgX, avgY, avgZ]);
-  soup.renderer.camera.x = soup.renderer.camera.y = 0.0;
-  soup.renderer.modelViewMatrix = soup.renderer.camera.generateMatrix();
-  soup.canvas.atomCORset = false;
+  molmil.zoomTo([avgX, avgY, avgZ], soup.COR, [0.0, 0.0, soup.calcZ(geomRanges)], soup, t);
 };
 
 molmil.selectSequence = function(seq, soup) {
@@ -13158,6 +13585,116 @@ molmil.selectSequence = function(seq, soup) {
     }
   }
   return output;
+}
+
+molmil.calcCenter = function(input) {
+  if (! (input instanceof Array)) input = [input];
+  var coords = [], tmp, j, c;
+  for (var i=0; i<input.length; i++) {
+    if (input[i] instanceof molmil.atomObject) {
+      if (input[i].element == "H") continue;
+      coords.push([input[i].chain.modelsXYZ[0][input[i].xyz], input[i].chain.modelsXYZ[0][input[i].xyz+1], input[i].chain.modelsXYZ[0][input[i].xyz+2]]);
+    }
+    else if (input[i] instanceof molmil.molObject) {
+      tmp = input[i].chain.modelsXYZ[0];
+      for (j=0; j<input[i].atoms.length; j++) if (input[i].atoms[j].element != "H") coords.push([tmp[input[i].atoms[j].xyz], tmp[input[i].atoms[j].xyz+1], tmp[input[i].atoms[j].xyz+2]]);
+    }
+    else if (input[i] instanceof molmil.chainObject) {
+      tmp = input[i].modelsXYZ[0];
+      for (j=0; j<input[i].atoms.length; j++) if (input[i].atoms[j].element != "H") coords.push([tmp[input[i].atoms[j].xyz], tmp[input[i].atoms[j].xyz+1], tmp[input[i].atoms[j].xyz+2]]);
+    }
+    else if (input[i] instanceof molmil.entryObject) {
+      for (c=0; c<input[i].chains.length; c++) {
+        tmp = input[i].chains[c].modelsXYZ[0];
+        for (j=0; j<input[i].chains[c].atoms.length; j++) if (input[i].chains[c].atoms[j].element != "H") coords.push([tmp[input[i].chains[c].atoms[j].xyz], tmp[input[i].chains[c].atoms[j].xyz+1], tmp[input[i].chains[c].atoms[j].xyz+2]]);
+      }
+    }
+  }
+  
+  var avgXYZ = [0.0, 0.0, 0.0], N=0;
+  for (i=0; i<coords.length; i++) {
+    avgXYZ[0] += coords[i][0]; avgXYZ[1] += coords[i][1]; avgXYZ[2] += coords[i][2];
+    N++;
+  }
+  avgXYZ[0] /= N; avgXYZ[1] /= N; avgXYZ[2] /= N;
+  
+  var xMin = 1e99, xMax = -1e99, yMin = 1e99, yMax = -1e99, zMin = 1e99, zMax = -1e99;
+  
+  var tmp, n_tmp;
+  for (var i=0; i<coords.length; i++) {
+    tmp = coords[i][0]-avgXYZ[0];
+    if (tmp < xMin) xMin = tmp;
+    if (tmp > xMax) xMax = tmp;
+    
+    tmp = coords[i][1]-avgXYZ[1]; 
+    if (tmp < yMin) yMin = tmp;
+    if (tmp > yMax) yMax = tmp;
+    
+    tmp = coords[i][2]-avgXYZ[2];
+    if (tmp < zMin) zMin = tmp;
+    if (tmp > zMax) zMax = tmp;
+  }
+
+  return [avgXYZ, Math.max((xMax-xMin)*.5, (yMax-yMin)*.5, (zMax-zMin)*.5)];
+}
+
+molmil.addLabel = function(text, settings, soup) {
+  soup = soup || molmil.cli_soup;
+  settings = settings || {};
+  
+  var obj;
+  if (soup instanceof molmil.labelObject) {
+    obj = soup;
+    soup = obj.soup
+    
+    text = text || obj.text;
+    settings.xyz = settings.xyz || obj.settings.xyz;
+  }
+  else {
+    if (! settings.hasOwnProperty("xyz")) return console.error("Cannot create label: no xyz variable set...");
+    obj = new molmil.labelObject(soup); soup.texturedBillBoards.push(obj);
+  }
+  
+  settings.fontSize = settings.fontSize || obj.settings.fontSize; settings.color = settings.color || obj.settings.color;
+  
+  if (text != obj.text || settings.fontSize != obj.settings.fontSize || settings.color[0] != obj.settings.color[0] || settings.color[1] != obj.settings.color[1] || settings.color[2] != obj.settings.color[2]) {
+    settings.fontSize *= 4;
+    var textCtx = document.createElement("canvas").getContext("2d");
+  
+    var tmp = text.split("\n"), h, w, i;
+    h = tmp.length*settings.fontSize; w = 0;
+    for (var i=0; i<tmp.length; i++) if (tmp[i].length > w) w = tmp[i].length;
+    w = (w*settings.fontSize*.6)+6;
+
+    textCtx.canvas.width = w; textCtx.canvas.height = h;
+    textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = "center"; textCtx.textBaseline = "middle"; textCtx.fillStyle = 'white';
+    textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
+    for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 2) + (settings.fontSize*i));
+
+    var gl = soup.renderer.gl;
+    var textTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, textTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    
+    obj.status = false;
+    obj.texture = textTex;
+    obj.texture.renderWidth = w*.25;
+    obj.texture.renderHeight = h*.25;
+    settings.fontSize *= .25;
+  }
+  
+  obj.text = text;
+  for (var e in settings) obj.settings[e] = settings[e];
+  
+  soup.canvas.update = true;
+
+  return obj;
 }
 
 molmil.mergeStructuresToModels = function(entries) { // merges multiple structures into separate models
