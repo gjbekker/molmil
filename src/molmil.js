@@ -8203,8 +8203,8 @@ molmil.UI.prototype.showLabelCM=function(e, entry) {
     else item.addEventListener("touchstart", function() {this.onclick();}, false);
   };
 
-  if (entry.label.display) {addEntry("Hidden", function() {this.entry.label.display = false; this.UI.soup.canvas.update = true; document.body.onmousedown();});}
-  else addEntry("Visible", function() {this.entry.label.display = true; this.UI.soup.canvas.update = true; document.body.onmousedown();});
+  if (entry.label.display) {addEntry("Hidden", function() {this.entry.label.display = false; this.entry.label.status = false; this.UI.soup.canvas.update = true; document.body.onmousedown();});}
+  else addEntry("Visible", function() {this.entry.label.display = true; this.entry.label.status = false; this.UI.soup.canvas.update = true; document.body.onmousedown();});
   
   addEntry("Edit", function() {this.UI.editLabel(this.entry.label);});
   
