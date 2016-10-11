@@ -27,6 +27,7 @@ molmil.settings_default = {
   promodeE_animation_url: "//ipr.pdbj.org/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
   
   molmil_video_url: "http://127.0.0.1:8080/app/",
+  dependencies: ["gl-matrix-min.js", "cif.js", "FileSaver.js"],
 };
 
 molmil.cli_canvas = null;
@@ -6888,7 +6889,8 @@ molmil.render.prototype.initShaders = function(programs) {
     
     if (! molmil.shaderEngine.code.hasOwnProperty(molmil.settings.src+ploc)) {
       var request = new molmil_dep.CallRemote("GET"); request.ASYNC = false;
-      request.Send(molmil.settings.src+ploc);
+      if (ploc.indexOf("//") == -1) request.Send(molmil.settings.src+ploc);
+      else request.Send(ploc);
       molmil.shaderEngine.code[molmil.settings.src+ploc] = request.request.responseText;
     }
   }

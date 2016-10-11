@@ -233,11 +233,12 @@ molmil_dep.initCheck = function() {
 
 molmil_dep.init = function() {
   if (! window.molmil.configBox || molmil.configBox.initFinished) return;
-  var deps = ["gl-matrix-min.js", "cif.js", "FileSaver.js"], obj;
+  var deps = molmil.settings.dependencies, obj;
   var head = document.getElementsByTagName("head")[0];
   for (var i=0; i<deps.length; i++) {
     obj = molmil_dep.dcE("script");
-    obj.src = (molmil.settings.extSrc || molmil.settings.src)+deps[i];
+    if (deps[i].indexOf("//") == -1) obj.src = molmil.settings.src+deps[i];
+    else obj.src = deps[i];
     obj.onload = molmil_dep.initCheck;
     head.appendChild(obj);
   }
