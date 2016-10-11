@@ -1,0 +1,101 @@
+<html>
+  <head>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+  <style>
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+      padding: 0px;
+      overflow:hidden;
+      
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      
+      font-family: verdana, meiryo, sans-serif, Arial Unicode MS, Cambria Math;
+      
+    }
+  
+    .molmil_UI_container {
+    }
+    
+    .welcome {
+      color: white;
+      font-size: 5em;
+      white-space: nowrap;
+    }
+    
+  </style>
+  
+  <script>  
+  
+    var canvas, cli;
+  
+    var molmil_settings = {src: "https://rawgit.com/gjbekker/molmil/master/src/", dependencies: ["https://gjbekker.github.io/molmil/gl-matrix-min.js", "https://gjbekker.github.io/molmil/cif.js", "https://gjbekker.github.io/molmil/FileSaver.js"]};
+    
+    function initViewer() {
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      
+      for (var i=0; i<molmil.configBox.glsl_shaders.length; i++) molmil.configBox.glsl_shaders[i][0] = "https://raw.githubusercontent.com/gjbekker/molmil/master/src/" + molmil.configBox.glsl_shaders[i][0];
+      
+      canvas = document.getElementById("molmilViewer");
+      canvas.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.height = (window.innerHeight || document.documentElement.clientHeight);
+      canvas = molmil.createViewer(canvas);
+      
+      window.onresize = function() {
+        var dpr = devicePixelRatio || 1;
+        canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+        canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+        canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+        canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+        canvas.renderer.resizeViewPort();
+        canvas.update = true;
+      };
+      
+      
+      cli = new molmil.commandLine(canvas);
+      
+      var hash = window.location.hash ? window.location.hash.substr(1) : "";
+      if (hash) cli.environment.console.runCommand(decodeURI(hash));
+      
+      molmil.bindCanvasInputs(canvas);
+      
+    }
+    
+    window.onhashchange = function() {
+      var hash = window.location.hash ? window.location.hash.substr(1) : "";
+      if (hash) {molmil.clear(canvas); cli.environment.console.runCommand(decodeURI(hash));}
+    }
+    
+
+  </script>
+  
+  </head>
+  
+  <body onload="initViewer();">
+    <div class="molmil_popup_outer" style="z-index: 1; top: -.5em;">
+      <div class = "molmil_popup_inner">
+      
+        <span class="welcome">
+          <span>Molmil viewer</span>
+        </span>
+      
+      </div>
+    </div>
+    <div class="molmil_UI_container">
+      <canvas id="molmilViewer">
+      </canvas>
+    </div>
+  </body>
+  
+  <script src="https://rawgit.com/gjbekker/molmil/master/src/molmil.js"></script>
+</html>
+
+ 
