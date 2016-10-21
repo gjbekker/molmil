@@ -7,7 +7,7 @@
  * License: LGPLv3
  *   See https://github.com/gjbekker/molmil/blob/master/LICENCE.md
  */
-
+ 
 // ** settings objects **
  
 var molmil = molmil || {};
@@ -819,13 +819,13 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else if ((format+"").toLowerCase() == "ccp4") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
-      return this.target.load_ccp4(this.request.response, this.filename, settings);
+      return this.target.load_ccp4(this.gz ? pako.inflate(new Uint8Array(this.request.response)) : this.request.responseText, this.filename);
     };
   }
   else if ((format+"").toLowerCase() == "obj") {
     request.ASYNC = true;
     request.parse = function() {
-      return this.target.load_obj(this.request.response, this.filename);
+      return this.target.load_obj(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename);
     };
   }
   else if ((format+"").toLowerCase() == "mdl") {
@@ -874,6 +874,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
       molmil.displayEntry(structures, 1);
       molmil.colorEntry(structures, 1, null, true, this.target);
     }
+    if (this.target.UI) this.target.UI.resetRM();
   };
   request.Send(loc);
 };
@@ -1435,7 +1436,7 @@ molmil.viewer.prototype.loadMyPrestoTrj = function(buffer, fxcell) {
 };
 
 // ** loads arbitrary data **
-
+//
 molmil.viewer.prototype.loadStructureData = function(data, format, filename, ondone, settings) {
   var struc;
   if (format == 1 || (format+"").toLowerCase() == "mmjson") struc = this.load_PDBx(typeof data == "string" ? JSON.parse(data) : data, filename);
@@ -1462,6 +1463,7 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
     molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, this);
   }
+  if (this.UI) this.UI.resetRM();
 };
 
 // ** connects amino bonds within a chain object **
@@ -1474,7 +1476,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
     delete chain.molecules[0].C;
     return;
   }
-  var m1, m2, xyz1, xyz2, rC, newChains, struc = chain.entry;
+  var m1, m2, xyz1, xyz2, rC, newChains, struc = chain.entry, dx, dy, dz, r;
   var xyzRef = chain.modelsXYZ[0];
   chain.bonds = [];
   for (m1=0; m1<chain.molecules.length; m1++) {
@@ -1722,6 +1724,8 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
           
   molmil.safeStartViewer(canvas);
   
+  return struct;
+  
 };
 
 molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
@@ -1847,7 +1851,9 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   canvas.update = true;
           
   molmil.safeStartViewer(canvas);
-      
+  
+  
+  return struct;
 };
     
 
@@ -2093,14 +2099,14 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   this.calculateCOG();
 
   for (i=0; i<bondData.length; i++) {
-    tmp = bondData[i].trim().split(/[ ,]+/);
+    tmp = bondData[i].trim().split(/[ ,\t]+/);
     if (tmp[0] == "") continue;
     a1 = parseInt(tmp[1])-1;
     a2 = parseInt(tmp[2])-1;
     if (tmp[3] == "ar") tmp[3] = 2;
     if (tmp[3] == "am") tmp[3] = 1;
     bt = parseInt(tmp[3]);
-    
+
     currentChain.bonds.push([currentChain.atoms[a1], currentChain.atoms[a2], bt]);
   }
   currentChain.bondsOK = true;
@@ -2830,6 +2836,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var type_symbol = atom_site.type_symbol || []; // Element
   
     var pdbx_PDB_model_num = atom_site.pdbx_PDB_model_num;
+    var group_PDB = atom_site.group_PDB || [];
   
     var currentChain = null; var ccid = null; var currentMol = null; var cmid = null; var atom;
   
@@ -2890,7 +2897,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       if (isCC || ! polyTypes.hasOwnProperty(currentMol.name)) {
         if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT") {currentMol.water = true; currentMol.ligand = false;}
       }
-      else {
+      else if (group_PDB || group_PDB[a] != "HETATM") {
         currentChain.isHet = false;
         if (atom.atomName == "N") {currentMol.N = atom; currentMol.ligand = false;}
         else if (atom.atomName == "CA") { currentMol.CA = atom; currentMol.ligand = false;}
@@ -3002,7 +3009,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var pdbx_struct_oper_list = pdb.pdbx_struct_oper_list;
     if (pdbx_struct_oper_list) {
       var i, length = pdbx_struct_oper_list.type.length;
-      var xmode = ! pdbx_struct_oper_list.hasOwnProperty("matrix[1][1]");
+      var xmode = ! pdbx_struct_oper_list.hasOwnProperty("matrix[1][1]"), mat;
       for (i=0; i<length; i++) {
         mat = mat4.create();
       
@@ -3114,10 +3121,10 @@ molmil.viewer.prototype.calculateCOG = function() {
   var n = 0;
   var CA;
   var xyzRef, Xpos;
-  var poss = [];
+  var poss = [], ALTs = [];
   
-  this.geomRanges = [0, 0, 0, 0, 0, 0], ALTs = [];
-  var struct, chain, s, c, m, a;
+  this.geomRanges = [0, 0, 0, 0, 0, 0];
+  var struct, chain, s, c, m, a, xyz;
   
   //molmil.polygonObject
   
@@ -3713,7 +3720,7 @@ molmil.exportSTL = function(soup) {
   var nof_ = new Uint32Array(1); nof_[0] = nof;
   var bin = [header, nof_];
         
-  var m, floatT, uint16T, vB, iB, i, v1 = [0, 0, 0], v2 = [0, 0, 0], v3 = [0, 0, 0], u1 = [0, 0, 0], u2 = [0, 0, 0];
+  var m, floatT, uint16T, vB, iB, i, v1 = [0, 0, 0], v2 = [0, 0, 0], v3 = [0, 0, 0], u1 = [0, 0, 0], u2 = [0, 0, 0], v;
         
   for (m=0; m<meshes.length; m++) {
     vB = meshes[m].vertexBuffer;
@@ -4343,7 +4350,17 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     
     for (var b=0; b<chain.bonds.length; b++) {
       if (chain.bonds[b][0].displayMode < 2 || chain.bonds[b][1].displayMode < 2 || ! chain.bonds[b][0].display || ! chain.bonds[b][1].display) continue;
-      if (chain.bonds[b][0].displayMode == 4 || chain.bonds[b][1].displayMode == 4) lines2draw.push(chain.bonds[b]);
+      if (chain.bonds[b][0].displayMode == 4 || chain.bonds[b][1].displayMode == 4) {
+        if (chain.bonds[b][0].displayMode != 4) {
+          console.log('a');
+          wfatoms2draw.push(chain.bonds[b][0]);
+        }
+        if (chain.bonds[b][1].displayMode != 4) {
+          console.log('b');
+          wfatoms2draw.push(chain.bonds[b][1]);
+        }
+        lines2draw.push(chain.bonds[b]);
+      }
       else {
         bonds2draw.push(chain.bonds[b]);
         nob += chain.bonds[b][2]*2;
@@ -4621,8 +4638,7 @@ molmil.geometry.generateAtomsImposters = function() {
 
 // ** build atoms representation (spheres) **
 molmil.geometry.generateAtoms = function() {
-  var atoms2draw = this.atoms2draw, vdwR = molmil.configBox.vdwR, r, sphere, a, v, rgba
-  vBuffer = this.buffer1.vertexBuffer, iBuffer = this.buffer1.indexBuffer, vP = this.buffer1.vP, iP = this.buffer1.iP, detail_lv = this.detail_lv,
+  var atoms2draw = this.atoms2draw, vdwR = molmil.configBox.vdwR, r, sphere, a, v, rgba, vBuffer = this.buffer1.vertexBuffer, iBuffer = this.buffer1.indexBuffer, vP = this.buffer1.vP, iP = this.buffer1.iP, detail_lv = this.detail_lv,
   vBuffer8 = this.buffer1.vertexBuffer8, vP8 = vP*4;
     
     
@@ -4689,13 +4705,13 @@ molmil.geometry.generateBonds = function() {
   
   var r, offsetX, offsetY, offsetZ, v1=[0,0,0], v2=[0,0,0], c1=[0,0,0];
   
-  var p = vP/8, x, y, z, x2, y2, z2, m, rgba;
+  var p = vP/8, x, y, z, x2, y2, z2, m, rgba, v;
   
   var rotationMatrix = mat4.create();
   var vertex = [0, 0, 0, 0], normal = [0, 0, 0, 0], dx, dy, dz, dij, angle;
   
   //bonds
-  for (b=0; b<bonds2draw.length; b++) {
+  for (var b=0; b<bonds2draw.length; b++) {
     m = bonds2draw[b][2] == 2 ? 4 : 2;
     
     tmp = mdl;
@@ -4968,11 +4984,11 @@ molmil.geometry.generateSurfaces = function(chains, soup) {
 
 // ** build cartoon representation **
 molmil.geometry.generateCartoon = function() {
-  var chains = this.cartoonChains, c, b, b2, m, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges;
+  var chains = this.cartoonChains, c, b, b2, m, chain, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges, BNs, currentBlock;
   var noi = this.noi;
   var novpr = this.novpr;
   
-  var nowp, wp, tmp, rotationMatrix;
+  var nowp, wp, tmp, rotationMatrix, identityMatrix, theta, smallest;
   
   // in the future speed this up a bit by using a line[idx]/tangents[idx] instead of .push()
 
@@ -5936,7 +5952,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
 
 // ** priestle smoothing for loop & sheet regions **
 molmil.priestle_smoothing = function(points, from, to, skip, steps) {
-  var s, nom = to-from, tmp = new Array(nom), local = new Array(nom);
+  var s, m, nom = to-from, tmp = new Array(nom), local = new Array(nom);
   for (m=0; m<nom; m++) {tmp[m] = [0, 0, 0];}
   for (s=0; s<steps; s++) {
     for (m=1; m<nom-1; m++) {
@@ -6895,7 +6911,7 @@ molmil.render.prototype.initShaders = function(programs) {
     }
   }
 
-  var name, fragmentShader, vertexShader, e, ploc, defines, programs = molmil.configBox.glsl_shaders, program;
+  var name, fragmentShader, vertexShader, e, ploc, defines, programs = molmil.configBox.glsl_shaders, program, source;
   for (var p=0; p<programs.length; p++) {
     ploc = programs[p][0];
     name = programs[p][1] || ploc.replace(/\\/g,'/').replace( /.*\//, '' ).split(".")[0];
@@ -7189,7 +7205,7 @@ molmil.render.prototype.resizeViewPort = function() {
 
   var convergence = molmil.configBox.zNear * molmil.configBox.stereoFocalFraction;
   var eyeSep = convergence/molmil.configBox.stereoEyeSepFraction;
-  var top, bottom;
+  var top, bottom, a, b, c;
   top = molmil.configBox.zNear * Math.tan(molmil.configBox.camera_fovy/2) * .25;
   bottom = -top;
   a = (this.width/this.height) * Math.tan(molmil.configBox.camera_fovy/2) * convergence;
@@ -8143,7 +8159,7 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y, pageX) {
   
   menu.pushNode("HR");
   
-  var UI = this;
+  var UI = this, item;
   
   var addEntry=function(name, action, hover) {
     item = menu.pushNode("div", name);
@@ -8287,10 +8303,10 @@ molmil.UI.prototype.showCM=function(e, entry) {
 };
 
 
-molmil.UI.prototype.showRM=function(icon) {
+molmil.UI.prototype.showRM=function(icon, reset) {
   var menu = icon.parentNode.menu;
-  molmil_dep.Clear(menu);
-  if (menu.style.display == "none") {
+  molmil_dep.Clear(menu);menu.innerHTML = "";
+  if (menu.style.display == "none" || reset) {
     icon.innerHTML = "&gt;<br/>&gt;<br/>&gt;";
     menu.style.maxHeight = ((this.canvas ? this.canvas : document.body)-32)+"px";
     menu.style.display = "";
@@ -8301,7 +8317,7 @@ molmil.UI.prototype.showRM=function(icon) {
   }
   
   var files = this.canvas ? this.canvas.molmilViewer.structures : [];
-  
+
   if (menu.childNodes.length > 0) {
     if (files.length == menu.nof) return;
   }
@@ -8349,7 +8365,6 @@ molmil.UI.prototype.showRM=function(icon) {
     item.UI = this; item.label = labels[i];
     molmil.setOnContextMenu(item, function(e) {this.UI.showLabelCM(e, this);});
   }
-  
 };
 
 molmil.UI.prototype.showChains=function(target, payload) {
@@ -8403,6 +8418,10 @@ molmil.UI.prototype.showResidues=function(target, payload) {
   target.pushNode("hr");
 };
 
+
+// add a new File IO handler, because the current list is getting too long (and it still doesn't include everything...)
+
+//molmil.UI.prototype.
 
 molmil.UI.prototype.showLM=function(icon) {
   try {if (icon.parentNode.childNodes.length > 1) {icon.parentNode.removeChild(icon.nextSibling); icon.parentNode.removeChild(icon.nextSibling); return;}}
@@ -8986,7 +9005,7 @@ molmil.UI.prototype.animationPopUp=function() {
 molmil.UI.prototype.resetRM=function() {
   try {
     molmil_dep.Clear(this.RM.parentNode.menu);
-    if (this.RM.parentNode.menu.style.display != "none") this.showRM(this.RM);  
+    if (this.RM.parentNode.menu.style.display != "none") this.showRM(this.RM, true);
   }
   catch (e) {}
 };
@@ -10422,7 +10441,7 @@ molmil.octaSphereBuilder = function (recursionLevel) {
     return index++;
   };
   getCenterPoint = function(v1, v2) {
-    var firstIsSmaller = v1 < v2;
+    var firstIsSmaller = v1 < v2, smallerIndex, greaterIndex, key, ret;
     smallerIndex = firstIsSmaller ? v1 : v2;
     greaterIndex = firstIsSmaller ? v2 : v1;
     key = [smallerIndex, greaterIndex];
@@ -10461,7 +10480,7 @@ molmil.octaSphereBuilder = function (recursionLevel) {
 
 // ** builds half a octahedron sphere **
 molmil.buildOctaDome = function (t, side) {
-  var sphere = molmil.octaSphereBuilder(t), dx, dy, dz, d, mfd = [], j;
+  var sphere = molmil.octaSphereBuilder(t), dx, dy, dz, d, mfd = [], j, k;
   for (var i=0; i<sphere.vertices.length; i++) {
     dx = sphere.vertices[4][0]-sphere.vertices[i][0];
     dy = sphere.vertices[4][1]-sphere.vertices[i][1];
@@ -10484,7 +10503,7 @@ molmil.buildOctaDome = function (t, side) {
 
 // ** buils a list of bonds for a molecule/residue **
 molmil.buildBondsList4Molecule = function (bonds, molecule, xyzRef) {
-  var dx, dy, dz, r, a1, a2, xyz1, xyz2, vdwR = molmil.configBox.vdwR;
+  var dx, dy, dz, r, a1, a2, xyz1, xyz2, vdwR = molmil.configBox.vdwR, maxDistance;
   for (a1=0; a1<molecule.atoms.length; a1++) {
     for (a2=a1+1; a2<molecule.atoms.length; a2++) {
       if (molecule.atoms[a1].label_alt_id != molecule.atoms[a2].label_alt_id && molecule.atoms[a1].label_alt_id != null && molecule.atoms[a2].label_alt_id != null) continue;
@@ -10684,7 +10703,7 @@ molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't dr
 
   var CB_NOI = molmil.configBox.QLV_SETTINGS[soup.renderer.QLV].CB_NOI/32; // NOI per A
   
-  var chainRepr = [], c, radii = [];
+  var chainRepr = [], c, radii = [], chain;
   
   for (c=0; c<chains.length; c++) {
     chain = chains[c];
@@ -11458,6 +11477,7 @@ var triTable = new Int32Array([
 // isolevel indicates the value at which to generate the mesh
 function polygonize(size, gridVals, isolevel, selectFunc) {
 	var cubeIndex = 0, vertlist = [], i, x, y, z, v0 = [0, 0, 0], v1 = [0, 0, 0], iv = 0, faces = [], vertexIndex = {}, vertices = [], face_normals = [], idx, vert1, vert2, vert3;
+  var grid0, grid1, grid2, grid3, grid4, grid5, grid6, grid7, idx1, idx2, idx3;
   
   for (i=0; i<12; i++) vertlist.push([0.0, 0.0, 0.0]);
   
@@ -12792,29 +12812,29 @@ molmil.commandLine = function(canvas) {
   
   this.environment.console.log = function() {
     if (this.debugMode) console.log.apply(console, arguments);
-    arguments = Array.prototype.slice.call(arguments, 0);
-    var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
+    var __arguments = Array.prototype.slice.call(arguments, 0);
+    var tmp = document.createElement("div"); tmp.textContent = __arguments.join(", ");
     this.custom(tmp);
   };
   this.environment.console.warning = function() {
     if (this.debugMode) console.warming.apply(console, arguments);
-    arguments = Array.prototype.slice.call(arguments, 0);
-    var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
+    var __arguments = Array.prototype.slice.call(arguments, 0);
+    var tmp = document.createElement("div"); tmp.textContent = __arguments.join(", ");
     tmp.style.color = "yellow";
     this.custom(tmp);
   };
   this.environment.console.error = function() {
     if (this.debugMode) console.error.apply(console, arguments);
-    arguments = Array.prototype.slice.call(arguments, 0);
-    //console.error.apply(console, arguments);
-    var tmp = document.createElement("div"); tmp.textContent = arguments.join(", ");
+    var __arguments = Array.prototype.slice.call(arguments, 0);
+    //console.error.apply(console, __arguments);
+    var tmp = document.createElement("div"); tmp.textContent = __arguments.join(", ");
     tmp.style.color = "red";
     this.custom(tmp);
   };
   this.environment.console.logCommand = function() {
     if (this.cli.environment.scriptUrl) return;
-    arguments = Array.prototype.slice.call(arguments, 0);
-    var tmp = document.createElement("div"); tmp.textContent = arguments.join("\n");
+    var __arguments = Array.prototype.slice.call(arguments, 0);
+    var tmp = document.createElement("div"); tmp.textContent = __arguments.join("\n");
     tmp.style.color = "#00BFFF";
     this.custom(tmp, true);
   };
@@ -12957,6 +12977,7 @@ molmil.commandLine.prototype.runCommand = function(command) { // note the /this/
   command = (' '+command).replace(/(\s|;)var\s+(\w+)\s*=/g, "$1this.$2 ="); // make sure that variables are stored in /this/ and not in the local scope...
   command = command.replace(/(\s|;)function\s+(\w+)/g, "$1this.$2 = function"); // make sure that functions are stored in /this/ and not in the local scope...
   command = command.replace(/(\s|;)return\sthis;/g, "$1return window;"); // make sure that it is impossible to get back the real window object
+  
   try {with (this) {eval(command);}}
   catch (e) {this.console.error(e.message);}
   molmil.cli_canvas = null; molmil.cli_soup = null;
@@ -13694,6 +13715,7 @@ molmil.addLabel = function(text, settings, soup) {
   obj.text = text;
   for (var e in settings) obj.settings[e] = settings[e];
   
+  if (soup instanceof molmil.viewer && soup.UI) soup.UI.resetRM();
   soup.canvas.update = true;
 
   return obj;
