@@ -35,6 +35,7 @@ attribute vec3 in_Position;
 attribute vec2 in_ScreenSpaceOffset;
 
 varying float fogFactor;
+varying float Pz;
 
 uniform float focus;
 uniform float fogSpan;
@@ -50,7 +51,7 @@ uniform float zNear;
 void main() {
   gl_Position = vec4(modelViewMatrix * vec4(in_Position, 1.0))-vec4(COR, 0.0);
   
-  vec3 refPos;
+  vec3 refPos = vec3(0.0, 0.0, 0.0);
   refPos.xy += in_ScreenSpaceOffset*sizeOffset;
   refPos.xy *= -(refPos.z+gl_Position.z)*scaleFactor;
   refPos += positionOffset;
@@ -64,7 +65,12 @@ void main() {
   gl_Position = projectionMatrix  * gl_Position;
   
   ex_FragTexCoord = step(in_ScreenSpaceOffset, vec2(0.0, 0.0));
-
+  
+#ifdef ENABLE_SLAB
+  vec3 vertPos = gl_Position.xyz / gl_Position.w;
+  Pz = -vertPos.z;
+#endif
+  
 #ifdef ENABLE_FOG
   vec3 vertPos = gl_Position.xyz / gl_Position.w;
   fogFactor = clamp((fogSpan - -vertPos.z) / (fogSpan - focus), 0.05, 1.0);
@@ -83,6 +89,7 @@ precision highp int;
 #endif
 
 varying float fogFactor;
+varying float Pz;
 uniform vec3 color;
 
 #ifdef ENABLE_SLAB
@@ -92,6 +99,7 @@ uniform float slabNear, slabFar;
 varying vec2 ex_FragTexCoord;
 
 uniform sampler2D textureMap;
+uniform vec4 backgroundColor;
 
 void main() {
 #ifdef ENABLE_SLAB
