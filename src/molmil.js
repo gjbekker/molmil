@@ -4402,7 +4402,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       this.gl.enable(this.gl.BLEND);
       this.gl.blendEquation(this.gl.FUNC_ADD); 
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
-      this.gl.disable(this.gl.DEPTH_TEST);
+      this.gl.depthMask(false);
     }
     
     this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
@@ -4415,7 +4415,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     
     if (this.settings.alphaMode) {
       this.gl.disable(this.gl.BLEND);
-      this.gl.enable(this.gl.DEPTH_TEST);
+      this.gl.depthMask(true);
     }
     
   };
