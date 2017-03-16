@@ -10,11 +10,7 @@
     "projectionMatrix": -1,
     "normalMatrix": -1,
     "focus": -1,
-    "fogSpan": -1,
-    "uniform_color": -1,
-    "backgroundColor": -1,
-    "slabNear": -1,
-    "slabFar": -1
+    "fogSpan": -1
   }
 }
 //#vertex
@@ -27,17 +23,6 @@ uniform vec3 COR;
 attribute vec3 in_Position;
 attribute vec3 in_Normal;
 
-
-#ifdef UNIFORM_COLOR
-#ifdef ALPHA_MODE
-uniform vec4 uniform_color;
-varying vec4 ex_Colour;
-#else
-uniform vec3 uniform_color;
-varying vec3 ex_Colour;
-#endif
-
-#else
 #ifdef ALPHA_MODE
 attribute vec4 in_Colour;
 varying vec4 ex_Colour;
@@ -46,14 +31,10 @@ attribute vec3 in_Colour;
 varying vec3 ex_Colour;
 #endif
 
-#endif
-
-
 varying vec3 ex_Normal;
 varying vec3 vertPos;
 
 varying float fogFactor;
-varying float Pz;
 
 uniform float focus;
 uniform float fogSpan;
@@ -64,15 +45,9 @@ void main() {
   vertPos = gl_Position.xyz / gl_Position.w;
   gl_Position = projectionMatrix * gl_Position;
 
-#ifdef UNIFORM_COLOR
-  ex_Colour = uniform_color;
-#else
   ex_Colour = in_Colour;
-#endif
   ex_Normal = normalMatrix * in_Normal;
   
-  Pz = -vertPos.z;
-
 #ifdef ENABLE_FOG
   fogFactor = clamp((fogSpan - -vertPos.z) / (fogSpan - focus), 0.05, 1.0);
 #endif
@@ -100,23 +75,15 @@ varying vec3 ex_Colour;
 const vec3 lightPos = vec3(50.0,50.0,100.0);
 
 varying float fogFactor;
-varying float Pz;
 
-uniform vec4 backgroundColor;
-
-#ifdef ENABLE_SLAB
-uniform float slabNear, slabFar;
-#endif
+const vec4 backgroundColor = vec4(0.0, 0.0, 0.0, 1.0);
 
 void main() {
-#ifdef ENABLE_SLAB
-  if (Pz < slabNear || Pz > slabFar+1.0) discard; // later change the slabFar functionality to a more fog-like function..
-#endif
-
   vec3 normal = normalize(ex_Normal);
   vec3 lightDir = normalize(lightPos - vertPos);
+  vec3 lightDir2 = lightPos - vertPos;
 
-  float lambertian = clamp(dot(normal, lightDir), 0.0, 1.0);
+  float lambertian = min(max(dot(normal, lightDir), 0.0), 1.0);
   float specular = 0.0;
   
 #ifndef DISABLE_SPECULAR
@@ -130,7 +97,7 @@ void main() {
 #endif
   
 #ifdef ALPHA_MODE
-  vec4 color = vec4(vec3(lambertian), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
+  vec4 color = vec4(vec3(max(lambertian, 0.2)), 1.0)*ex_Colour + vec4(specular, specular, specular, 1.0);
 #else
   vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0);
 #endif
@@ -139,14 +106,6 @@ void main() {
   gl_FragColor = mix(backgroundColor, color, fogFactor);
 #else
   gl_FragColor = color;
-#endif
-
-
-#ifdef ENABLE_SLAB
-  if (Pz > slabFar) gl_FragColor = mix(backgroundColor, color, clamp((slabFar+1.-Pz) / (1.0), 0.00, 1.0));
-#endif
-
-#ifdef ALPHA_MODE
-  gl_FragColor.a = 1.0 - pow(max(1.0-ex_Colour.a,0.0), 1.0/max(abs(normal.z),0.01));
+  //gl_FragColor = vec4(normalize(vertPos), 1.0);
 #endif
 }
