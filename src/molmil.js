@@ -10,6 +10,11 @@
  
 // ** settings objects **
  
+// modify the render engine so that each input entry is loaded into a different render object
+// then, set it up so that each object can be clipped differently
+// molmil.entryObject.programs = [];
+// dynamically update the programs (e.g. if a wireframe one isn't necessary, don't use it)
+ 
 var molmil = molmil || {};
 
 molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil.mouseMoved = false; molmil.Xcoord = 0; molmil.Ycoord = 0; molmil.Zcoord = 0; molmil.activeCanvas = null; molmil.touchList = null; molmil.touchMode = false;
@@ -122,7 +127,8 @@ molmil.configBox = {
   stereoEyeSepFraction: 30,
   camera_fovy: 45.0,
   HQsurface_gridSpacing: 1.0,
-  webGL2: false
+  webGL2: false,
+  vdwSphereMultiplier: 1.0
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -132,7 +138,7 @@ molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "H
 molmil.AATypesBase = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, "SER": 1, "THR": 1, "VAL": 1, "TRP": 1, "TYR": 1, "ACE": 1, "NME": 1, "HIP": 1, "HIE": 1, "HID": 1};
 
 molmil.initSettings = function () {
-  var colors, cmode = localStorage.getItem("molmil.settings_COLORS") || 1;
+  var colors, cmode = molmil.settings_COLORS || localStorage.getItem("molmil.settings_COLORS") || 1;
   if (cmode == 2) {
     colors = {
       DUMMY: [255, 20, 147],
@@ -325,6 +331,7 @@ molmil.entryObject = function (meta) { // this should become a structure object 
   this.chains = [];
   this.meta = meta || {};
   this.display = true;
+  this.programs = [];
 };
 
 molmil.entryObject.prototype.toString = function() {return "Entry "+(this.meta.id || "");};
@@ -855,11 +862,19 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
       return this.target.loadGromacsXTC(this.request.response, this.filename);
     };
   }
-  else if ((format+"").toLowerCase() == "psygene-traj") {
+  else if ((format+"").toLowerCase() == "psygene-traj" || (format+"").toLowerCase() == "presto-traj") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
       var buffer = this.request.response;
       this.target.loadMyPrestoTrj(buffer, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
+      return this.target.structures;
+    };
+  }
+  else if ((format+"").toLowerCase() == "presto-mnt") {
+    request.ASYNC = true; request.responseType = "arraybuffer";
+    request.parse = function() {
+      var buffer = this.request.response;
+      this.target.loadMyPrestoMnt(buffer, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
       return this.target.structures;
     };
   }
@@ -1238,7 +1253,8 @@ molmil.viewer.prototype.loadGromacsXTC = function(buffer) {
   
   this.structures[0].number_of_frames = this.structures[0].chains.length ? this.structures[0].chains[0].modelsXYZ.length : 0;
   
-  return [this.structures.length ? this.structures[0] : {}];
+  return [];
+  //return [this.structures.length ? this.structures[0] : {}];
   
 }
     
@@ -1324,9 +1340,71 @@ molmil.viewer.prototype.loadGromacsTRR = function(buffer) {
   
   // do wrapping (same as for psygene...)
   
-  return [this.structures.length ? this.structures[0] : {}];
+  return [];
+  //return [this.structures.length ? this.structures[0] : {}];
   
 };
+
+
+// ** parses myPresto mnt format **
+molmil.viewer.prototype.loadMyPrestoMnt = function(buffer, fxcell) {
+  var offset = 0, metadata, coords, chain_coords, c;
+  this.trajectoryMD = [];
+  var traj = [];
+
+  // this is an entire BLOB of data, but molmil has been redesigned using per-chain data!!!!!
+  // so after loading in the trajectory data, it needs to be split up in separate blocks
+  // the Float32Array(buffer, from, to) can be used to create a pointer to the sub-buffer and append that to the modelsXYZ list
+  
+  // first make a list of per-chain ranges (indexes)
+  
+  
+  var chains = this.structures[0].chains, coffset = [];
+  for (c=0; c<chains.length; c++) {
+    coffset.push([(chains[c].atoms[0].AID-1)*3, chains[c].atoms.length*3]);
+    chains[c].modelsXYZ = []; // don't use original pdb data, only use it for the topology...
+  }
+  
+  var slowView = new DataView(buffer);
+  
+  metadata = [];
+  offset += 4; // gomi
+  offset += 5; // idiot fileid
+  offset += 4; // version
+  var format = slowView.getInt32(offset, littleEndian=true); offset += 4
+  
+  offset += 4; // gomi
+  offset += 4; // gomi
+  
+  var num = slowView.getInt32(offset, littleEndian=true); offset += 4; var nlen = num*3;
+  offset += num*4; // skip atomids
+  offset += 4; // gomi
+  
+  
+  var array = Float32Array, N = 4; slowView.getFloat = slowView.getFloat32;
+  
+
+  var loopn, epot, i, arr;
+  while (true) {
+    offset += 4; // gomi
+    loopn = slowView.getInt32(offset, littleEndian=true); offset += 4;
+    epot = slowView.getFloat(offset, littleEndian=true); offset += 4;
+
+    
+    for (c=0; c<coffset.length; c++) {
+      arr = new array(coffset[c][1]);
+      for (i=0; i<coffset[c][1]; i++) {arr[i] = slowView.getFloat(offset, littleEndian=true); offset += N;}
+      chains[c].modelsXYZ.push(arr);
+    }
+    offset += 4; // gomi
+    if (offset >= buffer.byteLength) break;
+  }
+  
+  this.structures[0].number_of_frames = this.structures[0].chains.length ? this.structures[0].chains[0].modelsXYZ.length : 0;
+  
+  return [];
+
+}
 
 // ** parses myPresto trajectory format **
 molmil.viewer.prototype.loadMyPrestoTrj = function(buffer, fxcell) {
@@ -1439,8 +1517,8 @@ molmil.viewer.prototype.loadMyPrestoTrj = function(buffer, fxcell) {
     }
   }
 
-  return [this.structures.length ? this.structures[0] : {}];
-  
+  return [];
+  //return [this.structures.length ? this.structures[0] : {}];
 };
 
 // ** loads arbitrary data **
@@ -1460,7 +1538,8 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
   else if ((format+"").toLowerCase() == "xyz") struc = this.load_xyz(data, filename, settings);
   else if ((format+"").toLowerCase() == "ccp4") struc = this.load_ccp4(data, filename, settings);
   else if ((format+"").toLowerCase() == "obj") struc = this.load_obj(data, filename, settings);
-  else if ((format+"").toLowerCase() == "psygene-traj") struc = this.loadMyPrestoTrj(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
+  else if ((format+"").toLowerCase() == "psygene-traj" || (format+"").toLowerCase() == "presto-traj") struc = this.loadMyPrestoTrj(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
+  else if ((format+"").toLowerCase() == "presto-mnt") struc = this.loadMyPrestoMnt(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
   else if ((format+"").toLowerCase() == "gromacs-trr") struc = this.loadGromacsTRR(data);
   else if ((format+"").toLowerCase() == "gromacs-xtc") struc = this.loadGromacsXTC(data);
   if (! struc) return;
@@ -1722,7 +1801,7 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   struct.meta.geomRanges = geomRanges;
   
   var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
-  canvas.renderer.programs.push(program);
+  canvas.renderer.addProgram(program);
   struct.programs.push(program);
   
   canvas.molmilViewer.calculateCOG();
@@ -1850,7 +1929,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   }
 
   var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
-  canvas.renderer.programs.push(program);
+  canvas.renderer.addProgram(program);
   struct.programs.push(program);
 
   canvas.molmilViewer.calculateCOG();
@@ -1965,7 +2044,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename) {
           
     program.renderPicking = function() {};
           
-    renderer.programs.push(program);
+    renderer.addProgram(program);
     struct.programs.push(program);
             
     // also add an entry to the structures menu for easy enabling/disabling
@@ -2179,7 +2258,7 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
   
     this.chains.push(currentChain);
 
-    offset += 4+noa+nob;
+    offset += 3+noa+nob;
     while (true) {
       offset++;
       try {if (data[offset].trim() == "M  END") break;}
@@ -2255,7 +2334,8 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     if (! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
       if (currentMol.water) atom.display = false;
       //do special stuff for dna/rna
-      else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
+      //else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
+      else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom;}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
       else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
     }
@@ -2608,7 +2688,7 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
     }
     
     program = molmil.geometry.build_simple_render_program(lineVertexData, lineIndexData, this.renderer, {lines_render: true});
-    this.renderer.programs.push(program);
+    this.renderer.addProgram(program);
     struct.programs.push(program);
   }
   
@@ -2653,7 +2733,7 @@ molmil.viewer.prototype.processPolygon3D = function(struct, vertices, nov_l, noi
       }
     }
     program = molmil.geometry.build_simple_render_program(triangleVertexData, triangleIndexData, this.renderer, {solid: true, alphaMode: alpha != 255});
-    this.renderer.programs.push(program);
+    this.renderer.addProgram(program);
     struct.programs.push(program);
   }
   
@@ -2846,6 +2926,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var pdbx_PDB_model_num = atom_site.pdbx_PDB_model_num;
     var group_PDB = atom_site.group_PDB || [];
   
+  
+    var pdbx_PDB_ins_code = atom_site.pdbx_PDB_ins_code || [];
     var currentChain = null; var ccid = null; var currentMol = null; var cmid = null; var atom;
   
     var struc = null, Xpos, cmnum;
@@ -2873,7 +2955,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a], struc)); struc.chains.push(currentChain);
         currentChain.authName = auth_asym_id[a];
         currentChain.CID = this.CID++;
-        ccid = label_asym_id[a]; cmid = -1;
+        ccid = label_asym_id[a]; cmid = null;
         //console.log(ccid);
       }
       
@@ -2881,11 +2963,11 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       
       if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1) {
         currentChain.molecules.push(currentMol = new molmil.molObject((label_comp_id[a] || auth_comp_id[a]), (label_seq_id[a] || auth_seq_id[a]), currentChain));
-        currentMol.RSID = auth_seq_id[a] || label_seq_id[a];
+        currentMol.RSID = (auth_seq_id[a] || label_seq_id[a])+(pdbx_PDB_ins_code[a] || "");
         currentMol.MID = this.MID++;
         cmid = (label_seq_id[a] || auth_seq_id[a]);
       }
-
+      
       //console.log(Cartn_x[a], Cartn_y[a], Cartn_z[a]);
     
       Xpos = currentChain.modelsXYZ[0].length;
@@ -3291,24 +3373,25 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
     if (mol1.ligand || mol1.water || mol1.xna) continue;
     if (! mol1.previous) chains.push(chain=[]);
     chain.push(mol1);
+    //if (mol1.id == "94") console.log(mol1);
+    //if (mol1.id == "90") console.log(mol1);
     for (m2=m1+2; m2<chainObj.molecules.length; m2++) {
       mol2 = chainObj.molecules[m2]; c2 = mol2.chain;
-      if (mol2.ligand || mol2.water || mol1.xna || ! mol1.N || ! mol2.C || ! mol1.C || ! mol2.N) continue;
+      if (mol2.ligand || mol2.water || mol1.xna || ! mol2.N || ! mol1.C || ! mol2.C || ! mol1.N) continue;
       a[0] = c1.modelsXYZ[0][mol1.N.xyz]; a[1] = c1.modelsXYZ[0][mol1.N.xyz+1]; a[2] = c1.modelsXYZ[0][mol1.N.xyz+2];
       b[0] = c2.modelsXYZ[0][mol2.C.xyz]; b[1] = c2.modelsXYZ[0][mol2.C.xyz+1]; b[2] = c2.modelsXYZ[0][mol2.C.xyz+2];
       NC = distance2(a, b);
-      if (NC < 25 && mol1.NH && mol2.O) {
+      if (NC < 25 && mol2.NH && mol1.O) {
         NC = Math.sqrt(NC);
-        c[0] = c2.modelsXYZ[0][mol2.O.xyz]; c[1] = c2.modelsXYZ[0][mol2.O.xyz+1]; c[2] = c2.modelsXYZ[0][mol2.O.xyz+2];
+        c[0] = c1.modelsXYZ[0][mol1.O.xyz]; c[1] = c1.modelsXYZ[0][mol1.O.xyz+1]; c[2] = c1.modelsXYZ[0][mol1.O.xyz+2];
         NO = Math.sqrt(distance2(a, c));
-        if (mol1.NH == true) {HC = NC - 1.0; HO = NO - 1.0;}
+        if (mol2.NH == true) {HC = NC - 1.0; HO = NO - 1.0;}
         else {
-          HC = Math.sqrt(distance2(mol1.NH.xyz, b));
-          HO = Math.sqrt(distance2(mol1.NH.xyz, c));
+          HC = Math.sqrt(distance2(mol2.NH.xyz, b));
+          HO = Math.sqrt(distance2(mol2.NH.xyz, c));
         }
         E = 0.084*((1/NO) + (1/HC) - (1/HO) - (1/NC))*332;
-        //console.log(NO, HC, HO, NC);
-        if (E < -0.67) {
+        if (E < -0.5) {
           BBBonds[mol1.MID+"-"+mol2.MID] = E;
           //BBBonds[mol2.MID+"-"+mol1.MID] = E;
           if (! BBBondsList.hasOwnProperty(mol1.MID)) BBBondsList[mol1.MID] = [];
@@ -3324,8 +3407,7 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
         NC = Math.sqrt(NC);
         
         c[0] = c1.modelsXYZ[0][mol1.O.xyz]; c[1] = c1.modelsXYZ[0][mol1.O.xyz+1]; c[2] = c1.modelsXYZ[0][mol1.O.xyz+2];
-        
-        
+
         NO = Math.sqrt(distance2(b, c)); //
         if (mol2.NH == true) {HC = NC - 1.0; HO = NO - 1.0;}
         else {
@@ -3333,8 +3415,7 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
           HO = Math.sqrt(distance2(mol2.NH.xyz, c));
         }
         E = 0.084*((1/NO) + (1/HC) - (1/HO) - (1/NC))*332;
-        
-        if (E < -0.67) {
+        if (E < -0.5) {
           //BBBonds[mol1.MID+"-"+mol2.MID] = E;
           BBBonds[mol2.MID+"-"+mol1.MID] = E;
           if (! BBBondsList.hasOwnProperty(mol1.MID)) BBBondsList[mol1.MID] = [];
@@ -3450,11 +3531,6 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
       MID1 = getMID(chains[c][m1]);
       bp1 = bp2 = [c, m1];
       
-      //console.log(BBBonds.hasOwnProperty("90-87"), BBBonds.hasOwnProperty("91-87"), BBBonds.hasOwnProperty("92-87"));
-      // 87-91 --> 1.9822A...
-      
-      //console.log(BBBonds.hasOwnProperty("91-87"), MID1+"-"+getMID(chains[c][m1-4]));
-      
       if ((BBBonds.hasOwnProperty(getMID(chains[c][m1+3])+"-"+MID1)) && ! EOL && (patterns.length < 3 || BBBonds.hasOwnProperty(MID1+"-"+getMID(chains[c][m1-3])))) {
         pattern = 3;
         bp1 = [c, m1];
@@ -3503,7 +3579,7 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
       typedChain.push([pattern, bp1, bp2]);
     }
   }
-  
+
   for (var c=0; c<typedChains.length; c++) {
     typedChain = typedChains[c];
     block = []; patterns = []; pattern = 0;
@@ -3523,15 +3599,13 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
         pattern = typedChain[m1][0];
       }
     }
-    //console.log(patterns);
-    
     for (m1=0; m1<patterns.length; m1++) {
       //console.log(chains[c][Math.max(0, patterns[m1][0]-1)], chains[c][Math.min(chains[c].length-1, patterns[m1][1]+1)]);
       MID1 = Math.max(0, patterns[m1][0]-1);
       MID2 = Math.min(chains[c].length-1, patterns[m1][1]+1);
       
-      //pattern = MID2-MID1 > 4 || chains[c][MID1].sndStruc == 3 || chains[c][MID2].sndStruc == 3 ? 3 : 4;
-      pattern = chains[c][Math.max(0, patterns[m1][0]-1)].sndStruc == 3 || chains[c][Math.min(chains[c].length-1, patterns[m1][1]+1)].sndStruc == 3 ? 3 : 4;
+      pattern = MID2-MID1 > 5 || chains[c][MID1].sndStruc == 3 || chains[c][MID2].sndStruc == 3 ? 3 : 4;
+      //pattern = chains[c][Math.max(0, patterns[m1][0]-1)].sndStruc == 3 || chains[c][Math.min(chains[c].length-1, patterns[m1][1]+1)].sndStruc == 3 ? 3 : 4;
       for (m2=patterns[m1][0]; m2<patterns[m1][1]; m2++) chains[c][m2].sndStruc = pattern;
     }
     
@@ -3796,9 +3870,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
   
   var sphere = molmil.geometry.getSphere(1, detail_lv);
   var cylinder = molmil.geometry.getCylinder(detail_lv);
-  
   var ringTemplate = [];
-  
   var theta = 0.0, rad = 2.0/CB_NOVPR, x, y, p, p_pre, dij;
   for (p=0; p<CB_NOVPR; p++) {
     x = Math.cos(theta*Math.PI);
@@ -3807,35 +3879,54 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     theta += rad;
   }
   
-  var nov = 0, noi = 0;
+  var detail_lv_LQ = molmil.configBox.QLV_SETTINGS[0].SPHERE_TESS_LV;
+  var CB_NOI_LQ = molmil.configBox.QLV_SETTINGS[0].CB_NOI;
+  var CB_NOVPR_LQ = molmil.configBox.QLV_SETTINGS[0].CB_NOVPR;
+  
+  var sphereLQ = molmil.geometry.getSphere(1, detail_lv_LQ);
+  var cylinderLQ = molmil.geometry.getCylinder(detail_lv_LQ);
+  var ringTemplateLQ = [];
+  var theta = 0.0, rad = 2.0/CB_NOVPR_LQ, x, y, p, p_pre, dij;
+  for (p=0; p<CB_NOVPR_LQ; p++) {
+    x = Math.cos(theta*Math.PI);
+    y = Math.sin(theta*Math.PI);
+    ringTemplate.push([x, y, 0]);
+    theta += rad;
+  }
+  
+  
+  var nov = 0, noi = 0, tmpObj;
   
   for (o=0; o<objects.length; o++) {
     object = objects[o];
     if (object.type == "sphere") {
       // create a sphere with radius object.radius on object.coords[0]
-      nov += sphere.vertices.length/3;
-      noi += sphere.indices.length;
+      tmpObj = object.lowQuality ? sphereLQ : sphere;
+      nov += tmpObj.vertices.length/3;
+      noi += tmpObj.indices.length;
     }
     if (object.type == "cylinder") {
       // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
-      nov += cylinder.vertices.length/3;
-      noi += cylinder.indices.length;
-      // for now, no capping...
+      tmpObj = object.lowQuality ? cylinderLQ : cylinder;
+      nov += tmpObj.vertices.length/3;
+      noi += tmpObj.indices.length;
     }
     if (object.type == "dotted-cylinder") {
+      tmpObj = object.lowQuality ? cylinderLQ : cylinder;
       object.N = object.N || 1;
-      nov += (cylinder.vertices.length/3) * object.N;
-      noi += cylinder.indices.length * object.N;
+      nov += (tmpObj.vertices.length/3) * object.N;
+      noi += tmpObj.indices.length * object.N;
       nov += 2 * object.N; // caps
-      noi += cylinder.indices.length * object.N; // caps
+      noi += tmpObj.indices.length * object.N; // caps
     }
     if (object.type == "tube") {
-      nov += (sphere.vertices.length/3) * 2; // caps
-      noi += sphere.indices.length * 2; // caps
+      tmpObj = object.lowQuality ? sphereLQ : sphere;
+      nov += (tmpObj.vertices.length/3) * 2; // caps
+      noi += tmpObj.indices.length * 2; // caps
 
-      
-      nov += CB_NOVPR * object.coords.length;
-      noi += (object.coords.length-1)*CB_NOVPR*2*3 + (CB_NOVPR*3);
+      tmpObj = object.lowQuality ? CB_NOVPR_LQ : CB_NOVPR;
+      nov += tmpObj * object.coords.length;
+      noi += (object.coords.length-1)*tmpObj*2*3 + (tmpObj*3);
     }
   }
   
@@ -3847,8 +3938,9 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
   var vertex = [0, 0, 0, 0], normal = [0, 0, 0, 0], VEC = [0, 0, 0], NORMAL = [0, 0, 0], BINORMAL = [0, 0, 0];
   var r = 4.0, rgba, v=0, vP8=0, vP=0, p=0, iP = 0, v, dx, dy, dz, dij, angle;
   
-  var cylNverts = cylinder.vertices.length/3;
+  var cylNverts;
   var genCylinder = function() {
+    tmpObj = object.lowQuality ? cylinderLQ : cylinder;
     // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
     r = object.radius;
     dx = object.coords[1][0]-object.coords[0][0];
@@ -3859,12 +3951,12 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     angle = Math.acos(-dz);
     mat4.identity(rotationMatrix);
     mat4.rotate(rotationMatrix, rotationMatrix, angle, [dy, -dx, 0.0]);
-    for (v=0; v<cylinder.indices.length; v++, iP++) iBuffer[iP] = cylinder.indices[v]+p; // a2
+    for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p; // a2
       
-    for (v=0; v<cylinder.vertices.length; v+=3, vP8+=28) {
-      vec3.transformMat4(vertex, [cylinder.vertices[v]*r, cylinder.vertices[v+1]*r, cylinder.vertices[v+2]*dij*2], rotationMatrix);
-      //vec3.transformMat4(vertex, [(cylinder.vertices[v]*r)+offsetX, (cylinder.vertices[v+1]*r)+offsetY, (cylinder.vertices[v+2]+offsetZ)*dij], rotationMatrix);
-      vec3.transformMat4(normal, [cylinder.normals[v], cylinder.normals[v+1], cylinder.normals[v+2]], rotationMatrix);
+    for (v=0; v<tmpObj.vertices.length; v+=3, vP8+=28) {
+      vec3.transformMat4(vertex, [tmpObj.vertices[v]*r, tmpObj.vertices[v+1]*r, tmpObj.vertices[v+2]*dij*2], rotationMatrix);
+      //vec3.transformMat4(vertex, [(tmpObj.vertices[v]*r)+offsetX, (tmpObj.vertices[v+1]*r)+offsetY, (tmpObj.vertices[v+2]+offsetZ)*dij], rotationMatrix);
+      vec3.transformMat4(normal, [tmpObj.normals[v], tmpObj.normals[v+1], tmpObj.normals[v+2]], rotationMatrix);
 
       vBuffer[vP++] = vertex[0]+object.coords[1][0];
       vBuffer[vP++] = vertex[1]+object.coords[1][1];
@@ -3881,25 +3973,26 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       vP++
     } 
           
-    p += cylinder.vertices.length / 3;
+    p += tmpObj.vertices.length / 3;
   }
   
   var genSphere = function(idx) {
     // create a sphere with radius object.radius on object.coords[0]
+    tmpObj = object.lowQuality ? detail_lv_LQ : detail_lv;
     idx = idx || 0;
     r = object.radius;
-    sphere = molmil.geometry.getSphere(r, detail_lv);
+    tmpObj = molmil.geometry.getSphere(r, tmpObj);
 
-    for (v=0; v<sphere.indices.length; v++, iP++) iBuffer[iP] = sphere.indices[v]+p;
+    for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p;
     
-    for (v=0; v<sphere.vertices.length; v+=3, vP8+=28) {
-      vBuffer[vP++] = sphere.vertices[v]+object.coords[idx][0];
-      vBuffer[vP++] = sphere.vertices[v+1]+object.coords[idx][1];
-      vBuffer[vP++] = sphere.vertices[v+2]+object.coords[idx][2];
+    for (v=0; v<tmpObj.vertices.length; v+=3, vP8+=28) {
+      vBuffer[vP++] = tmpObj.vertices[v]+object.coords[idx][0];
+      vBuffer[vP++] = tmpObj.vertices[v+1]+object.coords[idx][1];
+      vBuffer[vP++] = tmpObj.vertices[v+2]+object.coords[idx][2];
     
-      vBuffer[vP++] = sphere.normals[v];
-      vBuffer[vP++] = sphere.normals[v+1];
-      vBuffer[vP++] = sphere.normals[v+2];
+      vBuffer[vP++] = tmpObj.normals[v];
+      vBuffer[vP++] = tmpObj.normals[v+1];
+      vBuffer[vP++] = tmpObj.normals[v+2];
 
       vBuffer8[vP8+24] = rgba[0];
       vBuffer8[vP8+25] = rgba[1];
@@ -3907,7 +4000,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       vBuffer8[vP8+27] = rgba[3];
       vP++
     }
-    p += sphere.vertices.length / 3;
+    p += tmpObj.vertices.length / 3;
     
   }
   // in the future also add support for billboarded spheres...
@@ -3915,17 +4008,20 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
   var genTube = function() {
     genSphere();
     
+    tmpObj = object.lowQuality ? ringTemplateLQ : ringTemplate;
+    var CB_NOVPR__ = object.lowQuality ? CB_NOVPR_LQ : CB_NOVPR;
+    
     r = object.radius;
     
-    for (i=0; i<ringTemplate.length; i++) {
+    for (i=0; i<tmpObj.length; i++) {
       iBuffer[iP++] = p+i+2;
       iBuffer[iP++] = p+i+1;
       iBuffer[iP++] = p;
     }
     iBuffer[iP-3] = p+1;
   
-    //p += ringTemplate.length+1;
-    p_pre = p-CB_NOVPR;
+    //p += tmpObj.length+1;
+    p_pre = p-CB_NOVPR__;
     
     
     var rotationMatrix = mat4.create(), identityMatrix = mat4.create();
@@ -3965,14 +4061,14 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       Bx = BINORMAL[0]; By = BINORMAL[1]; Bz = BINORMAL[2];
       Nx = NORMAL[0]; Ny = NORMAL[1]; Nz = NORMAL[2];
       
-      for (i=0; i<ringTemplate.length; i++, vP8+=28) {
-        vBuffer[vP++] = r*ringTemplate[i][0] * Nx + r*ringTemplate[i][1] * Bx + Px;
-        vBuffer[vP++] = r*ringTemplate[i][0] * Ny + r*ringTemplate[i][1] * By + Py;
-        vBuffer[vP++] = r*ringTemplate[i][0] * Nz + r*ringTemplate[i][1] * Bz + Pz;
+      for (i=0; i<tmpObj.length; i++, vP8+=28) {
+        vBuffer[vP++] = r*tmpObj[i][0] * Nx + r*tmpObj[i][1] * Bx + Px;
+        vBuffer[vP++] = r*tmpObj[i][0] * Ny + r*tmpObj[i][1] * By + Py;
+        vBuffer[vP++] = r*tmpObj[i][0] * Nz + r*tmpObj[i][1] * Bz + Pz;
 
-        vBuffer[vP++] = ringTemplate[i][0] * Nx + ringTemplate[i][1] * Bx;
-        vBuffer[vP++] = ringTemplate[i][0] * Ny + ringTemplate[i][1] * By;
-        vBuffer[vP++] = ringTemplate[i][0] * Nz + ringTemplate[i][1] * Bz;
+        vBuffer[vP++] = tmpObj[i][0] * Nx + tmpObj[i][1] * Bx;
+        vBuffer[vP++] = tmpObj[i][0] * Ny + tmpObj[i][1] * By;
+        vBuffer[vP++] = tmpObj[i][0] * Nz + tmpObj[i][1] * Bz;
 
         vBuffer8[vP8+24] = rgba[0];
         vBuffer8[vP8+25] = rgba[1];
@@ -3982,7 +4078,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       }
       
       if (v > 0) {
-        for (i=0; i<(CB_NOVPR*2)-2; i+=2, p+=1, p_pre+=1) {
+        for (i=0; i<(CB_NOVPR__*2)-2; i+=2, p+=1, p_pre+=1) {
           iBuffer[iP++] = p;
           iBuffer[iP++] = p_pre;
           iBuffer[iP++] = p_pre+1;
@@ -3993,17 +4089,17 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
         }
         iBuffer[iP++] = p;
         iBuffer[iP++] = p_pre;
-        iBuffer[iP++] = p_pre-(CB_NOVPR-1);
+        iBuffer[iP++] = p_pre-(CB_NOVPR__-1);
 
-        iBuffer[iP++] = p_pre-(CB_NOVPR-1);
-        iBuffer[iP++] = p-(CB_NOVPR-1);
+        iBuffer[iP++] = p_pre-(CB_NOVPR__-1);
+        iBuffer[iP++] = p-(CB_NOVPR__-1);
         iBuffer[iP++] = p;
 
         p++; p_pre++;
       }
       else {
-        p += CB_NOVPR;
-        p_pre += CB_NOVPR;
+        p += CB_NOVPR__;
+        p_pre += CB_NOVPR__;
       }
     }
     
@@ -4021,6 +4117,8 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       genTube();
     }
     if (object.type == "dotted-cylinder") {
+      tmpObj = object.lowQuality ? cylinderLQ : cylinder;
+      cylNverts = tmpObj.vertices.length/3
       tmp1 = [object.coords[0][0], object.coords[0][1], object.coords[0][2]];
       tmp2 = [(object.coords[1][0]-object.coords[0][0])/object.N, (object.coords[1][1]-object.coords[0][1])/object.N, (object.coords[1][2]-object.coords[0][2])/object.N];
       for (i=0; i<object.N; i++) {
@@ -4051,7 +4149,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
         vBuffer8[vP8+27] = rgba[3];
         vP++; vP8 += 28;
         
-        for (v=0; v<cylinder.vertices.length/6; v++) {
+        for (v=0; v<tmpObj.vertices.length/6; v++) {
           iBuffer[iP++] = p;
           iBuffer[iP++] = v*2 + p+2;
           iBuffer[iP++] = (v+1)*2 + p+2;
@@ -4080,7 +4178,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
         vBuffer8[vP8+27] = rgba[3];
         vP++; vP8 += 28;
         
-        for (v=0; v<cylinder.vertices.length/6; v++) {
+        for (v=0; v<tmpObj.vertices.length/6; v++) {
           iBuffer[iP++] = (v+1)*2 + p - cylNverts;
           iBuffer[iP++] = v*2 + p - cylNverts;
           iBuffer[iP++] = p;
@@ -4094,7 +4192,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
   }
 
   var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, programOptions);
-  soup.renderer.programs.push(program);
+  soup.renderer.addProgram(program);
   soup.renderer.initBuffers();
   soup.canvas.update = true;
   return program;
@@ -4200,9 +4298,20 @@ molmil.geometry.generate = function(structures, render, detail_or) {
 
 molmil.geometry.build_simple_render_program = function(vertices_, indices_, renderer, settings) {
   var gl = renderer.gl;
-          
-  var program = {}; program.settings = settings;
+
+  settings = settings || {};
+  if (settings.hasOwnProperty("setBuffers")) {
+    var program = settings;
+    settings = program.settings;
+  }
+  else {
+    var program = {}; program.settings = settings;
+  }
   program.gl = renderer.gl; program.renderer = renderer;
+  
+  program.rebuild = function() {
+    molmil.geometry.build_simple_render_program(null, null, this.renderer, this);
+  };
   
   program.setBuffers = function(vertices, indices) {
     var vbuffer = this.gl.createBuffer();
@@ -4397,8 +4506,9 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       molmil.bindAttribute(this.gl, this.standard_attributes.in_Colour, 4, this.gl.UNSIGNED_BYTE, true, 28, 24);
     }
     molmil.clearAttributes(this.gl);
-
+    
     if (this.settings.alphaMode) { // it's not actually making the stuff transparent...
+      if (! molmil.configBox.cullFace) {this.gl.enable(this.gl.CULL_FACE); this.gl.cullFace(this.gl.BACK);}
       this.gl.enable(this.gl.BLEND);
       this.gl.blendEquation(this.gl.FUNC_ADD); 
       this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -4414,6 +4524,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     else this.gl.drawElements(this.gl.TRIANGLES, this.nElements, gl.INDEXINT, 0);
     
     if (this.settings.alphaMode) {
+      if (! molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
       this.gl.disable(this.gl.BLEND);
       this.gl.depthMask(true);
     }
@@ -4503,27 +4614,27 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
 molmil.geometry.registerPrograms = function(renderer)  {
   if (! renderer.program1) {
     renderer.program1 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
-    renderer.programs.push(renderer.program1);
+    renderer.addProgram(renderer.program1);
   }
   if (! renderer.program2) {
     renderer.program2 = this.build_simple_render_program(null, null, renderer, {has_ID: true, lines_render: true});
-    renderer.programs.push(renderer.program2);
+    renderer.addProgram(renderer.program2);
   }
   if (! renderer.program3) {
     renderer.program3 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
-    renderer.programs.push(renderer.program3);
+    renderer.addProgram(renderer.program3);
   }
   if (! renderer.program4 || this.buffer4.reinit) {
     if (renderer.program4) renderer.programs.splice(renderer.programs.indexOf(renderer.program4), 1);
     renderer.program4 = this.build_simple_render_program(null, null, renderer, {has_ID: false, solid: true, alphaMode: this.buffer4.alphaMode});
-    renderer.programs.push(renderer.program4);
+    renderer.addProgram(renderer.program4);
   }
   
   if (molmil.configBox.EXT_frag_depth) {
   
     if (! renderer.program5) {
       renderer.program5 = this.build_simple_render_program(null, null, renderer, {has_ID: true, imposterPoints: true});
-      renderer.programs.push(renderer.program5);
+      renderer.addProgram(renderer.program5);
     }
     renderer.program5.setBuffers(this.buffer5.vertexBuffer, this.buffer5.indexBuffer);
   }
@@ -4819,7 +4930,7 @@ molmil.geometry.generateAtomsImposters = function() {
   var p = vP/7;
   
   for (a=0; a<atoms2draw.length; a++) {
-    if (atoms2draw[a].displayMode == 1) r = molmil_dep.getKeyFromObject(vdwR, atoms2draw[a].element, vdwR.DUMMY);
+    if (atoms2draw[a].displayMode == 1) r = molmil_dep.getKeyFromObject(vdwR, atoms2draw[a].element, vdwR.DUMMY)*molmil.configBox.vdwSphereMultiplier;
     else if (atoms2draw[a].displayMode == 2) r = .33;
     else r = .15;
 
@@ -4880,7 +4991,7 @@ molmil.geometry.generateAtoms = function() {
   var nov = sphere.vertices.length/3;
   
   for (a=0; a<atoms2draw.length; a++) {
-    if (atoms2draw[a].displayMode == 1) r = molmil_dep.getKeyFromObject(vdwR, atoms2draw[a].element, vdwR.DUMMY);
+    if (atoms2draw[a].displayMode == 1) r = molmil_dep.getKeyFromObject(vdwR, atoms2draw[a].element, vdwR.DUMMY)*molmil.configBox.vdwSphereMultiplier;
     else if (atoms2draw[a].displayMode == 2) r = .33;
     else r = .15;
   
@@ -6856,6 +6967,11 @@ molmil.render.prototype.clear = function() {
   
 };
 
+molmil.render.prototype.addProgram = function(program) {
+  if (program.settings.alphaMode) this.programs.push(program);
+  else this.programs.unshift(program);
+}
+
 molmil.render.prototype.reloadSettings=function() {
   this.QLV = localStorage.getItem("molmil.settings_QLV");
   if (this.QLV == null) {
@@ -7467,12 +7583,16 @@ molmil.render.prototype.renderAtomSelection = function(modelViewMatrix, COR) {
   molmil.bindAttribute(this.gl, this.shaders.atomSelection.attributes.in_ScreenSpaceOffset, 2, this.gl.FLOAT, false, 32, 24);
   molmil.clearAttributes(this.gl);
   
+  
   this.gl.enable(this.gl.BLEND); if (molmil.configBox.cullFace) {this.gl.disable(this.gl.CULL_FACE);}
   this.gl.blendEquation(this.gl.FUNC_ADD); this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+  this.gl.depthMask(false);
   
   this.gl.drawArrays(this.gl.TRIANGLES, 0, this.buffers.atomSelectionBuffer.items);
   
   if (molmil.configBox.cullFace) {this.gl.enable(this.gl.CULL_FACE);} this.gl.disable(this.gl.BLEND);
+  this.gl.disable(this.gl.BLEND);
+  this.gl.depthMask(true);
 };
 
 // fbo
@@ -8631,7 +8751,7 @@ molmil.UI.prototype.showResidues=function(target, payload) {
   payload = payload instanceof Array ? payload[0] : payload;
   for (var i=0; i<payload.molecules.length; i++) {
     mol = payload.molecules[i];
-    item = target.pushNode("div", mol.name+(mol.id ? " ("+mol.id+")" : ""));
+    item = target.pushNode("div", mol.name+(mol.RSID ? " ("+mol.RSID+")" : ""));
     item.title = "Double click to jump to residue\nRight click to show the context menu for display & color options";
     item.className = "optCat_n";
     item.payload = mol; item.UI = this.UI;
@@ -8969,9 +9089,12 @@ molmil.UI.prototype.configureSlab=function(target) {
     }
     else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
   };
+
   var szI = Math.min(this.soup.geomRanges[0], this.soup.geomRanges[2], this.soup.geomRanges[4]) + molmil.configBox.zNear;
   var szA = Math.max(this.soup.geomRanges[1], this.soup.geomRanges[3], this.soup.geomRanges[5]) + molmil.configBox.zNear;
-  
+
+  if (szI > szA - 1) szA = szI + 1;
+ 
   slab_near.min = slab_far.min = szI;
   slab_near.max = slab_far.max = szA;
   
@@ -9579,29 +9702,28 @@ molmil.UI.prototype.savePNG=function() {
   
   popup.save = popup.pushNode("button", "Save"); popup.range.canvas = popup.save.canvas = this.canvas;
   popup.save.onclick = function() {
+    var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
     var mult = parseInt(popup.range.value);
     if (mult != 1) {
       var width = this.canvas.width; var height = this.canvas.height; var opacity = molmil.configBox.BGCOLOR[3];
       // there appears to be a problem with chrome and changing the canvas w/h --> but only at very high resolutions...
-      this.canvas.width *= mult; this.canvas.height *= mult; molmil.configBox.BGCOLOR[3] = 0;
+      this.canvas.width *= mult; this.canvas.height *= mult; 
       this.canvas.renderer.selectDataContext(); this.canvas.renderer.resizeViewPort();
       this.canvas.update = true; this.canvas.renderer.render();
       this.canvas.toBlob(function(blob) {saveAs(blob, "image.png");});
       this.canvas.renderer.selectDefaultContext();
-      this.canvas.width = width; this.canvas.height = height; molmil.configBox.BGCOLOR[3] = opacity;
+      this.canvas.width = width; this.canvas.height = height;
       this.canvas.renderer.resizeViewPort();
-      this.canvas.update = true; this.canvas.renderer.render();
     }
     else {
-      var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
       this.canvas.renderer.selectDataContext();
       this.canvas.update = true;
       this.canvas.renderer.render();
       this.canvas.toBlob(function(blob) {saveAs(blob, "image.png");});
       this.canvas.renderer.selectDefaultContext();
-      molmil.configBox.BGCOLOR[3] = opacity;
-      this.canvas.update = true; this.canvas.renderer.render();
     }
+    molmil.configBox.BGCOLOR[3] = opacity;
+    this.canvas.update = true; this.canvas.renderer.render();
   
     popup.cancel.onclick();
   };
@@ -11250,8 +11372,7 @@ molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't dr
 
   if (typeof(settings.solid) == "undefined") settings.solid = true;
   var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, settings);
-  
-  soup.renderer.programs.push(program);
+  soup.renderer.addProgram(program);
   
   soup.calculateCOG();
   
@@ -12532,7 +12653,7 @@ molmil.toggleBU = function(assembly_id, displayMode, colorMode, struct, soup) {
       program.vertexBuffer = vbuffer; program.indexBuffer = ibuffer; program.nElements = noe;
       program.BUprogram = true; program.matrices = matrices; program.uniform_color = uniform_color;
       
-      if (program.matrices.length) renderer.programs.push(program);
+      if (program.matrices.length) renderer.addProgram(program);
       if (rangeInfo) {A = rangeInfo[0]; B = rangeInfo[1];}
       else {
         try {soup.BUcache[asym_ids[i]][displayMode][4] = [[A[0], A[1], A[2]], [B[0], B[1], B[2]]];}
@@ -12684,11 +12805,11 @@ molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between gr
   if (! (group1 instanceof Array)) group1 = [group1];
   if (! (group2 instanceof Array)) group2 = [group2];
     
+    
   // acceptors: list of acceptor atom
   // donors: list of [donor atom, hydrogen atom]
   var acceptors1 = [], acceptors2 = [], donors1 = [], donors2 = []; // first fetch all the possible acceptors and donors from each group...
   var c, i, j, a, a2, hcon = {}, nbonds = {};
-    
     
     
   var getAcceptors4Chain = function(chain, target) {
@@ -12749,13 +12870,13 @@ molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between gr
   }
     
   // now find matches between acceptors1-donors2 and acceptors2-donors1 (within 3A D-A and 45degrees D-H-A)
-    
+  
   var pairs = [];
     
   for (i=0; i<acceptors1.length; i++) {
     for (j=0; j<donors2.length; j++) {
       r = molmil.calcMMDistance(acceptors1[i], donors2[j][0], soup);
-      if (r < 3.0) {
+      if (r < 3.5) {
         theta = molmil.calcMMAngle(acceptors1[i], donors2[j][1], donors2[j][0], soup);
         if (theta > 135) pairs.push([acceptors1[i], donors2[j][1]]);
       }
@@ -12765,22 +12886,58 @@ molmil.calcHbonds  = function(group1, group2, soup) { // find H-bonds between gr
   for (i=0; i<acceptors2.length; i++) {
     for (j=0; j<donors1.length; j++) {
       r = molmil.calcMMDistance(acceptors2[i], donors1[j][0], soup);
-      if (r < 3.0) {
+      if (r < 3.5) {
         theta = molmil.calcMMAngle(acceptors2[i], donors1[j][1], donors1[j][0], soup);
         if (theta > 135) pairs.push([acceptors2[i], donors1[j][1]]);
       }
     }
   }
-    
   // now create some 3D graphics to depict these bonds...
-  var objects = [], object;
-  for (i=0; i<pairs.length; i++) objects.push({type: "dotted-cylinder", coords: [molmil.getAtomXYZ(pairs[i][0], soup), molmil.getAtomXYZ(pairs[i][1], soup)], rgba: [255, 165, 0, 255], radius: 0.0625, N: 5});
-  
-  molmil.geometry.generator(objects, soup, "Hydrogen bonds", {solid: true});
+  renderHbonds(pairs, soup);
     
   return pairs;
 }
+
+function renderHbonds(pairs, soup) {
+  if (! pairs.length) return;
+  var objects = [], object, i;
+  if (pairs[0][0] instanceof molmil.atomObject) {
+    for (i=0; i<pairs.length; i++) objects.push({lowQuality: true, type: "cylinder", coords: [molmil.getAtomXYZ(pairs[i][0], soup), molmil.getAtomXYZ(pairs[i][1], soup)], rgba: [0, 0, 255, 255], radius: 0.0375});
+  }
+  else {
+    for (i=0; i<pairs.length; i++) objects.push({lowQuality: true, type: "cylinder", coords: [pairs[i][0], pairs[i][1]], rgba: [0, 0, 255, 255], radius: 0.0375});
+  }
+  molmil.geometry.generator(objects, soup, "Hydrogen bonds", {solid: true});
+}
+
+function renderPIinteractions(pairs, soup) {
+  if (! pairs.length) return;
   
+  var objects = [], object, i;
+  for (i=0; i<pairs.length; i++) {
+    objects.push({type: "sphere", coords: [pairs[i][0]], rgba:[255, 255, 255, 255], radius: 0.15});
+    objects.push({type: "sphere", coords: [pairs[i][1]], rgba:[255, 255, 255, 255], radius: 0.15});
+    objects.push({lowQuality: true, type: "dotted-cylinder", coords: [pairs[i][0], pairs[i][1]], rgba: [0, 255, 0, 255], radius: 0.0375, N: 4});
+  }
+  
+  molmil.geometry.generator(objects, soup, "PI interactions", {solid: true});
+}
+
+function renderSaltBridges(pairs, soup) {
+  if (! pairs.length) return;
+  
+  var objects1 = [], objects2 = [], object, i, X1, X2;
+  for (i=0; i<pairs.length; i++) {
+    if (pairs[0][0] instanceof molmil.atomObject) {X1 = molmil.getAtomXYZ(pairs[i][0], soup); X2 = molmil.getAtomXYZ(pairs[i][1], soup);}
+    else {X1 = pairs[i][0]; X2 = pairs[i][1];}
+    objects1.push({type: "sphere", coords: [X1], rgba:[235, 235, 35, 127], radius: .25});
+    objects1.push({type: "sphere", coords: [X2], rgba:[235, 235, 35, 127], radius: .25});
+    objects2.push({lowQuality: true, type: "dotted-cylinder", coords: [X1, X2], rgba: [235, 235, 35, 255], radius: 0.0375, N: 6});
+  }
+  
+  molmil.geometry.generator(objects1, soup, "PI interactions", {solid: true, alphaMode: true});
+  molmil.geometry.generator(objects2, soup, "PI interactions", {solid: true});
+}
 
 molmil.hslToRgb123 = function (h, s, l) {
   var r, g, b;
@@ -13634,7 +13791,18 @@ molmil.bindCanvasInputs = function(canvas) {
   canvas.inputFunctions.push(function(canvas, fr) {
     if (fr.filename.indexOf(".cor", fr.filename.length-4) !== -1 || fr.filename.indexOf(".cod", fr.filename.length-4) !== -1) {
       fr.onload = function(e) {
-        canvas.molmilViewer.loadStructureData(e.target.result, "psygene-traj", this.filename);
+        canvas.molmilViewer.loadStructureData(e.target.result, "presto-traj", this.filename);
+      }
+      fr.readAsArrayBuffer(fr.fileHandle);
+      return true;
+    }
+  });
+  
+  // mypresto mnt file
+  canvas.inputFunctions.push(function(canvas, fr) {
+    if (fr.filename.indexOf(".mnt", fr.filename.length-4) !== -1) {
+      fr.onload = function(e) {
+        canvas.molmilViewer.loadStructureData(e.target.result, "presto-mnt", this.filename);
       }
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
@@ -13820,6 +13988,23 @@ molmil.selectionFocus = function(soup, t) {
   
   molmil.zoomTo([avgX, avgY, avgZ], soup.COR, [0.0, 0.0, soup.calcZ(geomRanges)], soup, t);
 };
+
+molmil.findResidue = function(resInfo, soup) {
+  soup = soup || molmil.cli_soup;
+  
+  var chains = [];
+  if (resInfo.chain) {for (var c=0; c<soup.chains.length; c++) {if (soup.chains[c].name == resInfo.chain) {chains.push(soup.chains[c]); break;}}}
+  else chains = soup.chains;
+  
+  var out = [], chain;
+  for (var c=0; c<chains.length; c++) {
+    chain = chains[c];
+    for (var m=0; m<chain.molecules.length; m++) {
+      if (resInfo.name && chain.molecules[m].name.toLowerCase() == resInfo.name.toLowerCase() && chain.molecules[m].id == resInfo.id) out.push(chain.molecules[m]);
+    }
+  }
+  return out;
+}
 
 molmil.selectSequence = function(seq, soup) {
   soup = soup || molmil.cli_soup;
