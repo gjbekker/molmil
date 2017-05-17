@@ -7008,7 +7008,7 @@ molmil.render.prototype.addProgram = function(program) {
 
 molmil.render.prototype.removeProgram = function(program) {
   if (program instanceof Array) {
-    for (var i=0; i<programs.length; i++) this.removeProgram(programs[i]);
+    for (var i=0; i<program.length; i++) this.removeProgram(program[i]);
     return;
   }
   var ndx = this.programs.indexOf(program);
