@@ -14,7 +14,8 @@
     "uniform_color": -1,
     "backgroundColor": -1,
     "slabNear": -1,
-    "slabFar": -1
+    "slabFar": -1,
+    "slabColor": -1
   }
 }
 //#vertex
@@ -108,6 +109,10 @@ uniform vec4 backgroundColor;
 uniform float slabNear, slabFar;
 #endif
 
+#ifdef ENABLE_SLABCOLOR
+  uniform vec4 slabColor;
+#endif
+
 void main() {
 #ifdef ENABLE_SLAB
   if (Pz < slabNear || Pz > slabFar+1.0) discard; // later change the slabFar functionality to a more fog-like function..
@@ -115,7 +120,7 @@ void main() {
 
   vec3 normal = normalize(ex_Normal);
   vec3 lightDir = normalize(lightPos - vertPos);
-
+  
   float lambertian = clamp(dot(normal, lightDir), 0.0, 1.0);
   float specular = 0.0;
   
@@ -144,10 +149,19 @@ void main() {
 
 #ifdef ENABLE_SLAB
   if (Pz > slabFar) gl_FragColor = mix(backgroundColor, color, clamp((slabFar+1.-Pz) / (1.0), 0.00, 1.0));
+  
+#ifdef ENABLE_SLABCOLOR
+  if (gl_FrontFacing == false) gl_FragColor = slabColor;
+#endif
+  
 #endif
 
 #ifdef ALPHA_MODE
   gl_FragColor.a = 1.0 - pow(max(1.0-ex_Colour.a,0.0), 1.0/max(abs(normal.z),0.01));
 #endif
+
+ #ifdef ENABLE_SLABCOLOR
+  if (gl_FrontFacing == false) gl_FragColor = slabColor;
+ #endif
 
 }

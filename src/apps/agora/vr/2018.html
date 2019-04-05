@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="style.css" type="text/css"/>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.4.3/seedrandom.min.js"></script>
+  <script>
+  
+    var molmil_settings = {src: "../../../"};
+    var canvas, cli;
+  
+    function initViewer() {
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      
+      molmil.configBox.BGCOLOR = [0, 0, 0, 1];
+      
+      canvas = document.getElementById("molmilViewer");
+      canvas.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.height = (window.innerHeight || document.documentElement.clientHeight);
+      canvas = molmil.createViewer(canvas);
+      
+      window.onresize = function() {
+        var dpr = devicePixelRatio || 1;
+        canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+        canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+        canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+        canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+        canvas.renderer.resizeViewPort();
+        canvas.update = true;
+      };
+      
+      canvas.molmilViewer.calcZ = function() {return 0;}
+      
+      canvas.molmilViewer.skipCOGupdate = true;
+      
+      molmil.autoSetup();
+      
+      //loadEntry("1crn", [9.26882874617737, 9.787284403669727, 6.967088685015288], -10, 12, 100);
+      //loadEntry("2prg", [51.14223041566734, -17.634338529176617, 24.122671862509975], 10, 50, 250);
+      //loadEntry("5wsd", [26.116029824561384, -1.8664258771929814, 2.761166228070172], 50, 40, 180);
+      //loadEntry("5bx2", [63.877416311452535, 53.471942455242974, 68.18808695652191], -50, 40, 275);
+      //loadEntry("5h8y", [-90.28249734964311, 51.05564785932719, -0.010721151885848018], -50, 40, 540);
+      
+      //return;
+      
+      //loadEntry("structures/emdb-1887.mpbf", [0, 0, 0], "debug", 385, false); // add BU support...
+      //loadEntry("1mbn", [0, 0, 0], "debug", 385, false); // add BU support...
+      
+      
+      //return;
+      
+      
+      var visualize_2ht7 = function (strucs) { // protein: cartoon, ligand: sticks
+        for (var i=0; i<strucs.length; i++) {
+          molmil.displayEntry(strucs[i].chains[0], molmil.displayMode_Default);
+          molmil.displayEntry(strucs[i].chains[1], molmil.displayMode_Spacefill);
+        }
+        molmil.colorEntry(strucs, molmil.colorEntry_Default);
+      };
+      var visualize_1bbt = function (strucs) {
+        molmil.colorEntry(strucs, molmil.colorEntry_ChainAlt);
+        molmil.displayEntry(strucs, molmil.displayMode_ChainSurfaceCG);
+      };
+      var visualize_1mbn = function(strucs) {
+        molmil.displayEntry(strucs[0].chains[0], molmil.displayMode_Default);
+        molmil.displayEntry(strucs[0].chains[2], molmil.displayMode_Spacefill); // HEM
+        molmil.colorEntry(strucs, molmil.colorEntry_Default);
+      };
+      var visualize_3rif = function(strucs) {
+        molmil.displayEntry(strucs, molmil.displayMode_Default);
+        molmil.colorEntry(strucs, molmil.colorEntry_Default);
+        
+        molmil.displayEntry(strucs[0].chains[5], molmil.displayMode_Spacefill);
+        molmil.displayEntry(strucs[0].chains[10], molmil.displayMode_Spacefill);
+        molmil.displayEntry(strucs[0].chains[17], molmil.displayMode_Spacefill);
+        molmil.displayEntry(strucs[0].chains[19], molmil.displayMode_Spacefill);
+        molmil.displayEntry(strucs[0].chains[22], molmil.displayMode_Spacefill);
+        
+        molmil.displayEntry(strucs[0].chains[6], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[7], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[8], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[9], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[10], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[11], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[12], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[13], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[14], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[15], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[16], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[18], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[20], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[21], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[23], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[24], molmil.displayMode_None);
+        molmil.displayEntry(strucs[0].chains[25], molmil.displayMode_None);
+      };
+      
+      var list = [];
+      list.push(["2ht7", [0, 0, -12.998189203296821], 52.52, visualize_2ht7, []]);
+      //list.push(["1bbt", [0, 0, 0], 161.08, visualize_1bbt, []]);
+      list.push(["structures/1bbt.mpbf", [0, 0, 0], 161.08]);
+      list.push(["1mbn", [14.077157360406089, 22.322335025380728, 7.487817258883243], 21.01, visualize_1mbn]);
+      list.push(["3rif", [13.277027176416455, 84.8801607554124, 49.29636204514049], 66.52, visualize_3rif]);
+      list.push(["structures/emdb-1887.mpbf", [248.74975892474137, 217.52950144358627, 156.11522220394386], 272.38]);
+      
+      
+      
+      
+/*
+2ht7
+1bbt
+EMDB-1887
+1mbn
+3rif
+*/
+      
+     // return;
+      
+      //return loadEntry("1brd", [0, 0, 0], "debug", 0, false); // add BU support...
+      //return loadEntry("structures/emdb-1887.mpbf", [0, 0, 0], "debug", 0, false); // add BU support...
+      
+      
+      //list.push(["2vzn", [38.06898148148149, 1.3999398148148157, 7.457990740740742], 18]);
+      //list.push(["5x2p", [46.27563619909505, 35.61148144796375, 23.219192760180977], 31.5]);
+      //list.push(["3rif", [11.860711733462125, 72.275527764365, 56.2790103814583], 56.6]);
+      //list.push(["1mbn",  [14.077157360406089, 22.322335025380728, 7.487817258883243], 14]);
+      //list.push(["1aon", [79.17751583146372, -51.61509660932439, -6.00893792071797], 68.4]);
+      //list.push(["structures/1brd.mpbf", [17.742746904621953, -0.8787130439011177, 3.1471739138359323], 35]);
+      //list.push(["structures/emdb-1887.mpbf", [248.74975892474137, 217.52950144358627, 156.11522220394386], 150]);
+      
+      // make some function to load an entry and place it somewhere...
+      distributeEntries(list);
+      
+      setupGamepad();
+      
+    }
+  
+  </script>
+  
+  <script type="text/javascript" src="script.js" charset="utf-8"></script>
+  <script type="text/javascript" src="../../../molmil.js"></script>
+  
+</head>
+<body onload="initViewer()">
+  <div class="molmil_popup_outer">
+    <div class = "molmil_popup_inner">
+    </div>
+  </div>
+  <div class="molmil_UI_container">
+    <canvas id="molmilViewer">
+    </canvas>
+  </div>
+  <div class="startbutton" onclick="molmil.startWebVR(canvas.molmilViewer);">Enable Molmil VR</div>
+</body>
+</html>

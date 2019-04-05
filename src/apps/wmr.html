@@ -1,0 +1,86 @@
+<html>
+  <head>
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
+  <style>
+    html, body {
+      width:  100%;
+      height: 100%;
+      margin: 0px;
+      padding: 0px;
+      overflow:auto;
+      
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      
+      font-family: verdana, meiryo, sans-serif, Arial Unicode MS, Cambria Math;
+      
+    }
+  
+    .molmil_UI_container {
+    }
+    
+    .welcome {
+      color: white;
+      font-size: 5em;
+      white-space: nowrap;
+    }
+    
+  </style>
+  
+  <script>
+    var molmil_settings = {src: "../"};
+
+    var canvas, cli;
+  
+    function initViewer() {
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      
+      molmil.configBox.BGCOLOR = [0, 0, 0, 1];
+      molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
+      
+      canvas = document.getElementById("molmilViewer");
+      canvas.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.height = (window.innerHeight || document.documentElement.clientHeight);
+      canvas = molmil.createViewer(canvas);
+      
+      window.onresize = function() {
+        var dpr = devicePixelRatio || 1;
+        canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+        canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+        if (molmil.configBox.stereoMode != 3) {
+          canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+          canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+          canvas.renderer.resizeViewPort();
+        }
+        canvas.update = true;
+      };
+      
+      molmil.autoSetup();
+      
+    }
+    
+
+  </script>
+  
+  </head>
+  
+  <body onload="initViewer();">
+    <div class="molmil_popup_outer" style="z-index: 1; top: -.5em;">
+      <div class = "molmil_popup_inner">
+
+      </div>
+    </div>
+    <div class="molmil_UI_container">
+      <canvas id="molmilViewer">
+      </canvas>
+    </div>
+  </body>
+  
+  <script src="../molmil.js"></script>
+</html>

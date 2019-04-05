@@ -1,0 +1,181 @@
+<html>
+<head>
+</head>
+
+<body>
+
+<pre>
+Molmil: https://pdbj.org/molmil_alpha/
+
+3D operations
+
+Rotate: hold left mouse button and drag
+Translate (x/y): (hold left+right mouse button, or hold scroll button, or hold left mouse button + shift key) and drag
+Zoom (z): hold right mouse button and drag
+
+Calculate distance between two atoms: Left click on first atom, Ctrl+left click on second atom
+Calculate angle between three atoms: Left click on first atom, Ctrl+left click on second atom, Ctrl+left click on third atom
+Calculate dihedral between four atoms: Left click on first atom, Ctrl+left click on second atom, Ctrl+left click on third atom, Ctrl+left click on fourth atom
+
+Menu operations:
+
+Show list of files/chains/residues (Structures menu): left mouse click on the right-side menu (>>>), click on the files/chains to see the underlying chains/residues. Right click on the files/chains/residues to modify the styling
+
+Show information about atom and show the styling menu (can be used to style corresponding residue/chain and display nearby residues): right click on any atom in the canvas
+
+Open file from the local drive:
+  1) Molmil menu (top left) -> Open
+  2) Drag-and-drop files from the local drive into the Molmil window
+  
+Save PNG: Molmil menu -> Save -> PNG image
+
+Settings: Molmil menu -> Settings (quality, loop/sheet smoothing, fog, projection mode, color scheme, background color)
+
+Slab: Molmil menu -> View -> Configure slab
+
+Show Biological Unit: Molmil menu -> View -> Configure BU
+
+Animation (PDB model or MD trajectory): Molmil menu -> Animation
+
+Full screen: Molmil menu -> Enable full-screen
+
+WebVR: Molmil menu -> Enable WebVR
+
+Show Command line interface:
+  1) Molmil menu -> Toggle CLI
+  2) "<" button in the bottom left corner
+  
+Clear all loaded files: Molmil menu -> Clear
+
+
+Toggle waters: Open the Structures menu (top right >>>) -> click the 3 dots -> Show/Hide waters
+Toggle hydrogens: Open the Structures menu (top right >>>) -> click the 3 dots -> Show/Hide hydrogens
+
+Add a label to a file/chain/residue/atom: 
+  1) Right click on a file/chain/residue -> Label
+  2) Any atom in the canvas -> Label -> Atom/Residue/Chain
+
+Pymol commands
+
+
+select
+  Select atoms by using an expression: select _name_, expression
+  
+  expression
+    name: select by atom name
+    symbol: select by element name
+    resn: select by residue name
+    resi: select by residue id 
+    ss: select by secondary structure (h: helix, s: sheet, l: loop)
+    chain: select by chain name
+    hydro: select waters
+    hetatm: select ligands
+    backbone: select protein backbone atoms
+    sidechain: select protein sidechain atoms
+    model: select by filename/fileid
+    and/or: combine multiple selections
+  
+  examples:  
+    1) select carbon atoms
+      select carbons, symbol C
+    
+    2) select the backbone heavy atoms
+      select sidechain_12, resi 12 and sidechain
+  
+color
+  Color a group of atoms: color clr, atom-list/expression
+  
+  clr can be either a colorname, a hex value (starting with #) or an rgb(a) value in the shape of [r, g, b, a], where r,g,b,a is an integer between 0-255
+  
+  atom-list is either a _name_ object (defined by a select command) or an expression as used by a select command
+  
+  1) color backbone heavy atoms
+    color red, sidechain_12
+    color red, resi 12 and sidechain
+    color [255, 255, 255], resi 12 and sidechain
+    
+cartoon_color
+  Color the cartoon representation of a group of atoms: cartoon_color, atom-list/expression
+  
+set_color
+  Define a new named color: set_color _color_name_, [r, g, b, a]
+  
+show
+  Show atoms: show _repr_, atom-list/expression
+  _repr_: spheres, ball_stick, sticks, lines, cartoon, ca-trace
+
+hide
+  Hide atoms: hide _repr, atom-list/expression
+  _repr_: hydro, all, cartoon, solvent
+  
+turn
+  Rotate the system: turn axis, degrees
+  axis: x, y, z
+  
+move
+  Translate the system: move axis, Angstrom
+  axis: x, y, z
+
+fetch
+  Fetch a PDB entry from PDBj: fetch pdbid
+
+load
+  Load a file: load location
+  location can be either a file path on the local hdd (requires the local version of Molmil, cannot run via the web version), or a URL
+
+mplay
+  Plays a trajectory: mplay
+  
+mstop
+  Stops playing a trajectory: mstop
+
+set
+  Set various settings
+  
+  Set the radius of the sticks for a group of atoms: set stick_radius, value, atom-list/expression
+  
+  Enable fog: set depth_cue, 1
+  Disable fog: set depth_cue, 0
+  
+origin
+  Set the origin to a specific set of atoms: origin selection
+
+bg_color
+  Set the background color: bg_color color
+
+label
+  Set a label to a set of atoms: label selection, label-name
+
+save
+  Save the loaded structure: save file.pdb, selection, snapshot, format
+
+viewport
+  Resize the viewport (screen size): viewport width, height
+  
+findseq
+  Finds a specific sequence: findseq sequence, selection, name
+  
+view
+  Recall or store a specific view: view key, action
+  action: recall, store
+  
+  Save the current view as "test": view test, store
+  Recall (restore) the view "test": view test
+  
+delete
+  Delete a set of atoms: delete selection
+  Delete chain A: delete chain A
+
+edmap
+  Fetch the electron density map of the loaded entry for a specific region: edmap selection, border
+  Show the electron density for all ligands and nearby region (5 A): edmap hetatm, 5
+
+frame
+  Select a specific frame (NMR-model / MD trajectory), starting from 1: frame modelId
+  Select 10th frame: frame 10
+  
+</pre>
+  
+</body>
+  
+</html>

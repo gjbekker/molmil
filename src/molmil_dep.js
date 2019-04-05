@@ -99,7 +99,7 @@ molmil_dep.dBT = new function() {
 }
 
 molmil_dep.CallRemote=function(method, crossDomain) {
-  this.formData = null; this.request = null; this.Method = method; this.parameters = [];
+  this.formData = null; this.request = null; this.Method = method; this.parameters = [], this.headers = {};
   if (method == "POSTv2" && typeof(FormData) != "undefined") {this.formData = new FormData();}
   else if (method == "POSTv2") {this.Method = "POST";}
   this.ASYNC = false;
@@ -123,10 +123,9 @@ molmil_dep.CallRemote.prototype.initRequest=function(crossDomain) {
       try {if (! this.ERROR) this.CRO.OnDone();} catch (e) {this.ERROR = e;}
       if (this.ERROR) {
         if (this.CRO.OnError) this.CRO.OnError();
-        else {if (! this.silent) /*document.waitingBox.hide();*/ console.error(this.ERROR.stack); throw this.ERROR;}
+        else {if (! this.silent) throw this.ERROR;}
       }
     }
-    //if (! this.silent) document.waitingBox.hide();
   };
   if (this.request.onload == null && ! stupidIE) {
     this.request.onload = this.request.loadHandler
@@ -148,7 +147,7 @@ molmil_dep.CallRemote.prototype.AddParameters=function(list) {
 };
 
 molmil_dep.CallRemote.prototype.Send=function(URL, silent) {
-  //if (! silent) document.waitingBox.show();
+  URL = URL || this.URL;
   if (this.forceSSL) URL = URL.replace("http://", "https://");
   if (molmil_dep.dBT.MSIE && molmil_dep.dBT.majorVersion < 10) {
     var domain = URL.split("/");
@@ -166,6 +165,10 @@ molmil_dep.CallRemote.prototype.Send=function(URL, silent) {
     this.request.open("POST", URL, this.ASYNC);
     try {this.request.setRequestHeader("Content-Type", this.ctype);}
     catch (e) {};// stupid IE
+    for (var e in this.headers) {
+      try {this.request.setRequestHeader(e, this.headers[e]);}
+      catch (e) {}; //stupid IE
+    }
     if (this.responseType) {this.request.responseType = this.responseType;}
     this.request.send((this.parameters.length ? this.parameters : null));
   }
@@ -227,7 +230,6 @@ molmil_dep.expandCatTree=function(ev, genOnly) {
 molmil_dep.initCheck = function() {
   if (molmil.configBox.initFinished) return;
   if (! window.glMatrix) return;
-  if (! window.CIFparser) return;
   molmil.configBox.initFinished = true;
 };
 
@@ -293,6 +295,31 @@ molmil_dep.strRounding=function(what, decimals) {
   return out;
 }
 
+molmil_dep.naturalSort=function(a, b) {
+  function chunkify(t) {
+    var tz = [], x = 0, y = -1, n = 0, i, j; var m;
+    while (i = (j = t.charAt(x++)).charCodeAt(0)) {
+      m = (i == 46 || (i >=48 && i <= 57));
+      if (m !== n) {tz[++y] = ""; n = m;}
+      tz[y] += j;
+    }
+    return tz;
+  }
+
+  var aa = chunkify(a);
+  var bb = chunkify(b);
+  var c, d;
+  for (var x = 0; aa[x] && bb[x]; x++) {
+    if (aa[x] !== bb[x]) {
+      c = Number(aa[x]), d = Number(bb[x]);
+      if (c == aa[x] && d == bb[x]) {return c - d;}
+      else return (aa[x] > bb[x]) ? 1 : -1;
+    }
+  }
+  return aa.length - bb.length;
+}
+
+
 Element.prototype.setClass=function(className) {if (this.className.indexOf(className) == -1) this.className += " "+className;}
 Element.prototype.removeClass=function(className) {this.className = this.className.replace(new RegExp("\\b"+className+"\\b", "g"), "").trim();}
 Element.prototype.switchClass=function(className, sw) {
@@ -319,6 +346,26 @@ if (! Array.unique) Array.prototype.unique = function () {
   for(i in o) r.push(o[i]);
   return r;
 };
+
+
+if (!Array.prototype.includes) {
+  Object.defineProperty(Array.prototype, 'includes', {
+    value: function(searchElement, fromIndex) {
+      if (this == null) throw new TypeError('"this" is null or not defined');
+      var o = Object(this);
+      var len = o.length >>> 0;
+      if (len === 0) return false;
+      var n = fromIndex | 0;
+      var k = Math.max(n >= 0 ? n : len - Math.abs(n), 0);
+      function sameValueZero(x, y) {return x === y || (typeof x === 'number' && typeof y === 'number' && isNaN(x) && isNaN(y));}
+      while (k < len) {
+        if (sameValueZero(o[k], searchElement)) return true;
+        k++;
+      }
+      return false;
+    }
+  });
+}
 
 
 molmil_dep.init();

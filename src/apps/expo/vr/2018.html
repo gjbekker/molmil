@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="style.css" type="text/css"/>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.4.3/seedrandom.min.js"></script>
+  <script>
+  
+    var molmil_settings = {src: "../../../"};
+    var canvas, cli;
+  
+    function initViewer() {
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      
+      randomSeed = 12;
+      
+      molmil.configBox.BGCOLOR = [0, 0, 0, 1];
+      //molmil.configBox.zFar = 1000000;
+      
+      canvas = document.getElementById("molmilViewer");
+      canvas.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.height = (window.innerHeight || document.documentElement.clientHeight);
+      canvas = molmil.createViewer(canvas);
+      
+      window.onresize = function() {
+        var dpr = devicePixelRatio || 1;
+        canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+        canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+        if (molmil.configBox.stereoMode != 3) {
+          canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+          canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+          canvas.renderer.resizeViewPort();
+        }
+        canvas.update = true;
+      };
+      
+      canvas.molmilViewer.calcZ = function() {return 0;}
+      
+      canvas.molmilViewer.skipCOGupdate = true;
+      
+      molmil.autoSetup();
+      
+      //loadEntry("5h8y", [-90.28249734964311, 51.05564785932719, -0.010721151885848018], -50, 40, 540);
+      //loadEntry("structures/5ire.mpbf", [0, 0, 0], "debug", 385, false); // add BU support...
+      
+      //return;
+
+      var visualize_1ema = function(strucs) {
+        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1ema, [strucs], null, 50);
+
+        canvas.commandLine.environment.struc_1ema = molmil.quickSelect("model "+strucs[0].meta.idnr);
+
+        canvas.commandLine.eval("show cartoon, struc_1ema and chain A");
+        canvas.commandLine.eval("cartoon_color white, struc_1ema and chain A");
+        canvas.commandLine.eval("hide sticks, struc_1ema");
+        canvas.commandLine.eval("show sticks, struc_1ema and resn CRO");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 64 and name C");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 64 and name CA");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 66 and name N");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 66 and name CA");
+        canvas.commandLine.eval("bond struc_1ema and resi 64 and name C, struc_1ema and resn CRO and name N1");
+        canvas.commandLine.eval("bond struc_1ema and resi 66 and name N, struc_1ema and resn CRO and name C3");
+        canvas.commandLine.eval("color tan, struc_1ema and symbol C and resn CRO");
+        
+        /*canvas.commandLine.eval("label struc_1ema and resi 12-22 and name CA, K");
+        canvas.commandLine.eval("label struc_1ema and resi 25-36 and name CA, J");
+        canvas.commandLine.eval("label struc_1ema and resi 41-48 and name CA, I");
+        canvas.commandLine.eval("label struc_1ema and resi 92-100 and name CA, C");
+        canvas.commandLine.eval("label struc_1ema and resi 105-115 and name CA, B");
+        canvas.commandLine.eval("label struc_1ema and resi 118-128 and name CA, A");
+        canvas.commandLine.eval("label struc_1ema and resi 148-152 and name CA, F");
+        canvas.commandLine.eval("label struc_1ema and resi 160-170 and name CA, E");
+        canvas.commandLine.eval("label struc_1ema and resi 176-187 and name CA, D");
+        canvas.commandLine.eval("label struc_1ema and resi 199-207 and name CA, G");
+        canvas.commandLine.eval("label struc_1ema and resi 220-227 and name CA, H");*/
+
+      };      
+      
+      var visualize_1mbn = function(strucs) {
+        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1mbn, [strucs], null, 50);
+
+        canvas.commandLine.environment.struc_1mbn = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_1mbn and chain A");
+        canvas.commandLine.eval("cartoon_color group, struc_1mbn and chain A");
+        canvas.commandLine.eval("show spheres, struc_1mbn and resn HEM");
+        canvas.commandLine.eval("show spheres, struc_1mbn and resn OH");
+        canvas.commandLine.eval("show sticks, struc_1mbn and resi 64 and sidechain");
+        canvas.commandLine.eval("color tan, struc_1mbn and symbol C and resn HEM");
+      };
+      var visualize_dna = function(strucs) {
+        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_dna, [strucs], null, 50);
+
+        canvas.commandLine.environment.struc_dna = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show sticks, struc_dna");
+        canvas.commandLine.eval("color khaki, struc_dna and symbol C and resn DC");
+        canvas.commandLine.eval("color salmon, struc_dna and symbol C and resn DG");
+        canvas.commandLine.eval("color lightskyblue, struc_dna and symbol C and resn DA");
+        canvas.commandLine.eval("color mediumseagreen, struc_dna and symbol C and resn DT");
+      };
+      var visualize_1tph = function(strucs) {
+        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1tph, [strucs], null, 50);
+        
+        canvas.commandLine.environment.struc_1tph = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_1tph and chain A");
+        canvas.commandLine.eval("delete struc_1tph and chain B");
+        canvas.commandLine.eval("delete struc_1tph and chain D");
+        canvas.commandLine.eval("delete struc_1tph and chain E");
+        canvas.commandLine.eval("delete struc_1tph and chain F");
+        canvas.commandLine.eval("cartoon_color group, struc_1tph");
+        canvas.commandLine.eval("show spheres, struc_1tph and resn PGH");
+      };
+      
+      var list = [];
+
+
+      list.push(["structures/3j3q.mpbf", [498.1543841381684, 609.675326993088, 470.2615158019828], 593.63]);
+      list.push(["1ema", [25.630047272727257, 27.931607272727298, 39.48978545454547], 27, visualize_1ema]);
+      list.push(["structures/1bbt.mpbf", [0, 0, 0], 161.08]);
+      list.push(["structures/5ire.mpbf", [0.07820328432419131, 0.1991919628225624, 0.3876471288888365], 258.48]);
+      list.push(["1mbn", [14.077157360406089, 22.322335025380728, 7.487817258883243], 21.01, visualize_1mbn]);
+      list.push(["dna", [0.051772277227722416, -0.01682178217821778, 15.21], 19.76, visualize_dna]);
+      list.push(["1tph", [6.470076902465184, 27.534610932475925, 21.694391211146804], 41.13, visualize_1tph]);
+      
+      
+      filename2name["structures/3j3q.mpbf"] = "HIVゲノムの収納箱\nHIVカプシド";
+      filename2name["1ema"] = "光るタンパク質\n緑色蛍光タンパク質\n（GFP）";
+      filename2name["structures/1bbt.mpbf"] = "ウシなどに病気を起こす\n口蹄疫ウイルス";
+      filename2name["1mbn"] = "ミオグロビン";
+      filename2name["dna"] = "生き物の設計図\nDNA";
+      filename2name["1tph"] = "多くの酵素に見られる筒型構造\nTIMバレル";
+      filename2name["structures/5ire.mpbf"] = "蚊が運ぶ\nジカウイルス";
+      
+      
+      //https://pdbj.org/molmil_alpha/#fetch 3j3q; hide cartoon, all; hide sticks, all; cartoon_color red, all; cartoon_color yellow, chain WWA or chain HXA or chain SXA or chain DYA or chain OYA or chain XWA or chain YWA or chain ZWA or chain AXA or chain BXA or chain CXA or chain DXA or chain EXA or chain FXA or chain GXA or chain IXA or chain JXA or chain KXA or chain LXA or chain MXA or chain NXA or chain OXA or chain PXA or chain QXA or chain RXA or chain TXA or chain UXA or chain VXA or chain WXA or chain XXA or chain YXA or chain ZXA or chain AYA or chain BYA or chain CYA or chain EYA or chain FYA or chain GYA or chain HYA or chain IYA or chain JYA or chain KYA or chain LYA or chain MYA or chain NYA or chain PYA or chain QYA or chain RYA or chain SYA or chain TYA or chain UYA or chain VYA or chain WYA or chain XYA or chain YYA or chain ZYA or chain AZA or chain BZA or chain CZA or chain DZA;
+      
+      
+      // make some function to load an entry and place it somewhere...
+      distributeEntries(list);
+      
+      setupGamepad();
+      
+    }
+  
+  </script>
+  
+  <script type="text/javascript" src="script.js" charset="utf-8"></script>
+  <script type="text/javascript" src="../../../molmil.js"></script>
+  
+</head>
+<body onload="initViewer()">
+  <div class="molmil_popup_outer">
+    <div class = "molmil_popup_inner">
+    </div>
+  </div>
+  <div class="molmil_UI_container">
+    <canvas id="molmilViewer">
+    </canvas>
+  </div>
+  <div class="startbutton" onclick="molmil.startWebVR(canvas.molmilViewer);">Enable Molmil VR</div>
+</body>
+</html>

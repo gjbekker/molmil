@@ -29,13 +29,11 @@ uniform sampler2D stereoRight;
 
 varying highp vec2 textureCoord;
 
+
 void main() {
 	vec4 leftFrag = texture2D(stereoLeft, textureCoord);
-	leftFrag = vec4(1.0, leftFrag.g, leftFrag.b, 1.0); // Left eye is full red and actual green and blue
-	
+	leftFrag = vec4(1.0, leftFrag.g, leftFrag.b, 1.0);
 	vec4 rightFrag = texture2D(stereoRight, textureCoord);
-	rightFrag = vec4(rightFrag.r, 1.0, 1.0, 1.0); // Right eye is full green and blue and actual red
- 
-	// Multiply left and right components for final ourput colour
+	rightFrag = vec4(rightFrag.r, 1.0, 1.0, 1.0);
 	gl_FragColor = vec4(leftFrag.rgb * rightFrag.rgb, 1.0); 
 }

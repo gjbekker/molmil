@@ -62,17 +62,16 @@ void main() {
   
   // translate in 3D space...
   
-  gl_Position = projectionMatrix  * gl_Position;
+  vec3 vertPos = gl_Position.xyz / gl_Position.w;
+  gl_Position = projectionMatrix * gl_Position;
   
   ex_FragTexCoord = step(in_ScreenSpaceOffset, vec2(0.0, 0.0));
   
 #ifdef ENABLE_SLAB
-  vec3 vertPos = gl_Position.xyz / gl_Position.w;
   Pz = -vertPos.z;
 #endif
-  
+
 #ifdef ENABLE_FOG
-  vec3 vertPos = gl_Position.xyz / gl_Position.w;
   fogFactor = clamp((fogSpan - -vertPos.z) / (fogSpan - focus), 0.05, 1.0);
 #endif
 
@@ -110,7 +109,8 @@ void main() {
   vec4 fragColor = texture2D(textureMap, 1.0-ex_FragTexCoord)*vec4(color, 1.0);
 
 #ifdef ENABLE_FOG
-  gl_FragColor = mix(backgroundColor, fragColor, fogFactor);
+  if (fragColor.a > 0.0) gl_FragColor = mix(backgroundColor, fragColor, fogFactor);
+  else gl_FragColor = fragColor;
 #else
   gl_FragColor = fragColor;
 #endif

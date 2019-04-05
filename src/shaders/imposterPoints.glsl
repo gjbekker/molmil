@@ -102,8 +102,6 @@ void main() {
 
 //#fragment
 
-#extension GL_EXT_frag_depth : enable
-
 #ifndef GL_FRAGMENT_PRECISION_HIGH
 precision mediump float;
 precision mediump int;

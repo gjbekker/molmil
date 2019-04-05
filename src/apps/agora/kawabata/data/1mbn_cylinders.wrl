@@ -1,0 +1,174 @@
+#VRML V2.0 utf8
+
+#COMMAND ./mk_globin.py -owrl 1mbn_cylinders.wrl -outconres F -outmargin F
+
+#DATE    2018/11/08 14:59:30
+
+#HELIX CYL_HELIX_ORIG/1.wrl
+ Transform{
+   translation 10.029709 14.317081 20.904179
+   scale  4.000000 10.742877 4.000000
+   rotation  0.278150 0.294025 0.914430 -1.365263
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.000000 0.000000 1.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/2.wrl
+ Transform{
+   translation 22.943409 17.901523 6.433757
+   scale  4.000000 7.556785 4.000000
+   rotation  -0.344777 0.692506 0.633691 -2.146712
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.000000 1.000000 1.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/3.wrl
+ Transform{
+   translation 18.636308 22.406508 -5.353776
+   scale  4.000000 2.968180 4.000000
+   rotation  0.116990 0.992635 -0.031463 -2.732886
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.000000 1.000000 0.500000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/4.wrl
+ Transform{
+   translation 31.903911 19.448237 1.324757
+   scale  4.000000 5.020157 4.000000
+   rotation  -0.267690 0.779208 0.566725 -2.096197
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.000000 1.000000 0.200000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/5.wrl
+ Transform{
+   translation 19.514045 25.689703 12.060922
+   scale  4.000000 13.875650 4.000000
+   rotation  0.419054 0.740587 -0.525285 2.485125
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.000000 1.000000 0.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/6.wrl
+ Transform{
+   translation 6.023580 31.739314 7.700833
+   scale  4.000000 9.447470 4.000000
+   rotation  0.089875 0.593894 0.799508 2.567507
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 0.500000 1.000000 0.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/7.wrl
+ Transform{
+   translation 14.277182 14.890466 4.838107
+   scale  4.000000 13.277917 4.000000
+   rotation  -0.377750 0.248127 0.892041 -2.272230
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 1.000000 1.000000 0.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
+#HELIX CYL_HELIX_ORIG/8.wrl
+ Transform{
+   translation 3.665073 18.583250 8.088025
+   scale  4.000000 16.270584 4.000000
+   rotation  -0.173936 0.952818 -0.248766 -3.055663
+   children[
+     Shape{
+       appearance Appearance{
+         material Material{
+           diffuseColor 1.000000 0.000000 0.000000
+           specularColor 0.5 0.5 0.5
+           transparency 0.500000
+         }
+       }
+       geometry Cylinder{
+         radius 1.0
+         height 2.0
+       }
+     }
+   ]
+ }
