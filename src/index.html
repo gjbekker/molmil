@@ -36,16 +36,10 @@
   <script>
   
 /*start_publish_erase*/
-    var molmil_settings = {
-      src: "/molmil_alpha/",
-      pdb_url: "https://pdbj.org/newweb_alpha/rest/displayPDBfile?format=mmjson-all&id=__ID__",
-      comp_url: "https://pdbj.org/newweb_alpha/rest/displayCOMPfile?format=mmjson&id=__ID__",
-      promodeE_check_url: "https://pdbj.org/newweb_alpha/rest/quick_search?fields=5&query=__ID__",
-      promodeE_base_structure_url: "https://pdbj.org/newweb_alpha/rest/displayPromodeEfile?format=min&id=__ID__",
-      promodeE_mode_vectors_url: "https://pdbj.org/newweb_alpha/rest/displayPromodeEfile?format=vec&id=__ID_____MODE__",
-      promodeE_animation_url: "https://pdbj.org/newweb_alpha/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
-    };
+    var molmil_settings = {};
 /*end_publish_erase*/  
+
+    molmil_settings.src = window.location.href.endsWith("/") ? window.location.href : window.location.href.split("/").slice(0, -1).join("/")+"/";
 
   
     var canvas, cli;
