@@ -2069,7 +2069,6 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     theta += rad;
   }
   
-  
   var nov = 0, noi = 0, tmpObj;
   
   for (o=0; o<objects.length; o++) {
@@ -2104,7 +2103,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       noi += (object.coords.length-1)*tmpObj*2*3 + (tmpObj*3);
     }
   }
-
+  
   var vBuffer = new Float32Array(nov * 7); // x, y, z, nx, ny, nz, rgba
   var vBuffer8 = new Uint8Array(vBuffer.buffer);
   var iBuffer = new Uint32Array(noi);
@@ -2155,11 +2154,10 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     // create a sphere with radius object.radius on object.coords[0]
     tmpObj = object.lowQuality ? detail_lv_LQ : detail_lv;
     idx = idx || 0;
-    r = object.radius;
-    tmpObj = molmil.geometry.getSphere(r, tmpObj);
+    tmpObj = molmil.geometry.getSphere(object.radius, tmpObj);
 
     for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p;
-    
+
     for (v=0; v<tmpObj.vertices.length; v+=3, vP8+=28) {
       vBuffer[vP++] = tmpObj.vertices[v]+object.coords[idx][0];
       vBuffer[vP++] = tmpObj.vertices[v+1]+object.coords[idx][1];
@@ -2175,6 +2173,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       vBuffer8[vP8+27] = rgba[3];
       vP++
     }
+
     p += tmpObj.vertices.length / 3;
     
   }
@@ -2297,14 +2296,10 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     object = objects[o];
     rgba = object.rgba;
     if (object.type == "sphere") genSphere();
-    if (object.type == "cylinder") genCylinder();
-    if (object.type == "tube") {
-      genTube();
-    }
-    if (object.type == "cone") {
-      genCone();
-    }
-    if (object.type == "dotted-cylinder") {
+    else if (object.type == "cylinder") genCylinder();
+    else if (object.type == "tube") genTube();
+    else if (object.type == "cone") genCone();
+    else if (object.type == "dotted-cylinder") {
       tmpObj = object.lowQuality ? cylinderLQ : cylinder;
       cylNverts = tmpObj.vertices.length/3
       tmp1 = [object.coords[0][0], object.coords[0][1], object.coords[0][2]];
@@ -2378,7 +2373,6 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     }
     
   }
-
   var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, programOptions);
   soup.renderer.addProgram(program);
   soup.renderer.initBuffers();

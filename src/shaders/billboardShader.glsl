@@ -55,8 +55,6 @@ void main() {
   refPos.xy += in_ScreenSpaceOffset*sizeOffset;
   refPos.xy *= -(refPos.z+gl_Position.z)*scaleFactor;
   refPos += positionOffset;
-  
-  
   gl_Position.xyz += refPos;
   
   
@@ -65,7 +63,7 @@ void main() {
   vec3 vertPos = gl_Position.xyz / gl_Position.w;
   gl_Position = projectionMatrix * gl_Position;
   
-  ex_FragTexCoord = step(in_ScreenSpaceOffset, vec2(0.0, 0.0));
+  ex_FragTexCoord = (in_ScreenSpaceOffset+1.0)*.5;
   
 #ifdef ENABLE_SLAB
   Pz = -vertPos.z;
@@ -106,7 +104,7 @@ void main() {
 #endif
 
 
-  vec4 fragColor = texture2D(textureMap, 1.0-ex_FragTexCoord)*vec4(color, 1.0);
+  vec4 fragColor = texture2D(textureMap, ex_FragTexCoord)*vec4(color, 1.0);
 
 #ifdef ENABLE_FOG
   if (fragColor.a > 0.0) gl_FragColor = mix(backgroundColor, fragColor, fogFactor);

@@ -674,7 +674,6 @@ molmil.getSelectedAtom = function(n, soup) {
 molmil.viewer.prototype.selectObject = function(x, y, event) {
   y = this.canvas.height-y;
   var gl = this.renderer.gl;
-  
   if (! this.renderer.FBOs.pickingBuffer) {
     this.renderer.FBOs.pickingBuffer = new molmil.FBO(gl, this.renderer.width, this.renderer.height);
     this.renderer.FBOs.pickingBuffer.addTexture("colourBuffer", gl.RGBA, gl.RGBA);
@@ -1976,7 +1975,7 @@ molmil.exportSTL = function(soup) {
 // ** geometry object, used to generate protein geometry; atoms, bonds, loops, helices, sheets **
 
 molmil.geometry = {
-  templates: {sphere: {}, cylinder: [], dome: {}},
+  templates: {sphere: {base: {}}, cylinder: [], dome: {}},
   detail_lvs: 5,
   dome: [0, 0, -1],
   radius: .25,
@@ -1994,8 +1993,9 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
 }
 
 molmil.geometry.getSphere = function(r, detail_lv) {
-  if (r in this.templates.sphere) return this.templates.sphere[r][detail_lv];
-  else return this.generateSphere(r)[detail_lv];
+  if (detail_lv > 6) detail_lv = 6;
+  if (r in this.templates.sphere && detail_lv in this.templates.sphere[r]) return this.templates.sphere[r][detail_lv];
+  else return this.generateSphere(r, detail_lv);
   // pull a sphere from the this.templates.sphere object if it exists for the given radius
 }
 
@@ -2040,18 +2040,17 @@ molmil.geometry.generateCylinder = function(detail_lv) {
   return this.templates.cylinder;
 }; molmil.geometry.generateCylinder();
 
-molmil.geometry.generateSphere = function(r) {
-  this.templates.sphere[r] = [];
-  var t, i, nfo, sphere;
-  for (t=0; t<this.detail_lvs; t++) {
-    nfo = {vertices: [], normals: [], indices: []};
-    sphere = molmil.octaSphereBuilder(t);
-    for (i=0; i<sphere.vertices.length; i++) nfo.vertices.push(sphere.vertices[i][0]*r, sphere.vertices[i][1]*r, sphere.vertices[i][2]*r);
-    for (i=0; i<sphere.faces.length; i++) nfo.indices.push(sphere.faces[i][0], sphere.faces[i][1], sphere.faces[i][2]);
-    for (i=0; i<sphere.vertices.length; i++) nfo.normals.push(sphere.vertices[i][0], sphere.vertices[i][1], sphere.vertices[i][2]);
-    this.templates.sphere[r].push(nfo);
-  }
-  return this.templates.sphere[r];
+molmil.geometry.generateSphere = function(r, detail_lv) {
+  this.templates.sphere[r] = {};
+  var i, nfo, sphere;
+  if (! this.templates.sphere.base[detail_lv]) sphere = this.templates.sphere.base[detail_lv] = molmil.octaSphereBuilder(detail_lv);
+  else sphere = this.templates.sphere.base[detail_lv];
+  nfo = {vertices: [], normals: [], indices: []};
+  for (i=0; i<sphere.vertices.length; i++) nfo.vertices.push(sphere.vertices[i][0]*r, sphere.vertices[i][1]*r, sphere.vertices[i][2]*r);
+  for (i=0; i<sphere.faces.length; i++) nfo.indices.push(sphere.faces[i][0], sphere.faces[i][1], sphere.faces[i][2]);
+  for (i=0; i<sphere.vertices.length; i++) nfo.normals.push(sphere.vertices[i][0], sphere.vertices[i][1], sphere.vertices[i][2]);
+  this.templates.sphere[r][detail_lv] = nfo;
+  return nfo;
 }
 
 
@@ -2177,6 +2176,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     program.wireframe_shader = renderer.shaders.lines;
     program.point_shader = renderer.shaders.points;
   }
+
   program.standard_attributes = program.standard_shader.attributes;
   program.wireframe_attributes = program.wireframe_shader.attributes;
   
@@ -2298,14 +2298,14 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     molmil.clearAttributes(this.renderer.gl);
     
     this.renderer.gl.bindBuffer(this.renderer.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-console.log(this.nElements);
+
     if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
       var dv = 0, vtd;
       while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.renderer.gl.drawElements(this.renderer.gl.LINES, vtd, this.renderer.gl.INDEXINT, dv*4); dv += vtd;}
     }
     else this.renderer.gl.drawElements(this.renderer.gl.LINES, this.nElements, this.renderer.gl.INDEXINT, 0);
   };
-      
+     
   program.standard_render = function(modelViewMatrix, COR, i) {
     if (! this.status) return;
     i = i || 0;
@@ -2400,7 +2400,7 @@ console.log(this.nElements);
       program.pickingAttributes = renderer.shaders.linesPicking.attributes;
       
       program.renderPicking = function(modelViewMatrix, COR) {
-        if (! this.status) return;
+        if (! this.status || ! this.vertexBuffer) return;
         this.renderer.gl.useProgram(this.pickingShader.program);
         this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
         this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
@@ -2426,7 +2426,7 @@ console.log(this.nElements);
       program.pickingAttributes = renderer.shaders.picking.attributes;
       
       program.renderPicking = function(modelViewMatrix, COR) {
-        if (! this.status) return;
+        if (! this.status || ! this.vertexBuffer) return;
         this.renderer.gl.useProgram(this.pickingShader.program);
         this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
         this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
@@ -5018,6 +5018,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
       this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, 0.0002);
       this.renderer.gl.depthMask(false);
     
+    
       for (i=0; i<N.length; i++) {
         // set uniforms (e.g. screen-space translation...)
       
@@ -5025,9 +5026,14 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         this.renderer.gl.bindTexture(this.renderer.gl.TEXTURE_2D, N[i].texture);
         this.renderer.gl.uniform1i(this.shader.uniforms.textureMap, 0);
         this.renderer.gl.uniform2f(this.shader.uniforms.sizeOffset, N[i].texture.renderWidth, N[i].texture.renderHeight);
+        //if (N[i].settings.centerTexture) this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx-(N[i].texture.renderWidth*.5), N[i].settings.dy-(N[i].texture.renderHeight*.5), N[i].settings.dz);
+        //else 
         this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx, N[i].settings.dy, N[i].settings.dz);
         this.renderer.gl.uniform3f(this.shader.uniforms.color, N[i].settings.color[0]/255, N[i].settings.color[1]/255, N[i].settings.color[2]/255);
+        
+        if (N[i].settings.alwaysFront) this.renderer.gl.disable(this.renderer.gl.DEPTH_TEST);
         this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, 6, this.renderer.gl.INDEXINT, i*24);
+        if (N[i].settings.alwaysFront) this.renderer.gl.enable(this.renderer.gl.DEPTH_TEST);
       }
     
       this.renderer.gl.disable(this.renderer.gl.BLEND);
@@ -5712,6 +5718,7 @@ molmil.glCamera.prototype.generateMatrix = function() {
 }
 
 molmil.glCamera.prototype.positionCamera = function() {
+  this.rollAngle = 0;
   quat.setAxisAngle(this.QPitch, [1, 0, 0], (this.pitchAngle/180)*Math.PI);
   quat.setAxisAngle(this.QHeading, [0, 1, 0], (this.headingAngle/180)*Math.PI);
   quat.setAxisAngle(this.QRoll, [0, 0, 1], (this.rollAngle/180)*Math.PI);
@@ -7979,7 +7986,6 @@ molmil.addLabel = function(text, settings, soup) {
   settings.textAlign = settings.textAlign || obj.settings.textAlign;
   
   if (text != obj.text || settings.fontSize != obj.settings.fontSize || settings.color[0] != obj.settings.color[0] || settings.color[1] != obj.settings.color[1] || settings.color[2] != obj.settings.color[2]) {
-    settings.fontSize *= 4;
     var textCtx = document.createElement("canvas").getContext("2d");
   
     var tmp = text.replace(/\\n/g, "\n").split(/\n/g), h, w, i;
@@ -7989,37 +7995,52 @@ molmil.addLabel = function(text, settings, soup) {
     if (regex.test(tmp[0])) w *= 2;
     w = (w*settings.fontSize*.6)+6;
     
+    var Yoffset = 0;
+    if (settings.addBorder) {
+      w += settings.fontSize*.5;
+      h += settings.fontSize*.5;
+      Yoffset += settings.fontSize*.2;
+    }
+    
+    
+    
     textCtx.canvas.width = w; textCtx.canvas.height = h;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; textCtx.fillStyle = 'white';
     textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
 
     if (settings.textAlign == "left") {
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], 0, (settings.fontSize / 1.75) + (settings.fontSize*i));
+      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], 0, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
     }
     else if (settings.textAlign == "right") {
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w, (settings.fontSize / 1.75) + (settings.fontSize*i));
+      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
     }
     else {
       textCtx.textAlign = settings.textAlign = "center";
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i));
+      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
+    }
+    
+    if (settings.addBorder) {
+      textCtx.beginPath();
+      textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, (textCtx.canvas.width*.5)-settings.fontSize*.05, (textCtx.canvas.height*.5)-settings.fontSize*.05, 0, 0, Math.PI * 2, false);
+      textCtx.strokeStyle = "white";
+      textCtx.lineWidth = settings.fontSize*.1;
+      textCtx.stroke();
     }
 
     var gl = soup.renderer.gl;
     var textTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, textTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.bindTexture(gl.TEXTURE_2D, null);
     
     obj.status = false;
     obj.texture = textTex;
-    obj.texture.renderWidth = w*.25;
-    obj.texture.renderHeight = h*.25;
-    settings.fontSize *= .25;
+    obj.texture.renderWidth = w;
+    obj.texture.renderHeight = h;
   }
   
   obj.text = text;
