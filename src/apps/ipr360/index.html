@@ -31,56 +31,28 @@
       white-space: nowrap;
     }
     
+    #vricon {
+      display: none;
+      position: absolute;
+      z-index: 999;
+      bottom: 2em;
+      right: 2em;
+      width: 5em;
+      height: 5em;
+      fill: white !important;
+    }
+    #vricon:hover {
+      fill: LightYellow !important;
+      cursor: pointer;
+    }
+    
   </style>
   
   <script>
     var molmil_settings = {src: "../../"}, RADIUS = 500;
 
     var canvas, cli;
-    
-    function panorama_mouseDown(event) {
-      molmil.activeCanvas = this;
-      molmil.Xcoord = event.clientX;
-      molmil.Ycoord = event.clientY;
-      molmil.mouseMoved = false;
-    }
-    
-    function panorama_mouseUp(event) {
-      molmil.activeCanvas = null;
-    }
-    
-    var lon = 0, lat = 0;
-    
-    function panorama_mouseMove(event) {
-      if (! molmil.activeCanvas) return;
-      
-      var clientX = event.clientX;
-      var clientY = event.clientY;
-
-      lon += ( molmil.Xcoord - event.clientX ) * 0.1;
-      lat += ( event.clientY - molmil.Ycoord ) * 0.1;
-      molmil.Xcoord = event.clientX;
-      molmil.Ycoord = event.clientY;
-      
-      lat = Math.max( - 85, Math.min( 85, lat ) );
-      var phi = glMatrix.toRadian( 90 - lat );
-      var theta = glMatrix.toRadian( lon );
-      
-      
-      
-      var point = [RADIUS * Math.sin( phi ) * Math.cos( theta ), RADIUS * Math.cos( phi ), Math.sin( phi ) * Math.sin( theta )];
-      
-      console.log(point);
-
-      var matrix = mat4.lookAt(mat4.create(), [0, 0, 0], point, [1, 0, 0]);
-      mat4.getRotation(canvas.renderer.camera.QView, matrix);
-      
-      canvas.update = true;
-
-      event.preventDefault();
-    
-    };
-    
+    var LANGUAGE = "en";
     
     function customPicker(x, y, event) {
       y = this.canvas.height-y;
@@ -96,24 +68,9 @@
       this.renderer.renderPicking();
       var data = new Uint8Array(4);
       gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      var u = (data[0]*255 + data[1])/65535;
-      var v = (data[2]*255 + data[3])/65535;
-
       var texturePointer = canvas.WORLD.program.settings.texturePointer;
-      var x = Math.round(u*texturePointer.image.width);
-      var y = Math.round(v*texturePointer.image.height);
-
-      var room = canvas.WORLD.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;
-      for (d=0; d<room.doors.length; d++) {
-         // doesn't work perfectly yet;
-         // needs to be made compatible with periodicity...
-         if (Math.pow(x-room.doors[d].x, 2)/Math.pow(room.doors[d].r1, 2) + Math.pow(y-room.doors[d].y, 2)/Math.pow(room.doors[d].r2, 2) <= 1) {
-           // jump to the new room...
-           canvas.WORLD.loadRoom(room.doors[d].to);
-           break;
-         }
-      }
-
+      var room = canvas.WORLD.rooms[texturePointer.id];
+      if (data[0] == 1) canvas.WORLD.loadRoom(room.doors[data[1]].to);
       this.renderer.FBOs.pickingBuffer.unbind();
       this.canvas.update = true;
     };
@@ -123,17 +80,18 @@
       if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
       
       molmil.configBox.camera_fovy = 75;
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere", ""]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking", "#define PICKING_MODE 1\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_1", "#define ROOM_SIZE 1\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_2", "#define ROOM_SIZE 2\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_3", "#define ROOM_SIZE 3\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_4", "#define ROOM_SIZE 4\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_1", "#define PICKING_MODE 1\n#define ROOM_SIZE 1\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_2", "#define PICKING_MODE 1\n#define ROOM_SIZE 2\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_3", "#define PICKING_MODE 1\n#define ROOM_SIZE 3\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_4", "#define PICKING_MODE 1\n#define ROOM_SIZE 4\n"]);
 
       molmil.configBox.BGCOLOR = [0, 0, 0, 1];
       molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
-      
-      //molmil.handle_molmilViewer_mouseDown = panorama_mouseDown;
-      //molmil.handle_molmilViewer_mouseUp = panorama_mouseUp;
-      //molmil.handle_molmilViewer_mouseMove = panorama_mouseMove;
-      
-      
+
       canvas = document.getElementById("molmilViewer");
       canvas.width = (window.innerWidth || document.documentElement.clientWidth);
       canvas.height = (window.innerHeight || document.documentElement.clientHeight);
@@ -158,15 +116,24 @@
       canvas.renderer.camera.generateMatrix_ = canvas.renderer.camera.generateMatrix;
       canvas.renderer.camera.generateMatrix = function() {
         var matrix = this.generateMatrix_();
-        //matrix[12] = 0;
-        //matrix[13] = 0;
-        //matrix[14] = 0;
+        matrix[12] = 0;
+        matrix[13] = 0;
+        matrix[14] = 0;
         return matrix;
       };
       
       canvas.molmilViewer.selectObject = customPicker;
       
       loadWorld("ipr/world.json");
+      
+      if (molmil.vrDisplays && molmil.vrDisplays.length) {
+        var vricon = document.getElementById("vricon");
+        vricon.style.display = "block";
+        vricon.onclick = function() {molmil.initVR(canvas.molmilViewer);};
+      }
+
+      
+      
     }
     
     function loadWorld(url, data) {
@@ -190,14 +157,17 @@
           var texture = gl.createTexture();
           texture.image = this;
           texture.id = id;
+          
+          var maxSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+          
+          if (image.height > maxSize || image.width > maxSize) var useImage = maxSizeImage(this, 4096);
+          else var useImage = this;
+          
           gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this);
-          if (isPowerOf2(this.width) && isPowerOf2(this.height)) gl.generateMipmap(gl.TEXTURE_2D);
-          else {
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          }
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, useImage);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
           world.catalogue[id] = texture;
           world.setRoom(id);
         };
@@ -217,6 +187,9 @@
         
         var texturePointer = this.program.settings.texturePointer;
         var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;
+        
+        this.program.setRoomSize(room.doors);
+        
         for (d=0; d<room.doors.length; d++) {
           u = room.doors[d].x/texturePointer.image.width;
           v = room.doors[d].y/texturePointer.image.height;
@@ -227,19 +200,31 @@
           x = Math.cos(phi) * Math.cos(theta) * 1;
           y = Math.sin(phi) * 1;
           z = Math.cos(phi) * Math.sin(theta) * 1;
-          
-          var xyz = [x,y,z];
-          vec3.negate(xyz,xyz);
-          vec3.scale(xyz, xyz, RADIUS);
-          molmil.addLabel("X", {xyz: xyz, fontSize: RADIUS/5., alwaysFront: true, centerTexture: false, addBorder: true}, canvas.molmilViewer);
 
-          //var objects = [{type: "sphere", coords: [xyz], rgba: [0, 255, 255, 255], radius: 100.0}];
-          //molmil.geometry.generator(objects, canvas.molmilViewer, "Path", {solid: true, alphaMode: false});
+          var toroom = this.rooms[room.doors[d].to];
+          if (LANGUAGE in toroom.name) var name = toroom.name[LANGUAGE];
+          else if ("en" in toroom.name) var name = toroom.name["en"];
+          else var name = Object.values(toroom.name)[0];
+          
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: RADIUS/5., scaleSize: room.doors[d].r1*.9*2, alwaysFront: true, centerTexture: false, addBorder: true}, canvas.molmilViewer);
         }
       };
       
       world.loadRoom(world["default-start"] || world.rooms[0].id);
     };
+    
+    function maxSizeImage(image, size) {
+      var mx = Math.max(image.width, image.height);
+      if (mx <= size) return image;
+      var sf = size/mx;
+      
+      var ctx = document.createElement("canvas").getContext("2d");
+      ctx.canvas.width = image.width*sf;
+      ctx.canvas.height = image.height*sf;
+      
+      ctx.drawImage(image, 0, 0, image.width*sf, image.height*sf);
+      return ctx.canvas;
+    }
     
     function createWorld(texturePointer, world) {
       var programOptions = {solid: true, texturePointer: texturePointer, radius: RADIUS};
@@ -250,10 +235,35 @@
       var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, canvas.renderer, programOptions);
       program.render = sphere360_renderer;
       program.renderPicking = sphere360_pickingRenderer;
-      program.standard_shader = canvas.renderer.shaders.standard360sphere;
-      program.pickingShader = canvas.renderer.shaders.standard360sphere_picking;
-      program.standard_attributes = program.standard_shader.attributes;
-      program.pickingAttributes = program.pickingShader.attributes;
+      
+      program.roomArrays = {};
+      program.setRoomSize = function(doors) {
+        var r1_squared_inv = new Float32Array(doors.length);
+        var r2_squared_inv = new Float32Array(doors.length);
+        var x = new Float32Array(doors.length);
+        var y = new Float32Array(doors.length);
+        var id = new Int32Array(doors.length);
+        
+        for (var d=0; d<doors.length; d++) {
+          r1_squared_inv[d] = 1./Math.pow(doors[d].r1/this.settings.texturePointer.image.width, 2);
+          r2_squared_inv[d] = 1./Math.pow(doors[d].r2/this.settings.texturePointer.image.height, 2);
+          x[d] = doors[d].x/this.settings.texturePointer.image.width;
+          y[d] = doors[d].y/this.settings.texturePointer.image.height;;
+          id[d] = d;
+        }
+        
+        this.roomArrays.r1_squared_inv = r1_squared_inv;
+        this.roomArrays.r2_squared_inv = r2_squared_inv;
+        this.roomArrays.x = x;
+        this.roomArrays.y = y;
+        this.roomArrays.id = id;
+      
+        var size = doors.length;
+        this.standard_shader = canvas.renderer.shaders["standard360sphere_"+size];
+        this.standard_attributes = this.standard_shader.attributes;
+        this.pickingShader = canvas.renderer.shaders["standard360sphere_picking_"+size];
+        this.pickingAttributes = this.pickingShader.attributes;
+      }
 
       canvas.renderer.addProgram(program);
       
@@ -269,6 +279,12 @@
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
       this.renderer.gl.uniform1f(this.standard_shader.uniforms.radius, this.settings.radius);
+      
+      this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r1_squared_inv, this.roomArrays.r1_squared_inv);
+      this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r2_squared_inv, this.roomArrays.r2_squared_inv);
+      this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_x, this.roomArrays.x);
+      this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_y, this.roomArrays.y);
+      this.renderer.gl.uniform1iv(this.standard_shader.uniforms.rooms_id, this.roomArrays.id);
 
       this.renderer.gl.activeTexture(this.renderer.gl.TEXTURE0);
       this.renderer.gl.bindTexture(this.renderer.gl.TEXTURE_2D, this.settings.texturePointer);
@@ -294,6 +310,12 @@
       this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
       this.renderer.gl.uniform1f(this.pickingShader.uniforms.radius, this.settings.radius);
       
+      this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_r1_squared_inv, this.roomArrays.r1_squared_inv);
+      this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_r2_squared_inv, this.roomArrays.r2_squared_inv);
+      this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_x, this.roomArrays.x);
+      this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_y, this.roomArrays.y);
+      this.renderer.gl.uniform1iv(this.pickingShader.uniforms.rooms_id, this.roomArrays.id);
+      
       this.renderer.gl.bindBuffer(this.renderer.gl.ARRAY_BUFFER, this.vertexBuffer);
       this.renderer.gl.bindBuffer(this.renderer.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
 
@@ -307,8 +329,6 @@
       }
       else this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, this.nElements, this.renderer.gl.INDEXINT, 0);
     };
-
-
 
   </script>
   
@@ -327,4 +347,9 @@
   </body>
   
   <script src="../../molmil.js"></script>
+  
+<svg id="vricon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="26" viewBox="0 0 40 26">
+<path d="m 37.49,8.0000002e-8 v 0 H 2.41 C 1.1,8.0000002e-8 0,1.1400001 0,2.5500001 V 23.44 C 0,24.85 1.1,26 2.46,26 h 9.59 c 1.03,0 1.91,-0.65 2.28,-1.58 l 2.78,-6.97 c 0.47,-1.18 1.59,-2 2.9,-2 1.3,0 2.42,0.82 2.89,2 l 2.78,6.97 c 0.37,0.93 1.25,1.58 2.23,1.58 h 9.57 C 38.9,26 40,24.86 40,23.45 V 2.5600001 C 40,1.1500001 38.9,8.0000003e-8 37.49,8.0000002e-8 Z M 11,17.25 c -2.35,0 -4.25,-1.9 -4.25,-4.25 0,-2.35 1.9,-4.2499999 4.25,-4.2499999 2.35,0 4.25,1.8999999 4.25,4.2499999 0,2.35 -1.9,4.25 -4.25,4.25 z m 18,0 c -2.35,0 -4.25,-1.9 -4.25,-4.25 0,-2.35 1.9,-4.2499999 4.25,-4.2499999 2.35,0 4.25,1.8999999 4.25,4.2499999 0,2.35 -1.9,4.25 -4.25,4.25 z"/>
+</svg>
+  
 </html>

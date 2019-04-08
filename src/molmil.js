@@ -7993,7 +7993,13 @@ molmil.addLabel = function(text, settings, soup) {
     for (var i=0; i<tmp.length; i++) if (tmp[i].length > w) w = tmp[i].length;
     var regex = /[\u3000-\u303F]|[\u3040-\u309F]|[\u30A0-\u30FF]|[\uFF00-\uFFEF]|[\u4E00-\u9FAF]|[\u2605-\u2606]|[\u2190-\u2195]|\u203B/g;
     if (regex.test(tmp[0])) w *= 2;
-    w = (w*settings.fontSize*.6)+6;
+    
+    if ("scaleSize" in settings) {
+      settings.fontSize *= (settings.scaleSize*4)/(w*settings.fontSize);
+      w = (w*settings.fontSize*.6)+6;
+      h = tmp.length*settings.fontSize;
+    }
+    else w = (w*settings.fontSize*.6)+6;
     
     var Yoffset = 0;
     if (settings.addBorder) {
@@ -8001,7 +8007,6 @@ molmil.addLabel = function(text, settings, soup) {
       h += settings.fontSize*.5;
       Yoffset += settings.fontSize*.2;
     }
-    
     
     
     textCtx.canvas.width = w; textCtx.canvas.height = h;

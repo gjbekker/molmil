@@ -5,7 +5,7 @@ name:
   en: IPR
 description: 
   en: something
-default-start: dblab.room1
+default-start: dblab.c304
 regions:
   dblab:
     name:
@@ -13,26 +13,26 @@ regions:
     description:
       en: something
 rooms:
-  dblab.room1:
+  dblab.c304:
     name:
-      en: room1
+      en: Room C-304
     description:
       en: ""
     doors:
       -  to: dblab.corridor1
-         x: 2600
+         x: 2575
          y: 1290
-         r1: 340
-         r2: 200
+         r1: 200
+         r2: 110
      
   dblab.corridor1:
     name:
-      en: corridor1
+      en: Corridor
     description:
       en: ""
     doors:
-      -  to: dblab.room1
-         x: 100
-         y: 1500
-         r1: 850
-         r2: 850
+      -  to: dblab.c304
+         x: 70
+         y: 1575
+         r1: 500
+         r2: 500
