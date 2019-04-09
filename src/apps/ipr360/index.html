@@ -63,16 +63,16 @@
         this.renderer.FBOs.pickingBuffer.setup();
       }
       else if (this.renderer.FBOs.pickingBuffer.width != this.renderer.width || this.renderer.FBOs.pickingBuffer.height != this.renderer.height) this.renderer.FBOs.pickingBuffer.resize(this.renderer.width, this.renderer.height);
-  
       this.renderer.FBOs.pickingBuffer.bind();
       this.renderer.renderPicking();
-      var data = new Uint8Array(4);
-      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      var texturePointer = canvas.WORLD.program.settings.texturePointer;
-      var room = canvas.WORLD.rooms[texturePointer.id];
-      if (data[0] == 1) canvas.WORLD.loadRoom(room.doors[data[1]].to);
+      var data = new Uint8Array(4); gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
       this.renderer.FBOs.pickingBuffer.unbind();
       this.canvas.update = true;
+      
+      var texturePointer = canvas.WORLD.program.settings.texturePointer;
+      var room = canvas.WORLD.rooms[texturePointer.id];
+      
+      if (data[0] == 1) canvas.WORLD.loadRoom(room.doors[data[1]].to);
     };
     
   
@@ -183,7 +183,7 @@
         canvas.update = true;
       }
       world.updateLabels = function() {
-        while (canvas.molmilViewer.texturedBillBoards.length) { canvas.molmilViewer.texturedBillBoards.pop(); }
+        for (var i=0; i<canvas.molmilViewer.texturedBillBoards.length; i++) canvas.molmilViewer.texturedBillBoards[i].remove();
         
         var texturePointer = this.program.settings.texturePointer;
         var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;

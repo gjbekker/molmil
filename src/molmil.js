@@ -5015,7 +5015,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
       this.renderer.gl.blendFunc(this.renderer.gl.ONE, this.renderer.gl.ONE_MINUS_SRC_ALPHA);
       //if (molmil.configBox.stereoMode == 3) this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor*4);
       //else this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor * (molmil.configBox.projectionMode == 2 ? 0.2 : 1.0));
-      this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, 0.0002);
+      this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, 0.0008);
       this.renderer.gl.depthMask(false);
     
     
@@ -7979,6 +7979,11 @@ molmil.addLabel = function(text, settings, soup) {
   else {
     if (! settings.hasOwnProperty("xyz") && ! settings.hasOwnProperty("atomSelection")) return console.error("Cannot create label: no xyz variable set...");
     obj = new molmil.labelObject(soup); soup.texturedBillBoards.push(obj);
+    obj.remove = function() {
+      gl.deleteTexture(this.texture);
+      var idx = soup.texturedBillBoards.indexOf(this);
+      if (idx != -1) soup.texturedBillBoards.splice(idx, 1);
+    };
   }
   
   settings.fontSize = settings.fontSize || obj.settings.fontSize; settings.color = settings.color || obj.settings.color;
@@ -7989,28 +7994,28 @@ molmil.addLabel = function(text, settings, soup) {
     var textCtx = document.createElement("canvas").getContext("2d");
   
     var tmp = text.replace(/\\n/g, "\n").split(/\n/g), h, w, i;
-    h = tmp.length*settings.fontSize; w = 0;
+    h = tmp.length*settings.fontSize*.25; w = 0;
     for (var i=0; i<tmp.length; i++) if (tmp[i].length > w) w = tmp[i].length;
     var regex = /[\u3000-\u303F]|[\u3040-\u309F]|[\u30A0-\u30FF]|[\uFF00-\uFFEF]|[\u4E00-\u9FAF]|[\u2605-\u2606]|[\u2190-\u2195]|\u203B/g;
     if (regex.test(tmp[0])) w *= 2;
     
     if ("scaleSize" in settings) {
-      settings.fontSize *= (settings.scaleSize*4)/(w*settings.fontSize);
+      settings.fontSize *= (settings.scaleSize)/(w*settings.fontSize);
       w = (w*settings.fontSize*.6)+6;
       h = tmp.length*settings.fontSize;
     }
-    else w = (w*settings.fontSize*.6)+6;
+    else w = (w*settings.fontSize*.6*.25)+6;
     
     var Yoffset = 0;
     if (settings.addBorder) {
       w += settings.fontSize*.5;
       h += settings.fontSize*.5;
-      Yoffset += settings.fontSize*.2;
+      Yoffset += settings.fontSize*.25;
     }
-    
-    
+
     textCtx.canvas.width = w; textCtx.canvas.height = h;
-    textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; textCtx.fillStyle = 'white';
+    textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
+    textCtx.fillStyle = 'white';
     textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
 
     if (settings.textAlign == "left") {
@@ -8039,6 +8044,7 @@ molmil.addLabel = function(text, settings, soup) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.bindTexture(gl.TEXTURE_2D, null);
     
