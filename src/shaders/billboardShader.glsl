@@ -16,7 +16,6 @@
     "textureMap": -1,
     "sizeOffset": -1,
     "positionOffset": -1,
-    "scaleFactor": -1,
     "color": -1
   }
 }
@@ -29,7 +28,6 @@ uniform vec3 COR;
 
 uniform vec2 sizeOffset;
 uniform vec3 positionOffset;
-uniform float scaleFactor;
 
 attribute vec3 in_Position;
 attribute vec2 in_ScreenSpaceOffset;
@@ -50,11 +48,10 @@ uniform float zNear;
 
 void main() {
   gl_Position = vec4(modelViewMatrix * vec4(in_Position, 1.0))-vec4(COR, 0.0);
-  
-  vec3 refPos = vec3(0.0, 0.0, 0.0);
-  refPos.xy += in_ScreenSpaceOffset*sizeOffset;
-  refPos.xy *= -(refPos.z+gl_Position.z)*scaleFactor;
+
+  vec3 refPos = vec3(in_ScreenSpaceOffset*sizeOffset, 0.0);
   refPos += positionOffset;
+  refPos.xy *= length(gl_Position+vec4(0.0, 0.0, positionOffset.z, 0.0))*0.0003*.5;// render at a higher resolution
   gl_Position.xyz += refPos;
   
   

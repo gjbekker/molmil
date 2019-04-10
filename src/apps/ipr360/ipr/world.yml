@@ -17,7 +17,9 @@ rooms:
     name:
       en: Room C-304
     description:
-      en: ""
+      en: "This is the C-304 room.\n
+Some description about the room\n
+spread over multiple lines for testing."
     doors:
       -  to: dblab.corridor1
          x: 2575

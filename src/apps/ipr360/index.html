@@ -183,7 +183,8 @@
         canvas.update = true;
       }
       world.updateLabels = function() {
-        for (var i=0; i<canvas.molmilViewer.texturedBillBoards.length; i++) canvas.molmilViewer.texturedBillBoards[i].remove();
+        while(canvas.molmilViewer.texturedBillBoards.length) canvas.molmilViewer.texturedBillBoards[0].remove();
+        console.log(canvas.molmilViewer.texturedBillBoards);
         
         var texturePointer = this.program.settings.texturePointer;
         var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;
@@ -201,13 +202,21 @@
           y = Math.sin(phi) * 1;
           z = Math.cos(phi) * Math.sin(theta) * 1;
 
-          var toroom = this.rooms[room.doors[d].to];
+          var toroom = world.rooms[room.doors[d].to];
           if (LANGUAGE in toroom.name) var name = toroom.name[LANGUAGE];
           else if ("en" in toroom.name) var name = toroom.name["en"];
           else var name = Object.values(toroom.name)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: RADIUS/5., scaleSize: room.doors[d].r1*.9*2, alwaysFront: true, centerTexture: false, addBorder: true}, canvas.molmilViewer);
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: RADIUS/5., scaleSize: room.doors[d].r1*.9*2, alwaysFront: true, addBorder: true}, canvas.molmilViewer);
         }
+        
+        if (room.description && room.description[LANGUAGE]) {
+          molmil.addLabel(room.description[LANGUAGE], {xyz: [0, RADIUS, 0], fontSize: RADIUS/12, alwaysFront: true}, canvas.molmilViewer);
+        }
+        
+        canvas.renderer.initBuffers();
+        canvas.update = true;
+        
       };
       
       world.loadRoom(world["default-start"] || world.rooms[0].id);
@@ -268,10 +277,19 @@
       canvas.renderer.addProgram(program);
       
       world.program = program;
+      
+      //world.updateLabels();
+      //canvas.renderer.render();
+      //world.program.render(mat4.create());
+      
       world.updateLabels();
-
-      canvas.renderer.initBuffers();
-      canvas.update = true;
+      
+      
+      //setTimeout(function() {
+      //  world.updateLabels();
+     // 
+     // }, 1000);
+      
     }
 
     function sphere360_renderer(modelViewMatrix) {
@@ -279,7 +297,6 @@
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
       this.renderer.gl.uniform1f(this.standard_shader.uniforms.radius, this.settings.radius);
-      
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r1_squared_inv, this.roomArrays.r1_squared_inv);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r2_squared_inv, this.roomArrays.r2_squared_inv);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_x, this.roomArrays.x);
