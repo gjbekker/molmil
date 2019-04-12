@@ -111,8 +111,6 @@
       
       molmil.autoSetup({enable: []});
       
-      // change the mouse interface to be more panarama-friendly...
-      
       canvas.renderer.camera.generateMatrix_ = canvas.renderer.camera.generateMatrix;
       canvas.renderer.camera.generateMatrix = function() {
         var matrix = this.generateMatrix_();
@@ -131,10 +129,141 @@
         vricon.style.display = "block";
         vricon.onclick = function() {molmil.initVR(canvas.molmilViewer);};
       }
-
       
+      // in mouse-mode
+      document.onmousemove = function(ev) {
+        molmil.handle_molmilViewer_mouseMove(ev);
+        
+        if (! canvas.WORLD || ! canvas.WORLD.program) return;
+        
+        var x = (ev.clientX/canvas.renderer.width) * 2 - 1; var y = -(ev.clientY/canvas.renderer.height) * 2 + 1;
+        var uv = calculateViewUV(x, y, canvas.renderer.projectionMatrix, canvas.renderer.camera.generateMatrix());
+        var hoverDoorway = uv == null ? -1 : figureHoverDoorway(uv, canvas.WORLD.program.roomArrays);
+        if (hoverDoorway != canvas.WORLD.program.roomArrays.hoverDoorway) {
+          canvas.WORLD.program.roomArrays.hoverDoorway = hoverDoorway;
+          canvas.update = true;
+        }
+        document.documentElement.style.cursor = hoverDoorway == -1 ? "unset" : "pointer";
+      };
       
+      // in vr-mode
+      var viewTrace = [], lastUpdated = -1, lastYaw = 0;
+      var lastPosition = {};
+      molmil.configBox.jitRenderFunc = function(bag) {
+        if (! molmil.configBox.stereoMode == 3 || ! molmil.vrDisplay) return; // only for webvr...
+        if (! canvas.WORLD || ! canvas.WORLD.program) return;
+        
+        var tmpMMat = mat4.create(), tmp2MMat = mat4.create();
+        mat4.copy(tmp2MMat, bag.frameData.leftViewMatrix);
+        tmp2MMat[12] = (bag.frameData.leftViewMatrix[12] + bag.frameData.rightViewMatrix[12])*.5; // get the center...
+        tmp2MMat[12] *= 100; tmp2MMat[13] *= 100; tmp2MMat[14] *= 100;
+        
+        if (molmil.configBox.altVR) mat4.multiply(tmpMMat, this.modelViewMatrix, tmp2MMat);
+        else mat4.multiply(tmpMMat, tmp2MMat, this.modelViewMatrix);
+        
+        var x = 0.0, y = 0.0;
+        var uv = calculateViewUV(x, y, bag.frameData.leftProjectionMatrix, tmpMMat);
+        var hoverDoorway = uv == null ? -1 : figureHoverDoorway(uv, canvas.WORLD.program.roomArrays);
+        canvas.WORLD.program.roomArrays.hoverDoorway = hoverDoorway;
+        
+        onHeadMove(bag.frameData.pose.orientation, hoverDoorway);        
+      };
     }
+    
+    // based on https://github.com/piterwilson/react-vr-head-gesture
+    
+    var MOTION_UP = -1, MOTION_DOWN = 1, MOTION_LEFT = 2, MOTION_RIGHT = -2, MOTION_DIRECTION_UP_DOWN = 1, MOTION_DIRECTION_LEFT_RIGHT = 2, MOTION_NUMBER_TO_ANALYZE = 4;
+    var motionObject;
+    
+    function resetMotions() {
+      motionObject = {motions: [], doorHover: [], motionDirection: 0, lastPosition: null};
+    };
+    resetMotions();
+    
+    function onHeadMove(YPR, dooridx) {
+      if (motionObject.lastPosition) {
+        if (Math.abs( YPR[0] - motionObject.lastPosition.yaw) > 0.025) { // significant motion on Y
+          if (YPR[0] > motionObject.lastPosition.yaw) setMotion(MOTION_DOWN, dooridx);
+          else setMotion(MOTION_UP, dooridx);
+        } 
+        else if (Math.abs(YPR[1] - motionObject.lastPosition.pitch) > 0.025) { // significant motion on X
+          if (YPR[1] > motionObject.lastPosition.pitch) setMotion(MOTION_RIGHT, dooridx);
+          else setMotion(MOTION_LEFT, dooridx);
+        }
+      }
+      analyzeMotions();
+      
+      motionObject.lastPosition = {pitch: YPR[1], yaw: YPR[0]};
+    }
+    
+    function analyzeMotions() {
+      if (motionObject.motions.length == MOTION_NUMBER_TO_ANALYZE) {
+        var total = motionObject.motions.reduce(function(t, n) {return t += n;}, 0);
+        if (total == 0) {
+          if (motionObject.motionDirection == MOTION_DIRECTION_UP_DOWN) {
+            var valids = motionObject.doorHover.filter(function(i) {return i != -1;}).filter(function(val, idx, self) {return self.indexOf(val) === idx;});
+            if (valids.length == 1) {
+              var texturePointer = canvas.WORLD.program.settings.texturePointer;
+              var room = canvas.WORLD.rooms[texturePointer.id];
+              canvas.WORLD.loadRoom(room.doors[valids[0]].to);
+            }
+            resetMotions();
+          }
+        }
+      }
+    }
+    
+    function setMotion(newMotion, dooridx) {
+      if (motionObject.motionDirection == MOTION_DIRECTION_UP_DOWN) {
+        if (newMotion == MOTION_LEFT || newMotion == MOTION_RIGHT) return resetMotions(); // added pitch motion when the current direction is yaw
+      } 
+      else if (motionObject.motionDirection == MOTION_DIRECTION_LEFT_RIGHT) {
+        if (newMotion == MOTION_UP || newMotion == MOTION_DOWN) return resetMotions(); // added yaw motion when the current direction is pitch
+      } 
+      else { // no `motionDirection` stablished yet, set from the value in `newMotion`
+        if (newMotion == MOTION_UP || newMotion == MOTION_DOWN) motionObject.motionDirection = MOTION_DIRECTION_UP_DOWN;
+        else motionObject.motionDirection = MOTION_DIRECTION_LEFT_RIGHT;
+      }
+      motionObject.motions.unshift(newMotion); // add this motion at the begining of the `motions` Array
+      motionObject.doorHover.unshift(dooridx);
+      if (motionObject.motions.length == MOTION_NUMBER_TO_ANALYZE + 1) { // keep the size of the `motions` Array to 4
+        motionObject.motions.pop();
+        motionObject.doorHover.pop();
+      }
+    }
+    
+    // end based on https://github.com/piterwilson/react-vr-head-gesture
+    
+    
+    
+    function calculateViewUV(x, y, projectionMatrix, modelViewMatrix) {
+      var pos = vec4.fromValues(x, y, 0.0, 1.0);
+      var mVpM = mat4.multiply(mat4.create(), projectionMatrix, modelViewMatrix), inv_mVpM = mat4.create();
+      if(! mat4.invert(inv_mVpM, mVpM)) { return null; }
+      var lower = vec4.transformMat4(vec4.create(), pos, inv_mVpM); lower[0] /= lower[3]; lower[1] /= lower[3]; lower[2] /= lower[3];
+      pos[2] = 1.0;
+      var upper = vec4.transformMat4(vec4.create(), pos, inv_mVpM); upper[0] /= upper[3]; upper[1] /= upper[3]; upper[2] /= upper[3];
+
+      vec3.normalize(pos, vec3.sub(vec3.create(), upper, lower)); // <-- normal vector
+      var u = 1.0 - (0.5 + (Math.atan2(pos[2], -pos[0])/(2.0*Math.PI)));
+      var v = 0.5 - (Math.asin(pos[1])/Math.PI);
+      
+      return [u, v];
+    }
+    
+    function figureHoverDoorway(uv, roomArrays) {
+      var d, dx, dy, r;
+      for (d=0; d<roomArrays.N; d++) {
+        dx = Math.abs(uv[0]-roomArrays.x[d]);
+        dy = Math.abs(uv[1]-roomArrays.y[d]);
+        if (dx > .5) dx = 1.-dx;
+        if (dy > .5) dy = 1.-dy;
+        r = (dx*dx)*roomArrays.r1_squared_inv[d] + (dy*dy)*roomArrays.r2_squared_inv[d];
+        if (r <= 1.0) return d;
+      }
+      return -1;
+    }
+    
     
     function loadWorld(url, data) {
       if (! data) {
@@ -207,11 +336,11 @@
           else if ("en" in toroom.name) var name = toroom.name["en"];
           else var name = Object.values(toroom.name)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: RADIUS/5., scaleSize: room.doors[d].r1*.9*2, alwaysFront: true, addBorder: true}, canvas.molmilViewer);
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*5, customHeight: room.doors[d].r2*5, alwaysFront: true, addBorder: true, viewpointAligned: true}, canvas.molmilViewer);
         }
         
         if (room.description && room.description[LANGUAGE]) {
-          molmil.addLabel(room.description[LANGUAGE], {xyz: [0, RADIUS, 0], fontSize: RADIUS/12, alwaysFront: true}, canvas.molmilViewer);
+          molmil.addLabel(room.description[LANGUAGE], {xyz: [0, RADIUS, 0], fontSize: 30, scaleFactor: 2.5, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
         }
         
         canvas.renderer.initBuffers();
@@ -236,7 +365,7 @@
     }
     
     function createWorld(texturePointer, world) {
-      var programOptions = {solid: true, texturePointer: texturePointer, radius: RADIUS};
+      var programOptions = {solid: true, texturePointer: texturePointer};
       var sphere = molmil.geometry.getSphere(1, 0);
       var vBuffer = Float32Array.from(sphere.normals);
       var iBuffer = Uint32Array.from(sphere.indices);
@@ -245,7 +374,7 @@
       program.render = sphere360_renderer;
       program.renderPicking = sphere360_pickingRenderer;
       
-      program.roomArrays = {};
+      program.roomArrays = {hoverDoorway: -1};
       program.setRoomSize = function(doors) {
         var r1_squared_inv = new Float32Array(doors.length);
         var r2_squared_inv = new Float32Array(doors.length);
@@ -257,10 +386,11 @@
           r1_squared_inv[d] = 1./Math.pow(doors[d].r1/this.settings.texturePointer.image.width, 2);
           r2_squared_inv[d] = 1./Math.pow(doors[d].r2/this.settings.texturePointer.image.height, 2);
           x[d] = doors[d].x/this.settings.texturePointer.image.width;
-          y[d] = doors[d].y/this.settings.texturePointer.image.height;;
+          y[d] = doors[d].y/this.settings.texturePointer.image.height;
           id[d] = d;
         }
         
+        this.roomArrays.N = doors.length;
         this.roomArrays.r1_squared_inv = r1_squared_inv;
         this.roomArrays.r2_squared_inv = r2_squared_inv;
         this.roomArrays.x = x;
@@ -278,30 +408,21 @@
       
       world.program = program;
       
-      //world.updateLabels();
-      //canvas.renderer.render();
-      //world.program.render(mat4.create());
-      
       world.updateLabels();
-      
-      
-      //setTimeout(function() {
-      //  world.updateLabels();
-     // 
-     // }, 1000);
-      
-    }
 
-    function sphere360_renderer(modelViewMatrix) {
+    }    
+
+    function sphere360_renderer(modelViewMatrix) {    
       this.renderer.gl.useProgram(this.standard_shader.program);
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
       this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.radius, this.settings.radius);
+      this.renderer.gl.uniform1f(this.standard_shader.uniforms.radius, RADIUS);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r1_squared_inv, this.roomArrays.r1_squared_inv);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_r2_squared_inv, this.roomArrays.r2_squared_inv);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_x, this.roomArrays.x);
       this.renderer.gl.uniform1fv(this.standard_shader.uniforms.rooms_y, this.roomArrays.y);
       this.renderer.gl.uniform1iv(this.standard_shader.uniforms.rooms_id, this.roomArrays.id);
+      this.renderer.gl.uniform1i(this.standard_shader.uniforms.hoverDoorway, this.roomArrays.hoverDoorway);
 
       this.renderer.gl.activeTexture(this.renderer.gl.TEXTURE0);
       this.renderer.gl.bindTexture(this.renderer.gl.TEXTURE_2D, this.settings.texturePointer);
@@ -325,7 +446,7 @@
       this.renderer.gl.useProgram(this.pickingShader.program);
       this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.modelViewMatrix, false, modelViewMatrix);
       this.renderer.gl.uniformMatrix4fv(this.pickingShader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-      this.renderer.gl.uniform1f(this.pickingShader.uniforms.radius, this.settings.radius);
+      this.renderer.gl.uniform1f(this.pickingShader.uniforms.radius, RADIUS);
       
       this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_r1_squared_inv, this.roomArrays.r1_squared_inv);
       this.renderer.gl.uniform1fv(this.pickingShader.uniforms.rooms_r2_squared_inv, this.roomArrays.r2_squared_inv);

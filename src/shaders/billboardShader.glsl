@@ -16,7 +16,9 @@
     "textureMap": -1,
     "sizeOffset": -1,
     "positionOffset": -1,
-    "color": -1
+    "scaleFactor": -1,
+    "color": -1,
+    "renderMode": -1
   }
 }
 //#vertex
@@ -28,6 +30,9 @@ uniform vec3 COR;
 
 uniform vec2 sizeOffset;
 uniform vec3 positionOffset;
+uniform int renderMode;
+
+uniform float scaleFactor;
 
 attribute vec3 in_Position;
 attribute vec2 in_ScreenSpaceOffset;
@@ -47,15 +52,19 @@ varying vec2 ex_FragTexCoord;
 uniform float zNear;
 
 void main() {
-  gl_Position = vec4(modelViewMatrix * vec4(in_Position, 1.0))-vec4(COR, 0.0);
+  gl_Position = vec4(modelViewMatrix * vec4(in_Position, 1.0))-vec4(COR-positionOffset, 0.0);
 
-  vec3 refPos = vec3(in_ScreenSpaceOffset*sizeOffset, 0.0);
-  refPos += positionOffset;
-  refPos.xy *= length(gl_Position+vec4(0.0, 0.0, positionOffset.z, 0.0))*0.0003*.5;// render at a higher resolution
-  gl_Position.xyz += refPos;
-  
-  
-  // translate in 3D space...
+  vec3 delta = vec3(in_ScreenSpaceOffset*sizeOffset, 0.0)*scaleFactor*length(gl_Position);
+ 
+  if (renderMode == 1) {
+    vec3 z = -gl_Position.xyz;
+    vec4 u = vec4(0.0, 1.0, 0.0, 1.0);
+    vec3 x = normalize(cross(u.xyz, z));
+    vec3 y = normalize(cross(z, x));
+    mat3 m = mat3(x, y, vec3(0.0, 0.0, 1.0));
+    gl_Position += vec4(m * delta, 0.0);
+  }
+  else gl_Position.xyz += delta;
   
   vec3 vertPos = gl_Position.xyz / gl_Position.w;
   gl_Position = projectionMatrix * gl_Position;

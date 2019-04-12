@@ -11,7 +11,8 @@
     "rooms_r2_squared_inv": -1,
     "rooms_x": -1,
     "rooms_y": -1,
-    "rooms_id": -1
+    "rooms_id": -1,
+    "hoverDoorway": -1
   }
 }
 //#vertex
@@ -51,6 +52,7 @@ uniform float rooms_y[ROOM_SIZE];
 uniform float rooms_r1_squared_inv[ROOM_SIZE];
 uniform float rooms_r2_squared_inv[ROOM_SIZE];
 uniform int rooms_id[ROOM_SIZE];
+uniform int hoverDoorway;
 
 void main() {
   float dx, dy, r;
@@ -64,7 +66,6 @@ void main() {
   vec4 color = texture2D(textureMap, vec2(u, 1.0-v));
 #endif
 
-  // now, deal with periodicity...
   for (int d=0; d<ROOM_SIZE; d++) {
     dx = abs(u-rooms_x[d]);
     dy = abs(v-rooms_y[d]);
@@ -75,9 +76,7 @@ void main() {
 #ifdef PICKING_MODE
       color = vec4(1.0/255.0,rooms_id[d]/255, 1.0, 1.0);
 #else
-      //if (r > 0.9) color.rgb = vec3(0.0, 0.0, 0.0);
-      //else 
-      color.rgb += 0.1;
+      color.rgb += hoverDoorway == d ? 0.25 : 0.1;
 #endif
       break;
     }

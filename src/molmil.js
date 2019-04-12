@@ -4815,12 +4815,12 @@ molmil.generateSphereImposterTexture = function(res, gl) {
 
   var texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, res, res, 0, gl.RGBA, gl.UNSIGNED_BYTE, out);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, res, res, 0, gl.RGBA, gl.UNSIGNED_BYTE, out);
   gl.bindTexture(gl.TEXTURE_2D, null);
   texture.loaded = true;
 
@@ -4928,7 +4928,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     this.billboardProgram.render = function(modelViewMatrix, COR) {
       //first check for new/modified billboards (texturedBillBoards[i].status == false)
       
-      var N = [], i, status = true;
+      var N = [], i, status = true, scaleFactor;
       for (i=0; i<this.data.length; i++) {
         if (! this.data[i].status) {this.data[i].status = true; status = false;}
         if (! this.data[i].display) continue;
@@ -5013,9 +5013,6 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     
       this.renderer.gl.enable(this.renderer.gl.BLEND);
       this.renderer.gl.blendFunc(this.renderer.gl.ONE, this.renderer.gl.ONE_MINUS_SRC_ALPHA);
-      //if (molmil.configBox.stereoMode == 3) this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor*4);
-      //else this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor * (molmil.configBox.projectionMode == 2 ? 0.2 : 1.0));
-      this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, 0.0008);
       this.renderer.gl.depthMask(false);
     
     
@@ -5025,9 +5022,19 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         this.renderer.gl.activeTexture(this.renderer.gl.TEXTURE0);
         this.renderer.gl.bindTexture(this.renderer.gl.TEXTURE_2D, N[i].texture);
         this.renderer.gl.uniform1i(this.shader.uniforms.textureMap, 0);
+        
+        scaleFactor = 0.0003*.5*(N[i].settings.scaleFactor||1);
+        
+        if (N[i].settings.customWidth && N[i].settings.customHeight) {
+          if (N[i].settings.customWidth < N[i].settings.customHeight) scaleFactor *= N[i].settings.customHeight/N[i].texture.renderHeight;
+          else scaleFactor *= N[i].settings.customWidth/N[i].texture.renderWidth;
+        }
+        this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor);
+        
+        if (N[i].settings.viewpointAligned) this.renderer.gl.uniform1i(this.shader.uniforms.renderMode, 1);
+        else this.renderer.gl.uniform1i(this.shader.uniforms.renderMode, 0);
+        
         this.renderer.gl.uniform2f(this.shader.uniforms.sizeOffset, N[i].texture.renderWidth, N[i].texture.renderHeight);
-        //if (N[i].settings.centerTexture) this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx-(N[i].texture.renderWidth*.5), N[i].settings.dy-(N[i].texture.renderHeight*.5), N[i].settings.dz);
-        //else 
         this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx, N[i].settings.dy, N[i].settings.dz);
         this.renderer.gl.uniform3f(this.shader.uniforms.color, N[i].settings.color[0]/255, N[i].settings.color[1]/255, N[i].settings.color[2]/255);
         
@@ -5237,8 +5244,6 @@ molmil.render.prototype.render = function() {
     var curFramePose = frameData.pose;
   }
   
-  var VRzScaleFactor = 100;
-  
   // figure out whether the VR scene has been updated, if not -> return to save power (and prevent overheating...)
   
   if (frameData && this.camera.vrXYZupdated) {
@@ -5350,6 +5355,8 @@ molmil.render.prototype.render = function() {
   var tmp = mat3.create(); mat3.fromMat4(tmp, this.modelViewMatrix);
   vec3.transformMat3(COR, this.soup.COR, tmp);
 
+  if (molmil.configBox.jitRenderFunc) molmil.configBox.jitRenderFunc.apply(this, [{frameData: frameData}]);
+  
   if (molmil.configBox.stereoMode && (molmil.configBox.stereoMode != 3 || molmil.vrDisplay)) {
     if (! this.FBOs.hasOwnProperty("stereoLeft")) {
       this.FBOs.stereoLeft = new molmil.FBO(this.gl, this.width, this.height);
@@ -5399,7 +5406,7 @@ molmil.render.prototype.render = function() {
     }
     else if (molmil.configBox.stereoMode == 3) { // webvr
       mat4.copy(tmp2MMat, frameData.leftViewMatrix);
-      tmp2MMat[12] *= VRzScaleFactor; tmp2MMat[13] *= VRzScaleFactor; tmp2MMat[14] *= VRzScaleFactor;
+      tmp2MMat[12] *= 100; tmp2MMat[13] *= 100; tmp2MMat[14] *= 100;
       
       tmp3MVec[0] = tmp2MMat[12]-frameData.leftViewMatrix[12];
       tmp3MVec[1] = tmp2MMat[13]-frameData.leftViewMatrix[13];
@@ -6837,11 +6844,11 @@ molmil.handleLoadedTexture = function (texture, gl) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
   //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // ?? needed???????????
   //gl.pixelStorei(gl.UNPACK_FLIP_X_WEBGL, true); // ?? needed???????????
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.image);
   gl.bindTexture(gl.TEXTURE_2D, null);
   texture.loaded = true;
 }
@@ -7992,19 +7999,15 @@ molmil.addLabel = function(text, settings, soup) {
   
   if (text != obj.text || settings.fontSize != obj.settings.fontSize || settings.color[0] != obj.settings.color[0] || settings.color[1] != obj.settings.color[1] || settings.color[2] != obj.settings.color[2]) {
     var textCtx = document.createElement("canvas").getContext("2d");
+    settings.fontSize *= 2; // render at a higher resolution
   
     var tmp = text.replace(/\\n/g, "\n").split(/\n/g), h, w, i;
-    h = tmp.length*settings.fontSize*.25; w = 0;
+    h = tmp.length*settings.fontSize; w = 0;
     for (var i=0; i<tmp.length; i++) if (tmp[i].length > w) w = tmp[i].length;
     var regex = /[\u3000-\u303F]|[\u3040-\u309F]|[\u30A0-\u30FF]|[\uFF00-\uFFEF]|[\u4E00-\u9FAF]|[\u2605-\u2606]|[\u2190-\u2195]|\u203B/g;
     if (regex.test(tmp[0])) w *= 2;
     
-    if ("scaleSize" in settings) {
-      settings.fontSize *= (settings.scaleSize)/(w*settings.fontSize);
-      w = (w*settings.fontSize*.6)+6;
-      h = tmp.length*settings.fontSize;
-    }
-    else w = (w*settings.fontSize*.6*.25)+6;
+    w = (w*settings.fontSize*.6)+6;
     
     var Yoffset = 0;
     if (settings.addBorder) {
@@ -8012,7 +8015,7 @@ molmil.addLabel = function(text, settings, soup) {
       h += settings.fontSize*.5;
       Yoffset += settings.fontSize*.25;
     }
-
+    
     textCtx.canvas.width = w; textCtx.canvas.height = h;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
     textCtx.fillStyle = 'white';
@@ -8040,18 +8043,19 @@ molmil.addLabel = function(text, settings, soup) {
     var gl = soup.renderer.gl;
     var textTex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, textTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCtx.canvas);
     gl.bindTexture(gl.TEXTURE_2D, null);
     
     obj.status = false;
     obj.texture = textTex;
     obj.texture.renderWidth = w;
     obj.texture.renderHeight = h;
+    settings.fontSize *= .5; // render at a higher resolution
   }
   
   obj.text = text;
