@@ -8379,7 +8379,7 @@ molmil.autoSetup = function(options, canvas) {
     if (options.enable.includes("cli-hash")) {
       var hash = window.location.hash ? window.location.hash.substr(1) : "";
       if (hash) cli.environment.console.runCommand(decodeURIComponent(hash));
-      
+
       window.onhashchange = function() {
         var hash = window.location.hash ? window.location.hash.substr(1) : "";
         if (hash) {molmil.clear(canvas); cli.environment.console.runCommand(decodeURIComponent(hash));}

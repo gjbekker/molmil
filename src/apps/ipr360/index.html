@@ -80,16 +80,11 @@
       if (! window.molmil.configBox || ! molmil.configBox.initFinished || ! window.jsyaml) {return setTimeout(initViewer, 100);}
       
       molmil.configBox.camera_fovy = 75;
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_0", "#define ROOM_SIZE 0\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_1", "#define ROOM_SIZE 1\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_2", "#define ROOM_SIZE 2\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_3", "#define ROOM_SIZE 3\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_4", "#define ROOM_SIZE 4\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_0", "#define PICKING_MODE 1\n#define ROOM_SIZE 0\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_1", "#define PICKING_MODE 1\n#define ROOM_SIZE 1\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_2", "#define PICKING_MODE 1\n#define ROOM_SIZE 2\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_3", "#define PICKING_MODE 1\n#define ROOM_SIZE 3\n"]);
-      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_4", "#define PICKING_MODE 1\n#define ROOM_SIZE 4\n"]);
+      var href = window.location.href.split("#")[0];
+      for (var i=0; i<5; i++) { // in the future change this to dynamically setup the required doors automatically...
+        molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_"+i, "#define ROOM_SIZE "+i+"\n"]);
+        molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_picking_"+i, "#define PICKING_MODE 1\n#define ROOM_SIZE "+i+"\n"]);
+      }
 
       molmil.configBox.BGCOLOR = [0, 0, 0, 1];
       molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
@@ -111,7 +106,9 @@
         canvas.update = true;
       };
       
-      molmil.autoSetup({enable: []});
+      molmil.autoSetup({environment: {LANGUAGE: LANGUAGE, initialRoom: null}, enable: ["cli", "cli-hash"]});
+      
+      canvas.commandLine.consoleBox.style.display = "none";
       
       canvas.renderer.camera.generateMatrix_ = canvas.renderer.camera.generateMatrix;
       canvas.renderer.camera.generateMatrix = function() {
@@ -274,6 +271,9 @@
         request.Send(url);
         return;
       }
+      if (! canvas.commandLine.initDone) return setTimeout(function() {loadWorld(url, data);}, 100);
+      
+      LANGUAGE = canvas.commandLine.environment.LANGUAGE || "en";
       
       var world = jsyaml.load(data); canvas.WORLD = world;
       var a = document.createElement("a"); a.href = url;
@@ -349,7 +349,7 @@
         
       };
       
-      world.loadRoom(world["default-start"] || world.rooms[0].id);
+      world.loadRoom(canvas.commandLine.environment.initialRoom || world["default-start"] || world.rooms[0].id);
     };
     
     function maxSizeImage(image, size) {

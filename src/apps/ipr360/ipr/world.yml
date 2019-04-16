@@ -2,7 +2,7 @@ name:
   en: IPR
 description: 
   en: something
-default-start: cryoem.g2_open
+default-start: general.entrance
 regions:
   dblab:
     name:
@@ -36,7 +36,33 @@ spread over multiple lines for testing."
          r1: 500
          r2: 500
 
-         
+
+  general.entrance:
+    name:
+      en: IPR Entrance
+    description:
+      en: ""
+    doors: 
+      - to: cryoem.g2_or
+        x: 2610
+        y: 1190
+        r1: 180
+        r2: 180
+        
+      - to: nmr.entrance
+        x: 1600
+        y: 1200
+        r1: 120
+        r2: 120
+        
+      - to: xray.entrance
+        x: 1200
+        y: 1140
+        r1: 150
+        r2: 150
+        
+# EM related
+        
   cryoem.g2_front:
     name:
       en: "FEI: \nTitan Krios G2 \n(front)"
@@ -48,6 +74,19 @@ spread over multiple lines for testing."
         y: 1000
         r1: 450
         r2: 750
+        
+      - to: cryoem.g2_back
+        x: 300
+        y: 1450
+        r1: 200
+        r2: 400
+        
+      - to: cryoem.jeol
+        x: 4850
+        y: 1450
+        r1: 200
+        r2: 400
+        
     
   cryoem.g2_open:
     name:
@@ -56,15 +95,21 @@ spread over multiple lines for testing."
       en: ""
     doors: 
       - to: cryoem.g2_front
-        x: 4300
+        x: 4200
         y: 1400
         r1: 400
         r2: 800
         
       - to: cryoem.g2_back
-        x: 200
+        x: 250
         y: 1450
-        r1: 100
+        r1: 200
+        r2: 400
+        
+      - to: cryoem.jeol
+        x: 5000
+        y: 1450
+        r1: 200
         r2: 400
     
   cryoem.g2_back:
@@ -96,18 +141,105 @@ spread over multiple lines for testing."
         y: 1360
         r1: 240
         r2: 400
+
+      - to: general.entrance
+        x: 275
+        y: 1400
+        r1: 200
+        r2: 350
     
   cryoem.jeol:
     name:
       en: "JEOL: JEM-2200fs"
     description:
       en: ""
-    doors: []
+    doors: 
+      - to: cryoem.g2_front
+        x: 0
+        y: 1480
+        r1: 200
+        r2: 400
+        
+      - to: cryoem.hitachi
+        x: 3000
+        y: 1400
+        r1: 300
+        r2: 400
     
   cryoem.hitachi:
     name:
       en: "HITACHI: H-7650"
     description:
       en: ""
-    doors: []
+    doors: 
+      - to: cryoem.jeol
+        x: 1800
+        y: 1500
+        r1: 300
+        r2: 500
   
+  
+# NMR related
+
+  nmr.entrance:
+    name:
+      en: "Bird view of the \nthree NMR machines"
+    description:
+      en: ""
+    doors: 
+      - to: general.entrance
+        x: 3130
+        y: 1430
+        r1: 180
+        r2: 350
+        
+      - to: nmr.bruker_top
+        x: 2150
+        y: 1000
+        r1: 320
+        r2: 320
+        
+  nmr.bruker_top:
+    name:
+      en: "BRUKER 960 MHz (top)"
+    description:
+      en: ""
+    doors: 
+      - to: nmr.entrance
+        x: 2230
+        y: 1140
+        r1: 180
+        r2: 400
+
+# XRAY related
+
+  xray.entrance:
+    name:
+      en: "Bird view of the \nthree X-ray machines"
+    description:
+      en: ""
+    doors: 
+      - to: xray.one
+        x: 560
+        y: 1690
+        r1: 180
+        r2: 350
+        
+      - to: general.entrance
+        x: 3500
+        y: 1400
+        r1: 250
+        r2: 400
+        
+  xray.one:
+    name:
+      en: "One X-ray machine"
+    description:
+      en: ""
+    doors: 
+      - to: general.entrance
+        x: 4600
+        y: 1350
+        r1: 200
+        r2: 300
+
