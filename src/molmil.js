@@ -5026,7 +5026,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         scaleFactor = 0.0003*.5*(N[i].settings.scaleFactor||1);
         
         if (N[i].settings.customWidth && N[i].settings.customHeight) {
-          if (N[i].settings.customWidth < N[i].settings.customHeight) scaleFactor *= N[i].settings.customHeight/N[i].texture.renderHeight;
+          if (N[i].settings.customWidth > N[i].settings.customHeight) scaleFactor *= N[i].settings.customHeight/N[i].texture.renderHeight;
           else scaleFactor *= N[i].settings.customWidth/N[i].texture.renderWidth;
         }
         this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor);

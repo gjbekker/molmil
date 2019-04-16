@@ -68,7 +68,7 @@
       var data = new Uint8Array(4); gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, data);
       this.renderer.FBOs.pickingBuffer.unbind();
       this.canvas.update = true;
-      
+
       var texturePointer = canvas.WORLD.program.settings.texturePointer;
       var room = canvas.WORLD.rooms[texturePointer.id];
       
@@ -77,13 +77,15 @@
     
   
     function initViewer() {
-      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished || ! window.jsyaml) {return setTimeout(initViewer, 100);}
       
       molmil.configBox.camera_fovy = 75;
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_0", "#define ROOM_SIZE 0\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_1", "#define ROOM_SIZE 1\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_2", "#define ROOM_SIZE 2\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_3", "#define ROOM_SIZE 3\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_4", "#define ROOM_SIZE 4\n"]);
+      molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_0", "#define PICKING_MODE 1\n#define ROOM_SIZE 0\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_1", "#define PICKING_MODE 1\n#define ROOM_SIZE 1\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_2", "#define PICKING_MODE 1\n#define ROOM_SIZE 2\n"]);
       molmil.configBox.glsl_shaders.push([window.location.href+"360sphere.glsl", "standard360sphere_picking_3", "#define PICKING_MODE 1\n#define ROOM_SIZE 3\n"]);
@@ -122,7 +124,7 @@
       
       canvas.molmilViewer.selectObject = customPicker;
       
-      loadWorld("ipr/world.json");
+      loadWorld("ipr/world.yml");
       
       if (molmil.vrDisplays && molmil.vrDisplays.length) {
         var vricon = document.getElementById("vricon");
@@ -273,7 +275,7 @@
         return;
       }
       
-      var world = JSON.parse(data); canvas.WORLD = world;
+      var world = jsyaml.load(data); canvas.WORLD = world;
       var a = document.createElement("a"); a.href = url;
       world.baseURL = a.href.split("/").slice(0, -1).join("/").trim()+"/";
       world.catalogue = {};
@@ -313,8 +315,7 @@
       }
       world.updateLabels = function() {
         while(canvas.molmilViewer.texturedBillBoards.length) canvas.molmilViewer.texturedBillBoards[0].remove();
-        console.log(canvas.molmilViewer.texturedBillBoards);
-        
+
         var texturePointer = this.program.settings.texturePointer;
         var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;
         
@@ -336,7 +337,7 @@
           else if ("en" in toroom.name) var name = toroom.name["en"];
           else var name = Object.values(toroom.name)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*5, customHeight: room.doors[d].r2*5, alwaysFront: true, addBorder: true, viewpointAligned: true}, canvas.molmilViewer);
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*8, customHeight: room.doors[d].r2*8, alwaysFront: true, addBorder: true, viewpointAligned: true}, canvas.molmilViewer);
         }
         
         if (room.description && room.description[LANGUAGE]) {
@@ -485,6 +486,7 @@
   </body>
   
   <script src="../../molmil.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/3.13.1/js-yaml.min.js"></script>
   
 <svg id="vricon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="40" height="26" viewBox="0 0 40 26">
 <path d="m 37.49,8.0000002e-8 v 0 H 2.41 C 1.1,8.0000002e-8 0,1.1400001 0,2.5500001 V 23.44 C 0,24.85 1.1,26 2.46,26 h 9.59 c 1.03,0 1.91,-0.65 2.28,-1.58 l 2.78,-6.97 c 0.47,-1.18 1.59,-2 2.9,-2 1.3,0 2.42,0.82 2.89,2 l 2.78,6.97 c 0.37,0.93 1.25,1.58 2.23,1.58 h 9.57 C 38.9,26 40,24.86 40,23.45 V 2.5600001 C 40,1.1500001 38.9,8.0000003e-8 37.49,8.0000002e-8 Z M 11,17.25 c -2.35,0 -4.25,-1.9 -4.25,-4.25 0,-2.35 1.9,-4.2499999 4.25,-4.2499999 2.35,0 4.25,1.8999999 4.25,4.2499999 0,2.35 -1.9,4.25 -4.25,4.25 z m 18,0 c -2.35,0 -4.25,-1.9 -4.25,-4.25 0,-2.35 1.9,-4.2499999 4.25,-4.2499999 2.35,0 4.25,1.8999999 4.25,4.2499999 0,2.35 -1.9,4.25 -4.25,4.25 z"/>

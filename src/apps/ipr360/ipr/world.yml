@@ -1,11 +1,8 @@
-# afterwards run 
-# python3 convert.py world.yml
-# to generate world.json
 name:
   en: IPR
 description: 
   en: something
-default-start: dblab.c304
+default-start: cryoem.g2_open
 regions:
   dblab:
     name:
@@ -38,3 +35,79 @@ spread over multiple lines for testing."
          y: 1575
          r1: 500
          r2: 500
+
+         
+  cryoem.g2_front:
+    name:
+      en: "FEI: \nTitan Krios G2 \n(front)"
+    description:
+      en: ""
+    doors: 
+      - to: cryoem.g2_open
+        x: 1240
+        y: 1000
+        r1: 450
+        r2: 750
+    
+  cryoem.g2_open:
+    name:
+      en: "FEI: \nTitan Krios G2 \n(open)"
+    description:
+      en: ""
+    doors: 
+      - to: cryoem.g2_front
+        x: 4300
+        y: 1400
+        r1: 400
+        r2: 800
+        
+      - to: cryoem.g2_back
+        x: 200
+        y: 1450
+        r1: 100
+        r2: 400
+    
+  cryoem.g2_back:
+    name:
+      en: "FEI: \nTitan Krios G2 \n(back)"
+    description:
+      en: ""
+    doors: 
+      - to: cryoem.g2_or
+        x: 1180
+        y: 1330
+        r1: 400
+        r2: 400
+        
+      - to: cryoem.g2_front
+        x: 0
+        y: 1400
+        r1: 200
+        r2: 700
+    
+  cryoem.g2_or:
+    name:
+      en: "FEI: \nTitan Krios G2 \n(operation room)"
+    description:
+      en: ""
+    doors: 
+      - to: cryoem.g2_back
+        x: 4760
+        y: 1360
+        r1: 240
+        r2: 400
+    
+  cryoem.jeol:
+    name:
+      en: "JEOL: JEM-2200fs"
+    description:
+      en: ""
+    doors: []
+    
+  cryoem.hitachi:
+    name:
+      en: "HITACHI: H-7650"
+    description:
+      en: ""
+    doors: []
+  

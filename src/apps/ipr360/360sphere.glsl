@@ -47,12 +47,14 @@ uniform sampler2D textureMap;
 
 const float PI = 3.1415926535897932384626433832795;
 
+#if ROOM_SIZE > 0
 uniform float rooms_x[ROOM_SIZE];
 uniform float rooms_y[ROOM_SIZE];
 uniform float rooms_r1_squared_inv[ROOM_SIZE];
 uniform float rooms_r2_squared_inv[ROOM_SIZE];
 uniform int rooms_id[ROOM_SIZE];
 uniform int hoverDoorway;
+#endif
 
 void main() {
   float dx, dy, r;
@@ -66,6 +68,7 @@ void main() {
   vec4 color = texture2D(textureMap, vec2(u, 1.0-v));
 #endif
 
+#if ROOM_SIZE > 0
   for (int d=0; d<ROOM_SIZE; d++) {
     dx = abs(u-rooms_x[d]);
     dy = abs(v-rooms_y[d]);
@@ -74,12 +77,13 @@ void main() {
     r = (dx*dx)*rooms_r1_squared_inv[d] + (dy*dy)*rooms_r2_squared_inv[d];
     if (r <= 1.0) {
 #ifdef PICKING_MODE
-      color = vec4(1.0/255.0,rooms_id[d]/255, 1.0, 1.0);
+      color = vec4(1.0/255.0, float(rooms_id[d])/255.0, 1.0, 1.0);
 #else
       color.rgb += hoverDoorway == d ? 0.25 : 0.1;
 #endif
       break;
     }
   }
+#endif // ROOM_SIZE > 0
   gl_FragColor = color;
 }
