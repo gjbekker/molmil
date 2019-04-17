@@ -110,15 +110,6 @@
       
       canvas.commandLine.consoleBox.style.display = "none";
       
-      canvas.renderer.camera.generateMatrix_ = canvas.renderer.camera.generateMatrix;
-      canvas.renderer.camera.generateMatrix = function() {
-        var matrix = this.generateMatrix_();
-        matrix[12] = 0;
-        matrix[13] = 0;
-        matrix[14] = 0;
-        return matrix;
-      };
-      
       canvas.molmilViewer.selectObject = customPicker;
       
       loadWorld("ipr/world.yml");
@@ -133,12 +124,67 @@
       }
       showVRicon();
       
+      // camera based on https://threejs.org/examples/webgl_panorama_equirectangular.html
+      var mouseActive = false;
+      var onMouseDownMouseX = 0, onMouseDownMouseY = 0, onMouseDownLon = 0, onMouseDownLat = 0, lon = 0, lat = 0;
+      canvas.onmousedown = function() {
+        mouseActive = true;
+        molmil.mouseMoved = false;
+        
+        var clientX = event.clientX || event.touches[ 0 ].clientX;
+        var clientY = event.clientY || event.touches[ 0 ].clientY;
+
+        onMouseDownMouseX = clientX;
+        onMouseDownMouseY = clientY;
+
+        onMouseDownLon = lon;
+        onMouseDownLat = lat;
+      };
+      document.onmouseup = function() {
+        if (mouseActive && ! molmil.mouseMoved) {
+          if (canvas.isFullScreen) var offset = {x: event.screenX, y: event.screenY};
+          else var offset = molmil.getOffset(event);
+          var dpr = window.devicePixelRatio || 1;
+          canvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);
+        }
+          
+        mouseActive = false;
+      };
+
+      canvas.renderer.camera.generateMatrix = function() {
+        lat = Math.max(-85, Math.min(85, lat));
+        var phi = glMatrix.toRadian(90 - lat);
+        var theta = glMatrix.toRadian(lon);
+          
+        var lookX = RADIUS * Math.sin(phi) * Math.cos(theta);
+        var lookY = RADIUS * Math.cos(phi);
+        var lookZ = RADIUS * Math.sin(phi) * Math.sin(theta);
+      
+        return mat4.lookAt(mat4.create(), [0, 0, 0], [lookX, lookY, lookZ], [0, 1, 0]);
+      };
+      
+      canvas.addEventListener(molmil_dep.dBT.MFF ? "DOMMouseScroll" : "mousewheel", function(ev) {
+        var fov = molmil.configBox.camera_fovy + ev.deltaY * 0.05;
+        molmil.configBox.camera_fovy = Math.min(Math.max(fov, 10), 75);
+        mat4.perspective(canvas.renderer.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/180), canvas.renderer.width/canvas.renderer.height, molmil.configBox.zNear, molmil.configBox.zFar);
+        canvas.update = true;
+      }, false);
+      
       // in mouse-mode
       document.onmousemove = function(ev) {
-        molmil.handle_molmilViewer_mouseMove(ev);
-        
+        //molmil.handle_molmilViewer_mouseMove(ev);
         if (! canvas.WORLD || ! canvas.WORLD.program) return;
-        
+
+        if (mouseActive) {
+          molmil.mouseMoved = true;
+          var clientX = event.clientX || event.touches[ 0 ].clientX;
+          var clientY = event.clientY || event.touches[ 0 ].clientY;
+
+          lon = ( onMouseDownMouseX - clientX ) * 0.1 + onMouseDownLon;
+          lat = ( clientY - onMouseDownMouseY ) * 0.1 + onMouseDownLat;
+          canvas.update = true;
+        }
+
         var x = (ev.clientX/canvas.renderer.width) * 2 - 1; var y = -(ev.clientY/canvas.renderer.height) * 2 + 1;
         var uv = calculateViewUV(x, y, canvas.renderer.projectionMatrix, canvas.renderer.camera.generateMatrix());
         var hoverDoorway = uv == null ? -1 : figureHoverDoorway(uv, canvas.WORLD.program.roomArrays);

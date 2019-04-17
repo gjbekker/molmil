@@ -61,6 +61,12 @@ spread over multiple lines for testing."
         r1: 150
         r2: 150
         
+      - to: cryoem.jeol
+        x: 3650
+        y: 1300
+        r1: 150
+        r2: 150
+        
 # EM related
         
   cryoem.g2_front:
@@ -70,23 +76,16 @@ spread over multiple lines for testing."
       en: ""
     doors: 
       - to: cryoem.g2_open
-        x: 1240
-        y: 1000
+        x: 2550
+        y: 1300
         r1: 450
         r2: 750
         
       - to: cryoem.g2_back
-        x: 300
-        y: 1450
+        x: 1800
+        y: 1400
         r1: 200
-        r2: 400
-        
-      - to: cryoem.jeol
-        x: 4850
-        y: 1450
-        r1: 200
-        r2: 400
-        
+        r2: 400        
     
   cryoem.g2_open:
     name:
@@ -95,19 +94,13 @@ spread over multiple lines for testing."
       en: ""
     doors: 
       - to: cryoem.g2_front
-        x: 4200
+        x: 3700
         y: 1400
         r1: 400
         r2: 800
         
       - to: cryoem.g2_back
-        x: 250
-        y: 1450
-        r1: 200
-        r2: 400
-        
-      - to: cryoem.jeol
-        x: 5000
+        x: 5400
         y: 1450
         r1: 200
         r2: 400
@@ -154,7 +147,7 @@ spread over multiple lines for testing."
     description:
       en: ""
     doors: 
-      - to: cryoem.g2_front
+      - to: general.entrance
         x: 0
         y: 1480
         r1: 200
