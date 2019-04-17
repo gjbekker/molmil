@@ -123,11 +123,15 @@
       
       loadWorld("ipr/world.yml");
       
-      if (molmil.vrDisplays && molmil.vrDisplays.length) {
-        var vricon = document.getElementById("vricon");
-        vricon.style.display = "block";
-        vricon.onclick = function() {molmil.initVR(canvas.molmilViewer);};
+      function showVRicon() {
+        if (molmil.vrDisplays && molmil.vrDisplays.length) {
+          var vricon = document.getElementById("vricon");
+          vricon.style.display = "block";
+          vricon.onclick = function() {molmil.initVR(canvas.molmilViewer);};
+        }
+        else setTimeout(showVRicon, 1000);
       }
+      showVRicon();
       
       // in mouse-mode
       document.onmousemove = function(ev) {
