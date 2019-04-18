@@ -54,6 +54,9 @@
     var canvas, cli;
     var LANGUAGE = "en";
     
+    var mouseActive = false;
+    var onMouseDownMouseX = 0, onMouseDownMouseY = 0, onMouseDownLon = 0, onMouseDownLat = 0, lon = 0, lat = 0;
+    
     function customPicker(x, y, event) {
       y = this.canvas.height-y;
       var gl = this.renderer.gl;
@@ -125,12 +128,10 @@
       showVRicon();
       
       // camera based on https://threejs.org/examples/webgl_panorama_equirectangular.html
-      var mouseActive = false;
-      var onMouseDownMouseX = 0, onMouseDownMouseY = 0, onMouseDownLon = 0, onMouseDownLat = 0, lon = 0, lat = 0;
       canvas.onmousedown = function() {
         mouseActive = true;
         molmil.mouseMoved = false;
-        
+
         var clientX = event.clientX || event.touches[ 0 ].clientX;
         var clientY = event.clientY || event.touches[ 0 ].clientY;
 
@@ -150,6 +151,10 @@
           
         mouseActive = false;
       };
+      
+      canvas.addEventListener("touchstart", function() {canvas.onmousedown();}, false);
+      canvas.addEventListener("touchmove", function(ev) {document.onmousemove(ev);}, false);
+      canvas.addEventListener("touchend", function(ev) {document.onmouseup();}, false);
 
       canvas.renderer.camera.generateMatrix = function() {
         lat = Math.max(-85, Math.min(85, lat));
@@ -177,8 +182,8 @@
 
         if (mouseActive) {
           molmil.mouseMoved = true;
-          var clientX = event.clientX || event.touches[ 0 ].clientX;
-          var clientY = event.clientY || event.touches[ 0 ].clientY;
+          var clientX = ev.clientX || (ev.touches ? ev.touches[ 0 ].clientX : 0);
+          var clientY = ev.clientY || (ev.touches ? ev.touches[ 0 ].clientY : 0);
 
           lon = ( onMouseDownMouseX - clientX ) * 0.1 + onMouseDownLon;
           lat = ( clientY - onMouseDownMouseY ) * 0.1 + onMouseDownLat;
@@ -359,7 +364,34 @@
       world.setRoom = function(id) {
         if (! this.catalogue[id]) return;
         if (! this.program) return createWorld(this.catalogue[id], this);
+        
+        var nextRoom = this.rooms[this.catalogue[id].id];
+        
+        var x, y, movemove = 180;
+        
+        if (nextRoom["default-orientation"]) {
+          x = nextRoom["default-orientation"][0];
+          y = nextRoom["default-orientation"][1];
+          movemove = 0;
+        }
+        else {
+          try {
+            var lastRoom = this.rooms[this.program.settings.texturePointer.id];
+            var refDoor = nextRoom.doors[0];
+            for (var i=1; i<nextRoom.doors.length; i++) {
+              if (nextRoom.doors[i].to == this.program.settings.texturePointer.id) {refDoor = nextRoom.doors[i]; break;}
+            }
+            x = refDoor.x; y = refDoor.y;
+          }
+          catch (e) {x = y = 0;}
+        }
         this.program.settings.texturePointer = this.catalogue[id];
+        
+        var u = x/this.program.settings.texturePointer.image.width, v = y/this.program.settings.texturePointer.image.height;
+        
+        lon = (u*360)+movemove;
+        lat = 90 - (v*180);
+
         this.updateLabels();
         canvas.update = true;
       }
@@ -458,6 +490,17 @@
       canvas.renderer.addProgram(program);
       
       world.program = program;
+      
+      var room = canvas.WORLD.rooms[texturePointer.id];
+      if (room["default-orientation"]) {
+        var x = room["default-orientation"][0];
+        var y = room["default-orientation"][1];
+        
+        var u = x/texturePointer.image.width, v = y/texturePointer.image.height;
+        
+        lon = u*360;
+        lat = 90 - (v*180);
+      }
       
       world.updateLabels();
 

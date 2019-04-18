@@ -42,6 +42,7 @@ spread over multiple lines for testing."
       en: IPR Entrance
     description:
       en: ""
+    default-orientation: [2610, 1190]
     doors: 
       - to: cryoem.g2_or
         x: 2610
@@ -74,6 +75,7 @@ spread over multiple lines for testing."
       en: "FEI: \nTitan Krios G2 \n(front)"
     description:
       en: ""
+    default-orientation: [2550, 1300]
     doors: 
       - to: cryoem.g2_open
         x: 2550
@@ -92,6 +94,7 @@ spread over multiple lines for testing."
       en: "FEI: \nTitan Krios G2 \n(open)"
     description:
       en: ""
+    default-orientation: [1490, 1620]
     doors: 
       - to: cryoem.g2_front
         x: 3700
@@ -229,6 +232,7 @@ spread over multiple lines for testing."
       en: "One X-ray machine"
     description:
       en: ""
+    default-orientation: [1285, 1540]
     doors: 
       - to: general.entrance
         x: 4600

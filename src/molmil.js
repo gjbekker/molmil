@@ -8632,7 +8632,6 @@ molmil.initVR = function(soup) {
     var head = document.getElementsByTagName("head")[0];
     head.appendChild(dep);
   }
-  
   if (! molmil.VRstatus) {
     if (navigator.getVRDisplays) {
       navigator.getVRDisplays().then(function(displays) {if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup);} else initFakeVR();}).catch(function(){initFakeVR();});
