@@ -199,6 +199,7 @@ molmil.UI.prototype.showRM=function(icon, reset) {
       item.name = item.pushNode("a", file.meta.id + " ("+file.meta.idnr+")");
       item.name.title = "Left click to expand\nRight click to show the context menu for display & color options";
       item.name.className = "optCat_n";
+      item.style.color = file.display ? "" : "lightgrey"
       item.plus.onclick = item.name.onclick = function(ev) {
         if (ev.ctrlKey) {
           if (this.parentNode.payload[0].display) {
@@ -266,11 +267,15 @@ molmil.UI.prototype.showChains=function(target, payload) {
     item = target.pushNode("div");
     item.plus = item.pushNode("a", "+");
     item.plus.className = "optCat_p";
-    item.name = item.pushNode("a", chain.name ? chain.name : i+1);
+    var saa = chain.name ? chain.name : i+1;
+    if (chain.authName != saa) saa += " ("+chain.authName+")";
+    item.name = item.pushNode("a", saa);
     item.name.title = "Left click to expand\nRight click to show the context menu for display & color options";
     item.name.className = "optCat_n";
+    if (chain.display) item.style.color = "";
+    item.style.color = chain.display ? "" : "lightgrey"
     item.plus.onclick = item.name.onclick = function(ev) {
-      if (ev.altKey) {
+      if (ev.ctrlKey) {
         if (this.parentNode.payload.display) {
           molmil.displayEntry(this.parentNode.payload, molmil.displayMode_None, true, this.UI.soup);
           this.parentNode.style.color = "lightgrey";
