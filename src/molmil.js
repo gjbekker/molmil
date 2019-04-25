@@ -8003,18 +8003,24 @@ molmil.addLabel = function(text, settings, soup) {
   
     var tmp = text.replace(/\\n/g, "\n").split(/\n/g), h, w, i;
     h = tmp.length*settings.fontSize; w = 0;
-    for (var i=0; i<tmp.length; i++) if (tmp[i].length > w) w = tmp[i].length;
+    var saa = 0;
     var regex = /[\u3000-\u303F]|[\u3040-\u309F]|[\u30A0-\u30FF]|[\uFF00-\uFFEF]|[\u4E00-\u9FAF]|[\u2605-\u2606]|[\u2190-\u2195]|\u203B/g;
-    if (regex.test(tmp[0])) w *= 2;
+    for (var i=0; i<tmp.length; i++) {
+      saa = (tmp[i].match(regex) || "").length*0.75 + tmp[i].length;
+      if (saa > w) w = saa;
+    }
     
     w = (w*settings.fontSize*.6)+6;
     
     var Yoffset = 0;
+    /*
     if (settings.addBorder) {
+      h = tmp.length*settings.fontSize*1.5;
       w += settings.fontSize*.5;
       h += settings.fontSize*.5;
-      Yoffset += settings.fontSize*.25;
+      Yoffset += settings.fontSize*.5;
     }
+    */
     
     textCtx.canvas.width = w; textCtx.canvas.height = h;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
@@ -8032,6 +8038,7 @@ molmil.addLabel = function(text, settings, soup) {
       for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
     }
     
+    /*
     if (settings.addBorder) {
       textCtx.beginPath();
       textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, (textCtx.canvas.width*.5)-settings.fontSize*.05, (textCtx.canvas.height*.5)-settings.fontSize*.05, 0, 0, Math.PI * 2, false);
@@ -8039,6 +8046,7 @@ molmil.addLabel = function(text, settings, soup) {
       textCtx.lineWidth = settings.fontSize*.1;
       textCtx.stroke();
     }
+    */
 
     var gl = soup.renderer.gl;
     var textTex = gl.createTexture();

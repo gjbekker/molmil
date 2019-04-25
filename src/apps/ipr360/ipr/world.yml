@@ -1,22 +1,8 @@
-name:
-  en: IPR
-description: 
-  en: something
 default-start: general.entrance
-regions:
-  dblab:
-    name:
-      en: Laboratory of Protein Databases
-    description:
-      en: something
 rooms:
   dblab.c304:
     name:
       en: Room C-304
-    description:
-      en: "This is the C-304 room.\n
-Some description about the room\n
-spread over multiple lines for testing."
     doors:
       -  to: dblab.corridor1
          x: 2575
@@ -24,11 +10,18 @@ spread over multiple lines for testing."
          r1: 200
          r2: 110
      
+    labels:
+      - content:
+          en: "saa"
+          ja: "さああ"
+        x: 0
+        y: 0
+        r1: 200
+        r2: 110
+     
   dblab.corridor1:
     name:
       en: Corridor
-    description:
-      en: ""
     doors:
       -  to: dblab.c304
          x: 70
@@ -39,9 +32,8 @@ spread over multiple lines for testing."
 
   general.entrance:
     name:
-      en: IPR Entrance
-    description:
-      en: ""
+      en: "IPR Entrance"
+      ja: "研究所の入り口にもどる"
     default-orientation: [2610, 1190]
     doors: 
       - to: cryoem.g2_or
@@ -68,13 +60,18 @@ spread over multiple lines for testing."
         r1: 150
         r2: 150
         
+      - to: spring8.outside
+        x: 4200
+        y: 1380
+        r1: 250
+        r2: 250
+        
 # EM related
         
   cryoem.g2_front:
     name:
-      en: "FEI: \nTitan Krios G2 \n(front)"
-    description:
-      en: ""
+      en: "FEI: \nTitan Krios G2 \n(front)" 
+      ja: "電子けんび鏡\nFEI Titan Krios G2"
     default-orientation: [2550, 1300]
     doors: 
       - to: cryoem.g2_open
@@ -83,7 +80,7 @@ spread over multiple lines for testing."
         r1: 450
         r2: 750
         
-      - to: cryoem.g2_back
+      - to: cryoem.g2_or
         x: 1800
         y: 1400
         r1: 200
@@ -91,9 +88,8 @@ spread over multiple lines for testing."
     
   cryoem.g2_open:
     name:
-      en: "FEI: \nTitan Krios G2 \n(open)"
-    description:
-      en: ""
+      en: "FEI: \nTitan Krios G2 \n(open)" 
+      ja: "電子けんび鏡\n Titan Krios G2 (ひらく)"
     default-orientation: [1490, 1620]
     doors: 
       - to: cryoem.g2_front
@@ -102,7 +98,8 @@ spread over multiple lines for testing."
         r1: 400
         r2: 800
         
-      - to: cryoem.g2_back
+#      - to: cryoem.g2_back
+      - to: cryoem.g2_or
         x: 5400
         y: 1450
         r1: 200
@@ -110,9 +107,8 @@ spread over multiple lines for testing."
     
   cryoem.g2_back:
     name:
-      en: "FEI: \nTitan Krios G2 \n(back)"
-    description:
-      en: ""
+      en: "FEI: \nTitan Krios G2 \n(back)" 
+      ja: "電子けんび鏡\nFEI Titan Krios G2"
     doors: 
       - to: cryoem.g2_or
         x: 1180
@@ -129,10 +125,9 @@ spread over multiple lines for testing."
   cryoem.g2_or:
     name:
       en: "FEI: \nTitan Krios G2 \n(operation room)"
-    description:
-      en: ""
+      ja: "電子けんび鏡(FEI)\n入り口"
     doors: 
-      - to: cryoem.g2_back
+      - to: cryoem.g2_front
         x: 4760
         y: 1360
         r1: 240
@@ -147,8 +142,7 @@ spread over multiple lines for testing."
   cryoem.jeol:
     name:
       en: "JEOL: JEM-2200fs"
-    description:
-      en: ""
+      ja: "電子けんび鏡\n(日本電子)"
     doors: 
       - to: general.entrance
         x: 0
@@ -165,10 +159,10 @@ spread over multiple lines for testing."
   cryoem.hitachi:
     name:
       en: "HITACHI: H-7650"
-    description:
-      en: ""
+      ja: "電子けんび鏡\n日立 H-7650"
     doors: 
-      - to: cryoem.jeol
+#      - to: cryoem.jeol
+      - to: general.entrance
         x: 1800
         y: 1500
         r1: 300
@@ -180,8 +174,8 @@ spread over multiple lines for testing."
   nmr.entrance:
     name:
       en: "Bird view of the \nthree NMR machines"
-    description:
-      en: ""
+      ja : "核磁気共鳴\n装置\n(かく じき\nきょうめい そうち)\n(NMR)\n入り口"
+#     ja:"核磁気共鳴(かくじききょうめい;NMR)"
     doors: 
       - to: general.entrance
         x: 3130
@@ -197,9 +191,8 @@ spread over multiple lines for testing."
         
   nmr.bruker_top:
     name:
-      en: "BRUKER 960 MHz (top)"
-    description:
-      en: ""
+      en: "BRUKER 950 MHz (top)"
+      ja: "上から見る"
     doors: 
       - to: nmr.entrance
         x: 2230
@@ -212,8 +205,7 @@ spread over multiple lines for testing."
   xray.entrance:
     name:
       en: "Bird view of the \nthree X-ray machines"
-    description:
-      en: ""
+      ja: "X線結晶解析\n構造解析装置 \n(えっくすせん\nこがた そうち）"
     doors: 
       - to: xray.one
         x: 560
@@ -229,9 +221,8 @@ spread over multiple lines for testing."
         
   xray.one:
     name:
-      en: "One X-ray machine"
-    description:
-      en: ""
+      en: "One X-ray machine" 
+      ja: "X線解析装置\n(えっくすせんのそうち)"
     default-orientation: [1285, 1540]
     doors: 
       - to: general.entrance
@@ -239,4 +230,109 @@ spread over multiple lines for testing."
         y: 1350
         r1: 200
         r2: 300
+
+        
+# spring8 related
+
+  spring8.outside:
+    name:
+      en: "Spring-8 entrance" 
+      ja : "X線結晶解析\n大型放射光施設Spring-8\n(えっくすせん\nおおがた そうち)\nの建物の前"
+    doors: 
+      - to: general.entrance
+        x: 0
+        y: 1400
+        r1: 300
+        r2: 300
+        
+      - to: spring8.inside1
+        x: 2800
+        y: 1350
+        r1: 300
+        r2: 300
+        
+  spring8.inside1:
+    name:
+      en: "Spring-8 Ring D3"
+      ja: "Spring-8 リングの出入り口　D3"
+    doors: 
+      - to: spring8.outside
+        x: 4590
+        y: 1400
+        r1: 300
+        r2: 300
+        
+      - to: spring8.inside2
+        x: 2650
+        y: 1130
+        r1: 300
+        r2: 300
+        
+      - to: spring8.inside3
+        x: 1850
+#        x: 1600
+        y: 1450
+        r1: 300
+        r2: 300
+        
+      - to: spring8.beamline1
+        x: 3700
+#        x: 2500
+        y: 1450
+        r1: 300
+        r2: 300
+        
+     
+  spring8.inside2:
+    name:
+      en: "Spring-8 upper level"
+      ja: "上から見る"
+    doors: 
+      - to: spring8.inside1
+        x: 3280
+        y: 1620
+        r1: 300
+        r2: 300
+        
+  spring8.inside3:
+    name:
+      en: "Spring-8 beamline sideway" 
+      ja: "ビームライン前"
+    doors: 
+      - to: spring8.inside1
+        x: 3420
+        y: 1360
+        r1: 300
+        r2: 300
+        
+        
+  spring8.beamline1:
+    name:
+      en: "Spring-8 beamline BL44XU (front)" 
+      ja: "たんぱく研のビームラインBL44XU"
+    doors: 
+      - to: spring8.inside1
+        x: 1880
+        y: 1740
+        r1: 300
+        r2: 300
+        
+      - to: spring8.beamline2
+        x: 3660
+        y: 1430
+        r1: 300
+        r2: 300
+        
+        
+  spring8.beamline2:
+    name:
+      en: "Spring-8 beamline BL44XU (back)" 
+      ja: "たんぱく研のビームラインBL44XU(奥)"
+    doors: 
+      - to: spring8.beamline1
+        x: 3040
+        y: 1430
+        r1: 300
+        r2: 300
+        
 

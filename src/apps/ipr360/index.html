@@ -84,7 +84,7 @@
       
       molmil.configBox.camera_fovy = 75;
       var href = window.location.href.split("#")[0];
-      for (var i=0; i<5; i++) { // in the future change this to dynamically setup the required doors automatically...
+      for (var i=0; i<10; i++) { // in the future change this to dynamically setup the required doors automatically...
         molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_"+i, "#define ROOM_SIZE "+i+"\n"]);
         molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_picking_"+i, "#define PICKING_MODE 1\n#define ROOM_SIZE "+i+"\n"]);
       }
@@ -184,9 +184,10 @@
           molmil.mouseMoved = true;
           var clientX = ev.clientX || (ev.touches ? ev.touches[ 0 ].clientX : 0);
           var clientY = ev.clientY || (ev.touches ? ev.touches[ 0 ].clientY : 0);
-
-          lon = ( onMouseDownMouseX - clientX ) * 0.1 + onMouseDownLon;
-          lat = ( clientY - onMouseDownMouseY ) * 0.1 + onMouseDownLat;
+          var sf = (molmil.configBox.camera_fovy/75) * 0.1;
+          
+          lon = ( onMouseDownMouseX - clientX ) * sf + onMouseDownLon;
+          lat = ( clientY - onMouseDownMouseY ) * sf + onMouseDownLat;
           canvas.update = true;
         }
 
@@ -391,6 +392,9 @@
         
         lon = (u*360)+movemove;
         lat = 90 - (v*180);
+        
+        molmil.configBox.camera_fovy = 75;
+        mat4.perspective(canvas.renderer.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/180), canvas.renderer.width/canvas.renderer.height, molmil.configBox.zNear, molmil.configBox.zFar);
 
         this.updateLabels();
         canvas.update = true;
@@ -419,11 +423,26 @@
           else if ("en" in toroom.name) var name = toroom.name["en"];
           else var name = Object.values(toroom.name)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*8, customHeight: room.doors[d].r2*8, alwaysFront: true, addBorder: true, viewpointAligned: true}, canvas.molmilViewer);
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*8, customHeight: room.doors[d].r2*8, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
         }
         
-        if (room.description && room.description[LANGUAGE]) {
-          molmil.addLabel(room.description[LANGUAGE], {xyz: [0, RADIUS, 0], fontSize: 30, scaleFactor: 2.5, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
+        for (d=0; d<(room.labels || []).length; d++) {
+          u = room.labels[d].x/texturePointer.image.width;
+          v = room.labels[d].y/texturePointer.image.height;
+          
+          theta = (-0.5+(1-u))*(2*Math.PI);
+          phi = (0.5-v)*(Math.PI);
+          
+          x = Math.cos(phi) * Math.cos(theta) * 1;
+          y = Math.sin(phi) * 1;
+          z = Math.cos(phi) * Math.sin(theta) * 1;
+          
+          var content = room.labels[d].content;
+          if (LANGUAGE in content) var name = content[LANGUAGE];
+          else if ("en" in content) var name = content["en"];
+          else var name = Object.values(content)[0];
+          
+          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.labels[d].r1*8, customHeight: room.labels[d].r2*8, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
         }
         
         canvas.renderer.initBuffers();
