@@ -4,7 +4,7 @@ var refPoints = [];
 var loadProgress = [0, 0];
 var filename2name = {};
 var crowdingFactor = 1.0;
-var label_fontSize = 22;
+var label_fontSize = 30;
     
 // instead of moving in the regular x,y,z direction, move in the direction based on where the viewer is looking at...
     

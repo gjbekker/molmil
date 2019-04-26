@@ -83,11 +83,13 @@
       if (! window.molmil.configBox || ! molmil.configBox.initFinished || ! window.jsyaml) {return setTimeout(initViewer, 100);}
       
       molmil.configBox.camera_fovy = 75;
+      molmil.configBox.glsl_fog = false;
       var href = window.location.href.split("#")[0];
       for (var i=0; i<10; i++) { // in the future change this to dynamically setup the required doors automatically...
         molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_"+i, "#define ROOM_SIZE "+i+"\n"]);
         molmil.configBox.glsl_shaders.push([href+"360sphere.glsl", "standard360sphere_picking_"+i, "#define PICKING_MODE 1\n#define ROOM_SIZE "+i+"\n"]);
       }
+      
 
       molmil.configBox.BGCOLOR = [0, 0, 0, 1];
       molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
@@ -388,13 +390,14 @@
         }
         this.program.settings.texturePointer = this.catalogue[id];
         
-        var u = x/this.program.settings.texturePointer.image.width, v = y/this.program.settings.texturePointer.image.height;
+        if (!(molmil.configBox.stereoMode == 3 && molmil.vrDisplay)) {
+          var u = x/this.program.settings.texturePointer.image.width, v = y/this.program.settings.texturePointer.image.height;
         
-        lon = (u*360)+movemove;
-        lat = 90 - (v*180);
-        
-        molmil.configBox.camera_fovy = 75;
-        mat4.perspective(canvas.renderer.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/180), canvas.renderer.width/canvas.renderer.height, molmil.configBox.zNear, molmil.configBox.zFar);
+          lon = (u*360)+movemove;
+          lat = 90 - (v*180);
+          molmil.configBox.camera_fovy = 75;
+          mat4.perspective(canvas.renderer.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/180), canvas.renderer.width/canvas.renderer.height, molmil.configBox.zNear, molmil.configBox.zFar);
+        }
 
         this.updateLabels();
         canvas.update = true;
@@ -403,7 +406,7 @@
         while(canvas.molmilViewer.texturedBillBoards.length) canvas.molmilViewer.texturedBillBoards[0].remove();
 
         var texturePointer = this.program.settings.texturePointer;
-        var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z;
+        var room = this.rooms[texturePointer.id], d, u, v, theta, phi, x, y, z, settings;
         
         this.program.setRoomSize(room.doors);
         
@@ -423,7 +426,10 @@
           else if ("en" in toroom.name) var name = toroom.name["en"];
           else var name = Object.values(toroom.name)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*8, customHeight: room.doors[d].r2*8, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
+          settings = {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.doors[d].r1*8, customHeight: room.doors[d].r2*8, alwaysFront: true, viewpointAligned: true, skipVRscale: true};
+          if (room.doors[d].color) settings.color = room.doors[d].color;
+          
+          molmil.addLabel(name, settings, canvas.molmilViewer);
         }
         
         for (d=0; d<(room.labels || []).length; d++) {
@@ -442,7 +448,10 @@
           else if ("en" in content) var name = content["en"];
           else var name = Object.values(content)[0];
           
-          molmil.addLabel(name, {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.labels[d].r1*8, customHeight: room.labels[d].r2*8, alwaysFront: true, viewpointAligned: true}, canvas.molmilViewer);
+          settings = {xyz: [-x*RADIUS, y*RADIUS, z*RADIUS], fontSize: 40, customWidth: room.labels[d].r1*8, customHeight: room.labels[d].r2*8, alwaysFront: true, viewpointAligned: true, skipVRscale: true};
+          if (room.labels[d].color) settings.color = room.labels[d].color;
+          
+          molmil.addLabel(name, settings, canvas.molmilViewer);
         }
         
         canvas.renderer.initBuffers();

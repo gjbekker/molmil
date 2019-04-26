@@ -122,6 +122,7 @@ molmil.commandLines.pyMol.stereoCommand = function(env, command) {
 
 molmil.commandLines.pyMol.orientCommand = function(env, command) {
   command = command.match(/orient[\s]*(.*)?[\s]*/);
+
   try {molmil.commandLines.pyMol.orient.apply(env, [command[1] ? command[1].trim() : null]);}
   catch (e) {console.error(e); return false;}
   return true;
@@ -433,7 +434,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     else if (expr[i] == "(" || expr[i] == "!") new_expr.push(expr[i]);
     else word += expr[i];
   }
-console.log(new_expr);
+//console.log(new_expr);
   new_expr = new_expr.join(" ");
 
   //console.log(new_expr);

@@ -1418,7 +1418,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     catch (e) {polyTypes = molmil.AATypes;}
 
     for (var a=0; a<Cartn_x.length; a++) {
-      if (Cartn_x[a] == null || (Cartn_x[a] == 0 && Cartn_y[a] == 0 && Cartn_z[a] == 0)) continue;
+      if (Cartn_x[a] == null || (Cartn_x[a] == 0 && Cartn_y[a] == 0 && Cartn_z[a] == 0 && Cartn_x.length > 1)) continue;
       // split this up in structure loading (1st model) & coordinate only loading (2+ models)
     
       if ((pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) || ! struc) {
@@ -1570,7 +1570,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     
       xyzs.push(Cartn_x[a], Cartn_y[a], Cartn_z[a]);
     }
-  
+    
     struc.number_of_frames = struc.chains.length ? struc.chains[0].modelsXYZ.length : 0;
     this.calculateCOG();
   
@@ -5024,11 +5024,9 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         this.renderer.gl.uniform1i(this.shader.uniforms.textureMap, 0);
         
         scaleFactor = 0.0003*.5*(N[i].settings.scaleFactor||1);
+        if (molmil.configBox.stereoMode == 3 && molmil.vrDisplay && ! N[i].settings.skipVRscale) scaleFactor *= 4;
         
-        if (N[i].settings.customWidth && N[i].settings.customHeight) {
-          if (N[i].settings.customWidth > N[i].settings.customHeight) scaleFactor *= N[i].settings.customHeight/N[i].texture.renderHeight;
-          else scaleFactor *= N[i].settings.customWidth/N[i].texture.renderWidth;
-        }
+        if (N[i].settings.customWidth && N[i].settings.customHeight) scaleFactor *= Math.min(N[i].settings.customHeight/N[i].texture.renderHeight, N[i].settings.customWidth/N[i].texture.renderWidth);
         this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor);
         
         if (N[i].settings.viewpointAligned) this.renderer.gl.uniform1i(this.shader.uniforms.renderMode, 1);
@@ -8493,8 +8491,9 @@ molmil.orient = function(atoms, soup, xyzs) {
   
   if (atoms) {
     for (a=0; a<atoms.length; a++) {
+      chain = atoms[a].chain;
       for (f=0; f<chain.modelsXYZ.length; f++) {
-        modelsXYZ = atoms[a].chain.modelsXYZ[f];
+        modelsXYZ = chain.modelsXYZ[f];
         xyzs.push([modelsXYZ[atoms[a].xyz], modelsXYZ[atoms[a].xyz+1], modelsXYZ[atoms[a].xyz+2]]);
       }
     }
@@ -8603,6 +8602,9 @@ molmil.orient = function(atoms, soup, xyzs) {
   
   var matrix = mat4.multiply(mat4.create(), stage2, stage1);
   mat4.getRotation(soup.renderer.camera.QView, matrix);
+  
+  if (atoms.length) molmil.cli_soup.calculateCOG(atoms);
+  //else molmil.cli_soup.calculateCOG();
   
   var mx = Math.max(minmaxX[1]-minmaxX[0], minmaxY[1]-minmaxY[0], minmaxZ[1]-minmaxZ[0])+resCor+2; // LYS side chain size + 2 A vdw correction
   if (molmil.configBox.projectionMode == 1) {
