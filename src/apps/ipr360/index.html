@@ -202,10 +202,8 @@
         }
         document.documentElement.style.cursor = hoverDoorway == -1 ? "unset" : "pointer";
       };
-      
+
       // in vr-mode
-      var viewTrace = [], lastUpdated = -1, lastYaw = 0;
-      var lastPosition = {};
       molmil.configBox.jitRenderFunc = function(bag) {
         if (! molmil.configBox.stereoMode == 3 || ! molmil.vrDisplay) return; // only for webvr...
         if (! canvas.WORLD || ! canvas.WORLD.program) return;
@@ -222,35 +220,38 @@
         var uv = calculateViewUV(x, y, bag.frameData.leftProjectionMatrix, tmpMMat);
         var hoverDoorway = uv == null ? -1 : figureHoverDoorway(uv, canvas.WORLD.program.roomArrays);
         canvas.WORLD.program.roomArrays.hoverDoorway = hoverDoorway;
-        
-        onHeadMove(bag.frameData.pose.orientation, hoverDoorway);        
+        motionObject.bag = bag;
       };
+      
+      setInterval(function() {
+        if (! motionObject || ! motionObject.bag) return;
+        onHeadMove(motionObject.bag.frameData.pose.orientation, canvas.WORLD.program.roomArrays.hoverDoorway); // instead of doing this during render, make this separate and call this every X ms...     
+      }, 100); // every 100 ms
     }
     
+    
     // based on https://github.com/piterwilson/react-vr-head-gesture
-    
-    var MOTION_UP = -1, MOTION_DOWN = 1, MOTION_LEFT = 2, MOTION_RIGHT = -2, MOTION_DIRECTION_UP_DOWN = 1, MOTION_DIRECTION_LEFT_RIGHT = 2, MOTION_NUMBER_TO_ANALYZE = 4;
     var motionObject;
-    
     function resetMotions() {
       motionObject = {motions: [], doorHover: [], motionDirection: 0, lastPosition: null};
-    };
-    resetMotions();
+    }; resetMotions();
     
-    function onHeadMove(YPR, dooridx) {
+    var MOTION_UP = -1, MOTION_DOWN = 1, MOTION_LEFT = 2, MOTION_RIGHT = -2, MOTION_DIRECTION_UP_DOWN = 1, MOTION_DIRECTION_LEFT_RIGHT = 2, MOTION_NUMBER_TO_ANALYZE = 6;
+    
+    function onHeadMove(PYR, dooridx) {
       if (motionObject.lastPosition) {
-        if (Math.abs( YPR[0] - motionObject.lastPosition.yaw) > 0.025) { // significant motion on Y
-          if (YPR[0] > motionObject.lastPosition.yaw) setMotion(MOTION_DOWN, dooridx);
+        if (Math.abs(PYR[0] - motionObject.lastPosition.pitch) > 0.1) { // significant motion on Y
+          if (PYR[0] > motionObject.lastPosition.pitch) setMotion(MOTION_DOWN, dooridx);
           else setMotion(MOTION_UP, dooridx);
         } 
-        else if (Math.abs(YPR[1] - motionObject.lastPosition.pitch) > 0.025) { // significant motion on X
-          if (YPR[1] > motionObject.lastPosition.pitch) setMotion(MOTION_RIGHT, dooridx);
+        else if (Math.abs(PYR[1] - motionObject.lastPosition.yaw) > 0.1) { // significant motion on X
+          if (PYR[1] > motionObject.lastPosition.yaw) setMotion(MOTION_RIGHT, dooridx);
           else setMotion(MOTION_LEFT, dooridx);
         }
       }
       analyzeMotions();
       
-      motionObject.lastPosition = {pitch: YPR[1], yaw: YPR[0]};
+      motionObject.lastPosition = {yaw: PYR[1], pitch: PYR[0]};
     }
     
     function analyzeMotions() {
@@ -272,10 +273,10 @@
     
     function setMotion(newMotion, dooridx) {
       if (motionObject.motionDirection == MOTION_DIRECTION_UP_DOWN) {
-        if (newMotion == MOTION_LEFT || newMotion == MOTION_RIGHT) return resetMotions(); // added pitch motion when the current direction is yaw
+        if (newMotion == MOTION_LEFT || newMotion == MOTION_RIGHT) return resetMotions(); // added yaw motion when the current direction is pitch
       } 
       else if (motionObject.motionDirection == MOTION_DIRECTION_LEFT_RIGHT) {
-        if (newMotion == MOTION_UP || newMotion == MOTION_DOWN) return resetMotions(); // added yaw motion when the current direction is pitch
+        if (newMotion == MOTION_UP || newMotion == MOTION_DOWN) return resetMotions(); // added pitch motion when the current direction is yaw
       } 
       else { // no `motionDirection` stablished yet, set from the value in `newMotion`
         if (newMotion == MOTION_UP || newMotion == MOTION_DOWN) motionObject.motionDirection = MOTION_DIRECTION_UP_DOWN;
@@ -371,7 +372,6 @@
         var nextRoom = this.rooms[this.catalogue[id].id];
         
         var x, y, movemove = 180;
-        
         if (nextRoom["default-orientation"]) {
           x = nextRoom["default-orientation"][0];
           y = nextRoom["default-orientation"][1];
