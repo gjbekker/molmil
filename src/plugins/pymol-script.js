@@ -286,7 +286,7 @@ molmil.commandLines.pyMol.mstopCommand = function(env, command) {
 
 molmil.commandLines.pyMol.loadCommand = function(env, command) {
   var cmd = command.match(/load[\s]+([^\s,]+)[\s]*(,[\s]*(.*))?/), options = {};
-  
+
   if (cmd[2]) {
     var opts = cmd[2].split(','), kv;
     for (var i=0; i<opts.length; i++) {
@@ -667,7 +667,7 @@ molmil.commandLines.pyMol.save = function(file, command) {
 
   if (state == undefined || soup.structures.length == 0 || state >= soup.structures[0].number_of_frames) state = 0;
   var prevState = soup.renderer.modelId;
-  if (state != -1) soup.renderer.modelId = state;
+  if (state == -1) state = soup.renderer.modelId;
   
   if (this.hasOwnProperty(selection)) selection = this[selection];
   //else selection = molmil.commandLines.pyMol.select(selection);
@@ -887,6 +887,7 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
 }
 
 molmil.commandLines.pyMol.turn = function(axis, degrees) {
+  console.log(axis, parseFloat(degrees));
   if (axis == "x") this.cli_soup.renderer.camera.pitchAngle += parseFloat(degrees) || 0;
   else if (axis == "y") this.cli_soup.renderer.camera.headingAngle += parseFloat(degrees) || 0;
   else if (axis == "z") this.cli_soup.renderer.camera.rollAngle += parseFloat(degrees) || 0;
@@ -922,6 +923,11 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   else if (key == "depth_cue") {
     molmil.configBox.glsl_fog = value == 1;
     molmil.shaderEngine.recompile(this.cli_soup.renderer);
+    this.cli_soup.canvas.update = true;
+  }
+  else if (key == "field_of_view") {
+    molmil.configBox.camera_fovy = parseFloat(value);
+    this.cli_soup.renderer.resizeViewPort();
     this.cli_soup.canvas.update = true;
   }
   else if (key == "orthoscopic") {

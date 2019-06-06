@@ -3,8 +3,7 @@ function isNumber(n) {
 }
 
 molmil.savePDB = function(soup, atomSelection, modelId, file) {
-  if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", this.savePDB, this, [soup, atomSelection, modelId, file]); 
-  
+  if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
   var out = "", atom, gname, aid, aname, rname, cname, rid, x, y, z;
   for (var i=0; i<atomSelection.length; i++) {
     atom = atomSelection[i];

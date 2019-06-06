@@ -130,17 +130,18 @@
 
 .molmil_UI_cl_icon {
   position: absolute;
-  bottom: .5em;
-  left: .5em;
+  bottom: 0em;
+  left: 0em;
   z-index: 9;
   cursor: pointer;
   pointer-events: auto;
+  padding: 0.5em;
 }
 
 .molmil_UI_cl_input {
   display: block;
   padding: .5em;
-  padding-left: 1.5em;
+  padding-left: 2.5em;
   position:absolute;
   bottom: 0px;
   width: calc(100% - 2em);

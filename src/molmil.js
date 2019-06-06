@@ -5723,7 +5723,6 @@ molmil.glCamera.prototype.generateMatrix = function() {
 }
 
 molmil.glCamera.prototype.positionCamera = function() {
-  this.rollAngle = 0;
   quat.setAxisAngle(this.QPitch, [1, 0, 0], (this.pitchAngle/180)*Math.PI);
   quat.setAxisAngle(this.QHeading, [0, 1, 0], (this.headingAngle/180)*Math.PI);
   quat.setAxisAngle(this.QRoll, [0, 0, 1], (this.rollAngle/180)*Math.PI);
@@ -7622,7 +7621,6 @@ molmil.commandLine.prototype.buildGUI = function() {
     this.innerHTML = "<"; this.title = "Display command line";
     this.inp.style.display = "none"; this.cli.logBox.style.display = "none";
   }
-  
   this.icon.onclick = function (mini) {
     if (mini == true) {
       if (this.inp.style.display != "") {
@@ -8603,7 +8601,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   var matrix = mat4.multiply(mat4.create(), stage2, stage1);
   mat4.getRotation(soup.renderer.camera.QView, matrix);
   
-  if (atoms.length) molmil.cli_soup.calculateCOG(atoms);
+  if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
   //else molmil.cli_soup.calculateCOG();
   
   var mx = Math.max(minmaxX[1]-minmaxX[0], minmaxY[1]-minmaxY[0], minmaxZ[1]-minmaxZ[0])+resCor+2; // LYS side chain size + 2 A vdw correction

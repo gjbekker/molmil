@@ -92,7 +92,7 @@
       
 
       molmil.configBox.BGCOLOR = [0, 0, 0, 1];
-      molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
+      //molmil.configBox.glAttribs = {preserveDrawingBuffer: true};
 
       canvas = document.getElementById("molmilViewer");
       canvas.width = (window.innerWidth || document.documentElement.clientWidth);
@@ -236,15 +236,15 @@
       motionObject = {motions: [], doorHover: [], motionDirection: 0, lastPosition: null};
     }; resetMotions();
     
-    var MOTION_UP = -1, MOTION_DOWN = 1, MOTION_LEFT = 2, MOTION_RIGHT = -2, MOTION_DIRECTION_UP_DOWN = 1, MOTION_DIRECTION_LEFT_RIGHT = 2, MOTION_NUMBER_TO_ANALYZE = 6;
+    var MOTION_UP = -1, MOTION_DOWN = 1, MOTION_LEFT = 2, MOTION_RIGHT = -2, MOTION_DIRECTION_UP_DOWN = 1, MOTION_DIRECTION_LEFT_RIGHT = 2, MOTION_NUMBER_TO_ANALYZE = 4;
     
     function onHeadMove(PYR, dooridx) {
       if (motionObject.lastPosition) {
-        if (Math.abs(PYR[0] - motionObject.lastPosition.pitch) > 0.1) { // significant motion on Y
+        if (Math.abs(PYR[0] - motionObject.lastPosition.pitch) > 0.075) { // significant motion on Y
           if (PYR[0] > motionObject.lastPosition.pitch) setMotion(MOTION_DOWN, dooridx);
           else setMotion(MOTION_UP, dooridx);
         } 
-        else if (Math.abs(PYR[1] - motionObject.lastPosition.yaw) > 0.1) { // significant motion on X
+        else if (Math.abs(PYR[1] - motionObject.lastPosition.yaw) > 0.075) { // significant motion on X
           if (PYR[1] > motionObject.lastPosition.yaw) setMotion(MOTION_RIGHT, dooridx);
           else setMotion(MOTION_LEFT, dooridx);
         }
