@@ -1256,7 +1256,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       no_identity = true;
       if (! chainInfo.hasOwnProperty(asym_ids[i])) chainInfo[asym_ids[i]] = [];
       if (soup.BUcache.hasOwnProperty(asym_ids[i]) && soup.BUcache[asym_ids[i]].hasOwnProperty(displayMode) && ! molmil.geometry.skipClearBuffer) {
-        c = soup.BUcache[asym_ids[i]][displayMode]; vbuffer = c[0]; ibuffer = c[1]; COM = c[2]; noe = c[3]; rangeInfo = c[4];
+        c = soup.BUcache[asym_ids[i]][displayMode]; vbuffer = c[0]; ibuffer = c[1]; COM = c[2]; noe = c[3]; rangeInfo = c[4]; vertices = c[5];
       }
       else if (displayMode == 3 || displayMode == 4 || displayMode == 6) { // tube or cartoon
         var dm_cache = [], rgba_cache = [], tmp, xyz, chains = [];
@@ -1324,7 +1324,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
 
         if (! soup.BUcache.hasOwnProperty(asym_ids[i])) soup.BUcache[asym_ids[i]] = {};
         
-        soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = molmil.geometry.buffer3.indexBuffer.length, []];
+        soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = molmil.geometry.buffer3.indexBuffer.length, [], vertices];
 
         for (c=0; c<chains.length; c++) {
           chains[c].displayMode = dm_cache[c];
@@ -1387,7 +1387,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         
           if (! soup.BUcache.hasOwnProperty(asym_ids[i])) soup.BUcache[asym_ids[i]] = {};
         
-          soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = surf.faces.length*3, []];
+          soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = surf.faces.length*3, [], vertices];
         }
       }
       else {
@@ -1512,7 +1512,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         
         if (! soup.BUcache.hasOwnProperty(asym_ids[i])) soup.BUcache[asym_ids[i]] = {};
         
-        soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = indices.length, []];
+        soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = indices.length, [], vertices];
       }
 
       for (c=0; c<BU[p][0].length; c++) {
