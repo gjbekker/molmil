@@ -1470,49 +1470,85 @@ molmil.bindCanvasInputs = function(canvas) {
 
   var dropDB = function (ev) {
     ev.preventDefault()
-    var count = 0, files = [];
-    try{
-      files = ev.dataTransfer.files;
-      count = files.length;
-    } catch (e) {}
       
     var fr, i, j, mjsFile = null, file;
+    
+    var dict = {}, item, entry, bakacounter = 0;
 
-    //console.log(files);
+    var bakacheck = function() {
+      if (bakacounter > 0) return;
+      
+      var items = Object.keys(dict).sort(molmil_dep.naturalSort);
+      var count = items.length;
+      for (i=0; i<count; i++) {
+        if (items[i].toLowerCase().endsWith(".mjs")) {mjsFile = items[i]; break;}
+      }
+      
+      
+      if (mjsFile != null) {
+        canvas.mjs_fileBin = {};
+        for (i=0; i<count; i++) {
+          fr = new FileReader();
+          file = dict[items[i]];
+          fr.filename = file.name;
+          fr.fileHandle = file;
+          canvas.mjs_fileBin[items[i]] = fr;
+        }
+        mjsFunc(canvas, canvas.mjs_fileBin[mjsFile]);
+        return false;
+      }
     
-    var dict = {};
-    for (i=0; i<count; i++) dict[files[i].name] = files[i];
-    var items = Object.keys(dict).sort(molmil_dep.naturalSort);
-    
-    //molmil_dep.naturalSort
-    
-    for (i=0; i<items.length; i++) {
-      if (items[i].toLowerCase().endsWith(".mjs")) {mjsFile = items[i]; break;}
-    }
-    if (mjsFile != null) {
-      canvas.mjs_fileBin = {};
+      
       for (i=0; i<count; i++) {
         fr = new FileReader();
         file = dict[items[i]];
         fr.filename = file.name;
         fr.fileHandle = file;
-        canvas.mjs_fileBin[fr.filename] = fr;
+      
+        for (j=0; j<canvas.inputFunctions.length; j++) {
+          if (canvas.inputFunctions[j](canvas, fr)) break;
+        }
       }
-      mjsFunc(canvas, canvas.mjs_fileBin[mjsFile]);
-      return false;
+      
+      
+    };
+    
+    var processEntry = function(item) {
+      if (item.isFile) {
+        bakacounter += 1;
+        item.file(function(baka) {
+          dict[item.fullPath.replace(/^\//, "")] = baka;
+          bakacounter -= 1;
+          bakacheck();
+        });
+      }
+      if (! item.isDirectory) return;
+      var directoryReader = item.createReader();
+      bakacounter += 1;
+      directoryReader.readEntries(function(entries) {entries.forEach(processEntry); bakacounter -= 1;});
+    };
+    
+    for (var i=0; i<ev.dataTransfer.items.length; i++) {
+      item = ev.dataTransfer.items[i];
+      if (item.kind != 'file') continue;
+      if (item.getAsEntry) entry = item.getAsEntry();
+      else if (item.webkitGetAsEntry) entry = item.webkitGetAsEntry();
+      else {dict = null; break;} // not supported
+      processEntry(entry);
     }
     
+    if (dict == null) {
+      var count = 0, files = [];
+      try{
+        files = ev.dataTransfer.files;
+        count = files.length;
+      } catch (e) {}
       
-    for (i=0; i<count; i++) {
-      fr = new FileReader();
-      file = dict[items[i]];
-      fr.filename = file.name;
-      fr.fileHandle = file;
-      
-      for (j=0; j<this.inputFunctions.length; j++) {
-        if (this.inputFunctions[j](canvas, fr)) break;
-      }
+      var dict = {};
+      for (i=0; i<count; i++) dict[files[i].name] = files[i];
+      bakacheck();
     }
+    
     return false;
   }
 
