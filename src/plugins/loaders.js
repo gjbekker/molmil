@@ -1014,20 +1014,20 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   
   for (; i<data.length; i++) {
     if (data[i].substring(0,5) == "MODEL") {
-      ccid = cid = -1;
+      for (cid=0; cid<struc.chains.length; cid++) struc.chains[cid].modelsXYZ.push([]);
+      cid = 0;
+      xyzs = struc.chains[cid].modelsXYZ.slice(-1)[0];
+      N = struc.chains[cid].modelsXYZ[0].length;
     }
     if (data[i].substring(0, 4) == "ATOM" || data[i].substring(0, 6) == "HETATM") {
-      chainName = data[i].substring(21, 22).trim();
-      
+      if (xyzs.length >= N) {
+        cid++;
+        xyzs = struc.chains[cid].modelsXYZ.slice(-1)[0];
+        N = struc.chains[cid].modelsXYZ[0].length;
+      }
       x = parseFloat(data[i].substring(30, 38).trim());
       y = parseFloat(data[i].substring(38, 46).trim());
       z = parseFloat(data[i].substring(46, 54).trim());
-
-      if (chainName != ccid) {
-        ccid = chainName; cid += 1;
-        struc.chains[cid].modelsXYZ.push(xyzs=[]);
-      }
-      
       xyzs.push(x, y, z);
     }
   }
@@ -1070,27 +1070,21 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
   
   if (newChains.length) {
     Array.prototype.push.apply(struc.chains, newChains);
-    var tmp = [];
+    var tmp = [], Nmodels = 0;
+    for (c=0; c<struc.chains.length; c++) if (struc.chains[c].modelsXYZ.length > Nmodels) Nmodels = struc.chains[c].modelsXYZ.length;
     for (c=0; c<struc.chains.length; c++) {
-      if (struc.chains[c].water) continue;
       struc.chains[c].name = (c+1)+"";
       Array.prototype.push.apply(tmp, struc.chains[c].molecules);
       struc.chains[c].molecules = [];
       struc.chains[c].modelsXYZ_old = struc.chains[c].modelsXYZ; struc.chains[c].modelsXYZ = [];
-      for (m1=0; m1<struc.chains[c].modelsXYZ_old.length; m1++) struc.chains[c].modelsXYZ.push([]);
+      for (m1=0; m1<Nmodels; m1++) struc.chains[c].modelsXYZ.push([]);
       struc.chains[c].atoms = [];
     }
     for (m1=0; m1<tmp.length; m1++) {
       tmp[m1].chain.molecules.push(tmp[m1]);
       for (i=0; i<tmp[m1].atoms.length; i++) {
         atom = tmp[m1].atoms[i].xyz;
-        for (c=0; c<tmp[m1].chain_alt.modelsXYZ_old.length; c++) {
-          tmp[m1].chain.modelsXYZ[c].push(
-            tmp[m1].chain_alt.modelsXYZ_old[c][atom], 
-            tmp[m1].chain_alt.modelsXYZ_old[c][atom+1], 
-            tmp[m1].chain_alt.modelsXYZ_old[c][atom+2]
-          );
-        }
+        for (c=0; c<tmp[m1].chain_alt.modelsXYZ_old.length; c++) tmp[m1].chain.modelsXYZ[c].push(tmp[m1].chain_alt.modelsXYZ_old[c][atom], tmp[m1].chain_alt.modelsXYZ_old[c][atom+1], tmp[m1].chain_alt.modelsXYZ_old[c][atom+2]);
         tmp[m1].atoms[i].xyz = tmp[m1].chain.modelsXYZ[0].length-3;
         tmp[m1].atoms[i].chain = tmp[m1].chain; 
       }
@@ -1109,9 +1103,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
       }
     }
   }
-  
-  
-  
+
   for (c=0; c<struc.chains.length; c++) this.chains.push(struc.chains[c]);
   
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
