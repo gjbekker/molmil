@@ -1048,7 +1048,10 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
   
   for (c=0; c<struc.chains.length; c++) {
     currentChain = struc.chains[c];
-    if (currentChain.water) continue;
+    if (currentChain.water) {
+      for (m1=0; m1<currentChain.molecules.length; m1++) currentChain.molecules[m1].chain_alt = currentChain.molecules[m1].chain;
+      continue;
+    };
     chainRef = currentChain, rC = currentChain.molecules.length;
     for (m1=0; m1<rC; m1++) {
       currentChain.molecules[m1].chain_alt = currentChain.molecules[m1].chain;
