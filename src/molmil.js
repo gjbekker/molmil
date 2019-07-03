@@ -1181,7 +1181,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
               dz = z1-altxyzRef[xyz2+2]; dz *= dz;
               r = dx+dy+dz;
               if (r > 6) continue; // unlikely that it'll create a covalent bond
-              maxDistance = 2.25;
+              maxDistance = 2.25; // set it to 1.0 somewhere for hydrogens...
               if (vdwR[chain.molecules[m1].atoms[a1].element] === undefined || vdwR[chain.molecules[m1].atoms[a1].element] >= 1.8) {
                 if (vdwR[altchain.molecules[m2].atoms[a2].element] === undefined || vdwR[altchain.molecules[m2].atoms[a2].element] >= 1.8) maxDistance = 6.0;
                 else maxDistance = 4.5;
@@ -1433,12 +1433,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       
       if (label_asym_id[a] != ccid || ! currentChain) {
         this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a], struc)); struc.chains.push(currentChain);
-        currentChain.authName = auth_asym_id[a];
+        currentChain.authName = auth_asym_id[a]; // afterwards get rid of this and set chain.name to auth_asym_id[a]...
+        currentChain.labelName = label_asym_id[a];
         currentChain.CID = this.CID++;
-        ccid = label_asym_id[a]; cmid = false;
+        ccid = label_asym_id[a]; currentMol = null;
         Xpos_first[currentChain] = currentChain.modelsXYZ[0].length;
       }
-      
+
       if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1) {
         currentChain.molecules.push(currentMol = new molmil.molObject((label_comp_id[a] || auth_comp_id[a]), (label_seq_id[a] || auth_seq_id[a]), currentChain));
         currentMol.RSID = (auth_seq_id[a] || label_seq_id[a] || "")+(pdbx_PDB_ins_code[a] || "");
@@ -1575,6 +1576,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     this.calculateCOG();
   
     for (var s=0; s<structs.length; s++) {
+      
       struc = structs[s];
       
       // loop over all residues and set showSC to true if a weird residue...
@@ -1586,6 +1588,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       }
   
       var struct_conn = pdb.struct_conn || {id: []}, a1, a2;
+      
       if (struct_conn.id.length) {
         var backboneAtoms = molmil.configBox.backboneAtoms4Display;
         for (c=0; c<struc.chains.length; c++) struc.chains[c].struct_conn = [];
@@ -8313,7 +8316,6 @@ molmil.loadPlugin = async function(URL, callBack, self, argList) {
 
 molmil.pointerLoc_setup = function(canvas) {
   molmil.activeCanvas = canvas;
-  console.log(document.pointerLockElement);
   //if (document.pointerLockElement === canvas) 
     document.addEventListener("mousemove", molmil.pointerLock_update, false);
   //else document.removeEventListener("mousemove", molmil.pointerLock_update, false);
