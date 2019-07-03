@@ -1772,7 +1772,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     this.pdbxData = pdb;
     delete pdb.atom_site;
   }
-  
+
   return structs;
 };
 
@@ -2895,7 +2895,6 @@ molmil.geometry.generateAtomsImposters = function() {
 molmil.geometry.generateAtoms = function() {
   var atoms2draw = this.atoms2draw, xna2draw = this.xna2draw, vdwR = molmil.configBox.vdwR, r, sphere, a, v, rgba, vBuffer = this.buffer1.vertexBuffer, iBuffer = this.buffer1.indexBuffer, vP = this.buffer1.vP, iP = this.buffer1.iP, detail_lv = this.detail_lv,
   vBuffer8 = this.buffer1.vertexBuffer8, vP8 = vP*4;
-    
     
   var p = vP/8;
   
@@ -8488,7 +8487,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   var COG = [0.0, 0.0, 0.0, 0], resCor = 0;
   
   // also take into account any BUs...
-  
+
   if (atoms) {
     for (a=0; a<atoms.length; a++) {
       chain = atoms[a].chain;
@@ -8502,12 +8501,13 @@ molmil.orient = function(atoms, soup, xyzs) {
     var chains = soup.chains;
     for (c=0; c<chains.length; c++) {
       chain = chains[c];
-      
+
       for (f=0; f<chain.modelsXYZ.length; f++) {
         modelsXYZ = chain.modelsXYZ[f];
     
         for (m=0; m<chain.molecules.length; m++) {
-           if (! chain.molecules[m].CA || chain.molecules[m].ligand) {
+          if (chain.molecules[m].water) continue;
+          if (! chain.molecules[m].CA || chain.molecules[m].ligand) {
              for (a=0; a<chain.molecules[m].atoms.length; a++) xyzs.push([modelsXYZ[chain.molecules[m].atoms[a].xyz], modelsXYZ[chain.molecules[m].atoms[a].xyz+1], modelsXYZ[chain.molecules[m].atoms[a].xyz+2]]);
           }
           else {
@@ -8601,7 +8601,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   var stage2 = mat4.create(); mat4.fromRotation(stage2, vec3.angle(v2p, axis2), cross2);
   
   var matrix = mat4.multiply(mat4.create(), stage2, stage1);
-  mat4.getRotation(soup.renderer.camera.QView, matrix);
+  if (! isNaN(sf)) mat4.getRotation(soup.renderer.camera.QView, matrix);
   
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
   //else molmil.cli_soup.calculateCOG();
