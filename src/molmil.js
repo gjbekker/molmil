@@ -1594,6 +1594,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         for (c=0; c<struc.chains.length; c++) struc.chains[c].struct_conn = [];
         for (var i=0, c; i<struct_conn.id.length; i++) {
           if (struct_conn.conn_type_id && (struct_conn.conn_type_id[i] == "hydrog" || struct_conn.conn_type_id[i] == "metalc" )) continue;
+          if ((struct_conn.ptnr1_symmetry && struct_conn.ptnr1_symmetry[i] != "1_555") || (struct_conn.ptnr2_symmetry && struct_conn.ptnr2_symmetry[i] != "1_555")) continue;
           a1 = molmil.searchAtom(struc, struct_conn.ptnr1_label_asym_id[i], struct_conn.ptnr1_auth_seq_id[i], struct_conn.ptnr1_label_atom_id[i]);
           if (! a1) continue;
           a2 = molmil.searchAtom(struc, struct_conn.ptnr2_label_asym_id[i], struct_conn.ptnr2_auth_seq_id[i], struct_conn.ptnr2_label_atom_id[i]);
