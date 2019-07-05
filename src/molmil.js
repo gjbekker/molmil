@@ -1645,14 +1645,15 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
 
           start = this.getMolObject4Chain(this.getChain(struc, beg_label_asym_id), beg_label_seq_id);
           end = this.getMolObject4Chain(this.getChain(struc, end_label_asym_id), end_label_seq_id);
+          if (start == end) continue;
           while (end) {
             if (start == null) break;
             start.sndStruc = conf_type_id;
             if (start == end) break;
             start = start.next;
           }
+          struct_set = true;
         }
-        struct_set = true;
       }
   
       var struct_sheet_range = pdb.struct_sheet_range;  
@@ -1664,16 +1665,17 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
           end_label_seq_id = struct_sheet_range.end_label_seq_id[i];
           start = this.getMolObject4Chain(this.getChain(struc, beg_label_asym_id), beg_label_seq_id);
           end = this.getMolObject4Chain(this.getChain(struc, end_label_asym_id), end_label_seq_id);
+          if (start == end) continue;
           while (end) {
             if (start == null) break;
             start.sndStruc = 2;
             if (start == end) break;
             start = start.next;
           }
+          struct_set = true;
         }
-        struct_set = true;
       }
-    
+
       if (! struct_set) {for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);}
   
       molmil.resetColors(struc, this);
