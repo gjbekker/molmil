@@ -985,6 +985,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     
     this.cli_soup.renderer.resizeViewPort();
   }
+  else if (key == "connect_cutoff") {
+    molmil.configBox.connect_cutoff = parseFloat(value);
+  }
   
   return true;
 }

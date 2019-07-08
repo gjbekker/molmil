@@ -164,7 +164,8 @@ molmil.configBox = {
   stickRadius: 0.15,
   groupColorFirstH: 240,
   groupColorLastH: 0,
-  backsideColor: true
+  backsideColor: true,
+  connect_cutoff: 0.35
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -1181,15 +1182,10 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
               dz = z1-altxyzRef[xyz2+2]; dz *= dz;
               r = dx+dy+dz;
               if (r > 6) continue; // unlikely that it'll create a covalent bond
-              maxDistance = 2.25; // set it to 1.0 somewhere for hydrogens...
-              if (vdwR[chain.molecules[m1].atoms[a1].element] === undefined || vdwR[chain.molecules[m1].atoms[a1].element] >= 1.8) {
-                if (vdwR[altchain.molecules[m2].atoms[a2].element] === undefined || vdwR[altchain.molecules[m2].atoms[a2].element] >= 1.8) maxDistance = 6.0;
-                else maxDistance = 4.5;
-              }
-              else if (vdwR[altchain.molecules[m2].atoms[a2].element] === undefined || vdwR[altchain.molecules[m2].atoms[a2].element] >= 1.8) {
-                if (vdwR[chain.molecules[m1].atoms[a1].element] === undefined || vdwR[chain.molecules[m1].atoms[a1].element] >= 1.8) maxDistance = 6.0;
-                else maxDistance = 4.5;
-              }
+              maxDistance = molmil.configBox.connect_cutoff;
+              maxDistance += ((vdwR[chain.molecules[m1].atoms[a1].element] || 1.8) + (vdwR[altchain.molecules[m2].atoms[a2].element] || 1.8))*.5;
+              if (chain.molecules[m1].atoms[a1].element == "H" || altchain.molecules[m2].atoms[a2].element == "H") maxDistance -= .2;
+              maxDistance *= maxDistance;
 
               if (r <= maxDistance) chain.bonds.push([chain.molecules[m1].atoms[a1], altchain.molecules[m2].atoms[a2], 1]);
             }
@@ -1210,7 +1206,10 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
             dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
             dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
             r = dx+dy+dz;
-            maxDistance = 2.25;
+
+            maxDistance = molmil.configBox.connect_cutoff;
+            maxDistance += ((vdwR[chain.molecules[m1].atoms[a1].element] || 1.8) + (vdwR[chain.molecules[m2].atoms[a2].element] || 1.8))*.5;
+            maxDistance *= maxDistance;
             if (r <= maxDistance) chain.bonds.push([chain.molecules[m1].atoms[a1], chain.molecules[m2].atoms[a2], 1]);
           }
         }
@@ -7006,16 +7005,11 @@ molmil.buildBondsList4Molecule = function (bonds, molecule, xyzRef) {
       dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
       dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
       r = dx+dy+dz;
-      maxDistance = 3.0;
-      if (vdwR[molecule.atoms[a1].element] === undefined || vdwR[molecule.atoms[a1].element] >= 1.8) {
-        if (vdwR[molecule.atoms[a2].element] === undefined || vdwR[molecule.atoms[a2].element] >= 1.8) maxDistance = 6.0;
-        else maxDistance = 4.5;
-      }
-      else if (vdwR[molecule.atoms[a2].element] === undefined || vdwR[molecule.atoms[a2].element] >= 1.8) {
-        if (vdwR[molecule.atoms[a1].element] === undefined || vdwR[molecule.atoms[a1].element] >= 1.8) maxDistance = 6.0;
-        else maxDistance = 4.5;
-      }
-      else if (molecule.atoms[a1].element == "H" || molecule.atoms[a2].element == "H" || molecule.atoms[a1].element == "D" || molecule.atoms[a2].element == "D") maxDistance = 1.6;
+
+      maxDistance = molmil.configBox.connect_cutoff;
+      maxDistance += ((vdwR[molecule.atoms[a1].element] || 1.8) + (vdwR[molecule.atoms[a2].element] || 1.8))*.5;
+      if (molecule.atoms[a1].element == "H" || molecule.atoms[a2].element == "H") maxDistance -= .2;
+      maxDistance *= maxDistance;
       if (r <= maxDistance) bonds.push([molecule.atoms[a1], molecule.atoms[a2], 1]);
     }
   }
