@@ -1267,9 +1267,10 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         COM = [0, 0, 0, 0];
         A[0] = A[1] = A[2] = 1e99; // xyzMin
         B[0] = B[1] = B[2] = -1e99; // xyzMax
-        
+
         for (c=0; c<struct.chains.length; c++) {
-          if (struct.chains[c].molecules.length < 1 || struct.chains[c].isHet || struct.chains[c].molecules[0].water) continue;
+          //if (struct.chains[c].molecules.length < 1 || struct.chains[c].isHet || struct.chains[c].molecules[0].water) continue;
+          if (struct.chains[c].molecules.length < 1 || struct.chains[c].molecules[0].water) continue;
           if (struct.chains[c].name != asym_ids[i]) continue;
           chains.push(struct.chains[c]);
           dm_cache.push(struct.chains[c].displayMode);
@@ -1284,7 +1285,6 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
             struct.chains[c].molecules[m].rgba = molmil_dep.getKeyFromObject(molmil.configBox.sndStrucColor, struct.chains[c].molecules[m].sndStruc, molmil.configBox.sndStrucColor[1]);
             
             struct.chains[c].molecules[m].displayMode = DM == 4 ? 31 : 3;
-            
             if (struct.chains[c].molecules[m].CA) {
               xyz = struct.chains[c].molecules[m].CA.xyz;
               COM[0] += struct.chains[c].modelsXYZ[0][xyz];
@@ -1298,7 +1298,24 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
               if (struct.chains[c].modelsXYZ[0][xyz] > B[0]) B[0] = struct.chains[c].modelsXYZ[0][xyz];
               if (struct.chains[c].modelsXYZ[0][xyz+1] > B[1]) B[1] = struct.chains[c].modelsXYZ[0][xyz+1];
               if (struct.chains[c].modelsXYZ[0][xyz+2] > B[2]) B[2] = struct.chains[c].modelsXYZ[0][xyz+2];
+            }
+            else {
+              for (var a=0; a<struct.chains[c].molecules[m].atoms.length; a++) {
+                xyz = struct.chains[c].molecules[m].atoms[a].xyz;
+                
+                COM[0] += struct.chains[c].modelsXYZ[0][xyz];
+                COM[1] += struct.chains[c].modelsXYZ[0][xyz+1];
+                COM[2] += struct.chains[c].modelsXYZ[0][xyz+2];
+                COM[3] += 1;
               
+                if (struct.chains[c].modelsXYZ[0][xyz] < A[0]) A[0] = struct.chains[c].modelsXYZ[0][xyz];
+                if (struct.chains[c].modelsXYZ[0][xyz+1] < A[1]) A[1] = struct.chains[c].modelsXYZ[0][xyz+1];
+                if (struct.chains[c].modelsXYZ[0][xyz+2] < A[2]) A[2] = struct.chains[c].modelsXYZ[0][xyz+2];
+                if (struct.chains[c].modelsXYZ[0][xyz] > B[0]) B[0] = struct.chains[c].modelsXYZ[0][xyz];
+                if (struct.chains[c].modelsXYZ[0][xyz+1] > B[1]) B[1] = struct.chains[c].modelsXYZ[0][xyz+1];
+                if (struct.chains[c].modelsXYZ[0][xyz+2] > B[2]) B[2] = struct.chains[c].modelsXYZ[0][xyz+2];
+                
+              }
             }
           }
         }
@@ -1619,26 +1636,26 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
           if (B[2] > zMax) zMax = B[2];
         }
         toggleIdentity[asym_ids[i]] = 1;
+        any_identity = true;
       }
-      
-      
-      
-      for (c=0; c<program.matrices.length; c++) {
-        if (COM[3] == 0) continue;
-        vec3.transformMat4(COM_tmp, COM, program.matrices[c]);
-        COM_avg[0] += COM_tmp[0]; COM_avg[1] += COM_tmp[1]; COM_avg[2] += COM_tmp[2]; COM_avg[3] += 1;
-        vec3.transformMat4(COM_tmp, A, program.matrices[c]);
-        if (COM_tmp[0] < xMin) xMin = COM_tmp[0];
-        if (COM_tmp[1] < yMin) yMin = COM_tmp[1];
-        if (COM_tmp[2] < zMin) zMin = COM_tmp[2];
-        vec3.transformMat4(COM_tmp, B, program.matrices[c]);
-        if (COM_tmp[0] > xMax) xMax = COM_tmp[0];
-        if (COM_tmp[1] > yMax) yMax = COM_tmp[1];
-        if (COM_tmp[2] > zMax) zMax = COM_tmp[2];
-        NOC++;
+
+      // only do this if it is NOT a reducing BU...
+      if (vertices.length) {
+        for (c=0; c<program.matrices.length; c++) {
+          if (COM[3] == 0) continue;
+          vec3.transformMat4(COM_tmp, COM, program.matrices[c]);
+          COM_avg[0] += COM_tmp[0]; COM_avg[1] += COM_tmp[1]; COM_avg[2] += COM_tmp[2]; COM_avg[3] += 1;
+          vec3.transformMat4(COM_tmp, A, program.matrices[c]);
+          if (COM_tmp[0] < xMin) xMin = COM_tmp[0];
+          if (COM_tmp[1] < yMin) yMin = COM_tmp[1];
+          if (COM_tmp[2] < zMin) zMin = COM_tmp[2];
+          vec3.transformMat4(COM_tmp, B, program.matrices[c]);
+          if (COM_tmp[0] > xMax) xMax = COM_tmp[0];
+          if (COM_tmp[1] > yMax) yMax = COM_tmp[1];
+          if (COM_tmp[2] > zMax) zMax = COM_tmp[2];
+          NOC++;
+        }
       }
-      
-      if (! no_identity) any_identity = true;
     }
   }
   
@@ -1732,7 +1749,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
     for (c=0; c<struct.chains.length; c++) {
       chain = struct.chains[c];
       modelsXYZ = chain.modelsXYZ[soup.renderer.modelId];
-      if (chain.display) {
+      if (chain.display && ! chain.molecules[0].water) {
         for (i=0; i<chain.atoms.length; i++) {
           if (! chain.atoms[i].display) continue;
           xyzs.push([modelsXYZ[chain.atoms[i].xyz], modelsXYZ[chain.atoms[i].xyz+1], modelsXYZ[chain.atoms[i].xyz+2]]);
@@ -1741,7 +1758,6 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
     }
     molmil.orient(null, soup, xyzs);
   }
-  
  
   soup.canvas.update = true;
   
