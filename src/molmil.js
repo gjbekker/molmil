@@ -165,7 +165,8 @@ molmil.configBox = {
   groupColorFirstH: 240,
   groupColorLastH: 0,
   backsideColor: true,
-  connect_cutoff: 0.35
+  connect_cutoff: 0.35,
+  orientMODELs: false
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -8492,7 +8493,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   xyzs = xyzs || [];
   var c, m, a, f, modelsXYZ;
   
-  var COG = [0.0, 0.0, 0.0, 0], resCor = 0;
+  var COG = [0.0, 0.0, 0.0, 0];
   
   // also take into account any BUs...
 
@@ -8511,6 +8512,7 @@ molmil.orient = function(atoms, soup, xyzs) {
       chain = chains[c];
 
       for (f=0; f<chain.modelsXYZ.length; f++) {
+        if (! molmil.configBox.orientMODELs && f > 0) break;
         modelsXYZ = chain.modelsXYZ[f];
     
         for (m=0; m<chain.molecules.length; m++) {
@@ -8518,42 +8520,31 @@ molmil.orient = function(atoms, soup, xyzs) {
           if (! chain.molecules[m].CA || chain.molecules[m].ligand) {
              for (a=0; a<chain.molecules[m].atoms.length; a++) xyzs.push([modelsXYZ[chain.molecules[m].atoms[a].xyz], modelsXYZ[chain.molecules[m].atoms[a].xyz+1], modelsXYZ[chain.molecules[m].atoms[a].xyz+2]]);
           }
-          else {
-            xyzs.push([modelsXYZ[chain.molecules[m].CA.xyz], modelsXYZ[chain.molecules[m].CA.xyz+1], modelsXYZ[chain.molecules[m].CA.xyz+2]]);
-            resCor = 12.0;
-          }
+          else xyzs.push([modelsXYZ[chain.molecules[m].CA.xyz], modelsXYZ[chain.molecules[m].CA.xyz+1], modelsXYZ[chain.molecules[m].CA.xyz+2]]);
         }
       }
     }
   }
-  
-  var minmaxX = [1e99, -1e99];
-  var minmaxY = [1e99, -1e99];
-  var minmaxZ = [1e99, -1e99];
 
   for (n=0; n<xyzs.length; n++) {
     COG[0] += xyzs[n][0];
     COG[1] += xyzs[n][1];
     COG[2] += xyzs[n][2];
     COG[3] += 1;
-    
-    if (xyzs[n][0] < minmaxX[0]) minmaxX[0] = xyzs[n][0];
-    if (xyzs[n][0] > minmaxX[1]) minmaxX[1] = xyzs[n][0];
-      
-    if (xyzs[n][1] < minmaxY[0]) minmaxY[0] = xyzs[n][1];
-    if (xyzs[n][1] > minmaxY[1]) minmaxY[1] = xyzs[n][1];
-      
-    if (xyzs[n][2] < minmaxZ[0]) minmaxZ[0] = xyzs[n][2];
-    if (xyzs[n][2] > minmaxZ[1]) minmaxZ[1] = xyzs[n][2];
   }
   COG[0] /= COG[3]; COG[1] /= COG[3]; COG[2] /= COG[3];
   
-  var n, i, j, C_ij = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], x, y, z;
+  var n, i, j, C_ij = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], x, y, z, r2, maxRadius = 0;
 
   for (n=0; n<xyzs.length; n++) {
     x = xyzs[n][0] - COG[0]; y = xyzs[n][1] - COG[1]; z = xyzs[n][2] - COG[2];
+
+    r2 = x*x + y*y + z*z;
+    if (r2 > maxRadius) maxRadius = r2;
+    
     C_ij[0][0] += x * x; C_ij[1][1] += y * y; C_ij[2][2] += z * z;
     C_ij[0][1] += x * y; C_ij[0][2] += x * z; C_ij[1][2] += y * z;
+    
   }
   
   var Ninv = 1./xyzs.length;
@@ -8612,13 +8603,13 @@ molmil.orient = function(atoms, soup, xyzs) {
   if (! isNaN(sf)) mat4.getRotation(soup.renderer.camera.QView, matrix);
   
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
-  //else molmil.cli_soup.calculateCOG();
-  
-  var mx = Math.max(minmaxX[1]-minmaxX[0], minmaxY[1]-minmaxY[0], minmaxZ[1]-minmaxZ[0])+resCor+2; // LYS side chain size + 2 A vdw correction
+  //else molmil.cli_soup.calculateCOG();  
+
+  var mx = Math.sqrt(maxRadius)*2 + 5;
   if (molmil.configBox.projectionMode == 1) {
     var zmove = ((mx/Math.sin(molmil.configBox.camera_fovy*(Math.PI/180)))), aspect = soup.renderer.height/soup.renderer.width;
     if (aspect > 1) zmove *= aspect;
-    soup.renderer.camera.z = -zmove*1.125;
+    soup.renderer.camera.z = -zmove;
   }
   else if (molmil.configBox.projectionMode == 2) soup.renderer.camera.z = -((mx/Math.min(soup.renderer.width, soup.renderer.height))*molmil.configBox.zFar*(.5))-molmil.configBox.zNear-1;
 }
