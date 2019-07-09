@@ -1504,9 +1504,18 @@ molmil.bindCanvasInputs = function(canvas) {
         file = dict[items[i]];
         fr.filename = file.name;
         fr.fileHandle = file;
+        var ok = false;
       
         for (j=0; j<canvas.inputFunctions.length; j++) {
-          if (canvas.inputFunctions[j](canvas, fr)) break;
+          if (canvas.inputFunctions[j](canvas, fr)) {ok=true; break;}
+        }
+        
+        if (! ok) {
+          for (var j in molmil.formatList) {
+            if (typeof molmil.formatList[j] != "function" || ! cmd[1].endsWith(j)) continue;
+            molmil.loadFilePointer(fr, molmil.formatList[j], canvas);
+            break;
+          }
         }
       }
       

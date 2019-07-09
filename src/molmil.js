@@ -895,8 +895,10 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else if (typeof(format) == "function") {
     request.ASYNC = async;
     request.parseFunction = format;
+    if (settings.responseType) request.responseType = settings.responseType;
     request.parse = function() {
-      return this.parseFunction(this.request, this.filename);
+      if (settings.responseType == "arraybuffer" || settings.responseType == "json") return this.parseFunction(this.request.response, this.filename);
+      else return this.parseFunction(this.request.responseText, this.filename);
     };
   }
   else {console.log("Unknown format: "+format); return;}
@@ -8256,35 +8258,44 @@ molmil.colorBfactor = function(color1, color3, color2, settings, soup) {
   // molmil.colorBfactor([0, 0, 255], [255, 255, 255], [255, 0, 0], {skipMinMax:true})
 }
 
+molmil.formatList = {}
+molmil.formatList[".pdb"] = molmil.formatList[".ent"] = "pdb";
+molmil.formatList[".mmtf"] = "mmtf";
+molmil.formatList[".cif"] = "mmcif";
+molmil.formatList[".gro"] = "gro";
+molmil.formatList[".trr"] = "gromacs-trr";
+molmil.formatList[".xtc"] = "gromacs-xtc";
+molmil.formatList[".cor"] = molmil.formatList[".cod"] = "psygene-traj";
+molmil.formatList[".mnt"] = "presto-mnt";
+molmil.formatList[".mpbf"] = "mpbf";
+molmil.formatList[".ccp4"] = "ccp4";
+molmil.formatList[".mdl"] = molmil.formatList[".mol"] = molmil.formatList[".sdl"] = "mdl";
+molmil.formatList[".mol2"] = "mol2";
+molmil.formatList[".xyz"] = "xyz";
+molmil.formatList[".obj"] = "obj";
+molmil.formatList[".wrl"] = "wrl";
+molmil.formatList[".stl"] = "stl";
+molmil.formatList[".efvet"] = "efvet";
+molmil.formatList[".mjs"] = "mjs";
+
 molmil.guess_format = function(name) {
   var format = null;
-  var formats = {};
-  formats[".pdb"] = formats[".ent"] = "pdb";
-  formats[".mmtf"] = "mmtf";
-  formats[".cif"] = "mmcif";
-  formats[".gro"] = "gro";
-  formats[".trr"] = "gromacs-trr";
-  formats[".xtc"] = "gromacs-xtc";
-  formats[".cor"] = formats[".cod"] = "psygene-traj";
-  formats[".mnt"] = "presto-mnt";
-  formats[".mpbf"] = "mpbf";
-  formats[".ccp4"] = "ccp4";
-  formats[".mdl"] = formats[".mol"] = formats[".sdl"] = "mdl";
-  formats[".mol2"] = "mol2";
-  formats[".xyz"] = "xyz";
-  formats[".obj"] = "obj";
-  formats[".wrl"] = "wrl";
-  formats[".stl"] = "stl";
-  formats[".efvet"] = "efvet";
-  formats[".mjs"] = "mjs";
-  
   var fname = name.split("/").slice(-1)[0].replace(".gz", "");
-  for (var ext in formats) {      
-    if (fname.substr(fname.length-ext.length) == ext) {format = formats[ext]; break;}
+  for (var ext in molmil.formatList) {      
+    if (fname.substr(fname.length-ext.length) == ext) {format = molmil.formatList[ext]; break;}
   }
-  
   return format;
 };
+
+molmil.loadFilePointer = function(fileObj, func, canvas) {
+  fileObj.onload = function(e) {
+    func(e.target.result, this.filename);
+    delete canvas.molmilViewer.downloadInProgress;
+  }
+  canvas.molmilViewer.downloadInProgress = true;
+  fileObj.readAsText(fileObj.fileHandle);
+  return true;
+}
 
 /*
 

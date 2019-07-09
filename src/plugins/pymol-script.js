@@ -302,10 +302,18 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
   
   if (mjs_fileBin.hasOwnProperty(cmd[1])) {
     // load it manually...
-    var fakeObj = mjs_fileBin[cmd[1]];
+    var fakeObj = mjs_fileBin[cmd[1]], ok = false;
     
-    for (var j=0, ok=false; j<canvas.inputFunctions.length; j++) {
-      if (canvas.inputFunctions[j](canvas, fakeObj)) break;
+    for (var j=0; j<canvas.inputFunctions.length; j++) {
+      if (canvas.inputFunctions[j](canvas, fakeObj)) {ok=true; break;}
+    }
+    
+    if (! ok) {
+      for (var j in molmil.formatList) {
+        if (typeof molmil.formatList[j] != "function" || ! cmd[1].endsWith(j)) continue;
+        molmil.loadFilePointer(fakeObj, molmil.formatList[j], canvas);
+        break;
+      }
     }
     
     return true;
