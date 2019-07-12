@@ -2609,16 +2609,21 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   vs += (bonds2draw.length+(xna2draw.length*0.5))*(detail_lv+1)*4*2;
   vs += nor*CB_NOI*CB_NOVPR;
   
-  if (vs > 1e7) detail_lv -= 1;
-  if (vs > 3e7) detail_lv -= 1;
-  if (vs > 1e8) detail_lv -= 1;
-  if (vs < 2.5e5 && detail_lv < 3) detail_lv += 1;
-  if (typeof molmil.configBox.strictDetailLV == "number" && detail_lv < molmil.configBox.strictDetailLV) detail_lv = molmil.configBox.strictDetailLV;
-  else if (molmil.configBox.strictDetailLV == true) molmil.configBox.strictDetailLV = molmil.configBox.QLV_SETTINGS[render.QLV].SPHERE_TESS_LV;
+  if (molmil.configBox.customDetailLV) detail_lv = this.detail_lv = molmil.configBox.customDetailLV(vs, detail_lv);
+  else {
+    if (vs > 1e7) detail_lv -= 1;
+    if (vs > 3e7) detail_lv -= 1;
+    if (vs > 1e8) detail_lv -= 1;
+    if (vs < 2.5e5 && detail_lv < 3) detail_lv += 1;
+    if (typeof molmil.configBox.strictDetailLV == "number" && detail_lv < molmil.configBox.strictDetailLV) detail_lv = molmil.configBox.strictDetailLV;
+    else if (molmil.configBox.strictDetailLV == true) molmil.configBox.strictDetailLV = molmil.configBox.QLV_SETTINGS[render.QLV].SPHERE_TESS_LV;
+    //detail_lv = 1;
+    detail_lv = this.detail_lv = Math.max(detail_lv+detail_or, 0);
+    if (molmil.configBox.liteMode && ! molmil.configBox.strictDetailLV) detail_lv = this.detail_lv = 1;
+  }
   
-  //detail_lv = 1;
-  detail_lv = this.detail_lv = Math.max(detail_lv+detail_or, 0);
-  if (molmil.configBox.liteMode && ! molmil.configBox.strictDetailLV) detail_lv = this.detail_lv = 1;
+  
+  
   
   // use a separate detail lv for atoms in case of < 250 atoms --> higher quality
   
