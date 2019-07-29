@@ -5554,9 +5554,9 @@ molmil.render.prototype.resizeViewPort = function() {
   var convergence = molmil.configBox.zNear * molmil.configBox.stereoFocalFraction;
   var eyeSep = convergence/molmil.configBox.stereoEyeSepFraction;
   var top, bottom, a, b, c;
-  top = molmil.configBox.zNear * Math.tan(molmil.configBox.camera_fovy/2) * .25;
+  top = molmil.configBox.zNear * Math.tan(molmil.configBox.camera_fovy) * .25;
   bottom = -top;
-  a = (this.width/this.height) * Math.tan(molmil.configBox.camera_fovy/2) * convergence;
+  a = (this.width/this.height) * Math.tan(molmil.configBox.camera_fovy) * convergence;
   b = a - (eyeSep/2);
   c = a + (eyeSep/2);
   
@@ -7508,6 +7508,7 @@ molmil.commandLine = function(canvas) {
   };
   this.environment.console.runCommand = function(command) {
     if (! molmil.isBalancedStatement(command)) return;
+    if (this.cli.environment.cli_canvas.commandLine.initDone === undefined) return molmil_dep.asyncStart(this.runCommand, [command], this, 10);
     
     var sub_commands = [], startIdx = 0, idx=0, sc, tmpIdx;
     var n = 0;
@@ -7556,6 +7557,7 @@ molmil.commandLine = function(canvas) {
     }
     */
     this.buffer = ""; this.blSel = -1;
+    if (this.cli.environment.cli_canvas.commandLine.initDone == false) this.cli.environment.cli_canvas.commandLine.initDone = true;
   };
   this.run = function(command) {this.environment.console.runCommand(command);}
   this.environment.console.backlog = [];
@@ -7573,10 +7575,11 @@ molmil.commandLine = function(canvas) {
   // this.bindPymolInterface();
   
   var init = function() {
+    if (this.environment.console.backlog.length == 0) this.initDone = true;
+    else this.initDone = false;
     this.bindPymolInterface();
     this.icon.show(true); this.icon.hide();
     if (molmil.onInterfacebind) molmil.onInterfacebind(this);
-    this.initDone = true;
   };
   
   if (! molmil.commandLines.pyMol) {
