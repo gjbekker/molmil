@@ -467,7 +467,7 @@ rooms:
 
   spring8.inside2:
     name:
-      en: "SPring-8 BL44XU upper  level"
+      en: "SPring-8 BL44XU upper level"
       ja: "上から見る"
     default-orientation: [1500, 2000]
     doors: 
