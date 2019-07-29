@@ -416,6 +416,7 @@ rooms:
     name:
       en: "SPring-8 entrance" 
       ja : "X線結晶解析\n大型放射光施設SPring-8\nえっくすせん\nおおがた そうち\nの建物の前"
+    default-orientation: [2800, 1350]
     doors: 
       - to: general.entrance
         x: 0
