@@ -467,7 +467,7 @@ rooms:
 
   spring8.inside2:
     name:
-      en: "SPring-8 upper level"
+      en: "SPring-8 BL44XU upper  level"
       ja: "上から見る"
     default-orientation: [1500, 2000]
     doors: 
@@ -509,7 +509,7 @@ rooms:
         
   spring8.beamline1:
     name:
-      en: "SPring-8 beamline BL44XU (front)" 
+      en: "SPring-8 BL44XU (Experimental Hutch)" 
       ja: "たんぱく研のビームライン\nBL44XU"
     labels:
       - content:
@@ -558,7 +558,7 @@ rooms:
         
   spring8.beamline2:
     name:
-      en: "SPring-8 beamline BL44XU (back)" 
+      en: "SPring-8 BL44XU (Optics Hutch)" 
       ja: "たんぱく研のビームラインBL44XU(奥)"
     labels:
       - content:
