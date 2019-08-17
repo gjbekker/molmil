@@ -1265,8 +1265,8 @@ molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
 };
 
 molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
-  if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/loaders.js", this.load_ccp4, this, [buffer, filename, settings])) return;
-  //return molmil.loadPlugin(molmil.settings.src+"plugins/loaders.js", this.load_ccp4, this, [buffer, filename, settings]);
+  //if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/loaders.js", this.load_ccp4, this, [buffer, filename, settings])) return;
+  return molmil.loadPlugin(molmil.settings.src+"plugins/loaders.js", this.load_ccp4, this, [buffer, filename, settings]);
 };
 
 molmil.viewer.prototype.load_stl = function(buffer, filename, settings) {

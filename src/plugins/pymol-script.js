@@ -646,6 +646,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border) {
   request.AddParameter("border", border*.5);
   request.AddParameter("pdbid", atoms[0].chain.entry.meta.id);
   request.timeout = 0; request.ASYNC = true; request.responseType = "arraybuffer";
+  request.console = this.console;
   request.OnDone = function() {
     if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/loaders.js", this.OnDone, this, [])) return;
     if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/misc.js", this.OnDone, this, [])) return;
@@ -660,6 +661,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border) {
     var struct = soup.load_ccp4(this.request.response, "???", settings);
     struct.meta.idnr = "#"+(soup.SID++);
   };
+  request.OnError = function() {this.console.error("Unable to retrieve map...");};
   request.Send("https://pdbj.org/rest/edmap2");
 }
 
