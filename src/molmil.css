@@ -393,3 +393,8 @@
   background-color: yellow;
   cursor: pointer;
 }
+
+[contenteditable] {
+    -webkit-user-select: text;
+    user-select: text;
+}
