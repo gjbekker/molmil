@@ -182,10 +182,12 @@
         //molmil.handle_molmilViewer_mouseMove(ev);
         if (! canvas.WORLD || ! canvas.WORLD.program) return;
 
+        var dpr = window.devicePixelRatio || 1;
+
         if (mouseActive) {
           molmil.mouseMoved = true;
-          var clientX = ev.clientX || (ev.touches ? ev.touches[ 0 ].clientX : 0);
-          var clientY = ev.clientY || (ev.touches ? ev.touches[ 0 ].clientY : 0);
+          var clientX = (ev.clientX || (ev.touches ? ev.touches[ 0 ].clientX : 0))*dpr;
+          var clientY = (ev.clientY || (ev.touches ? ev.touches[ 0 ].clientY : 0))*dpr;
           var sf = (molmil.configBox.camera_fovy/75) * 0.1;
           
           lon = ( onMouseDownMouseX - clientX ) * sf + onMouseDownLon;
@@ -193,7 +195,7 @@
           canvas.update = true;
         }
 
-        var x = (ev.clientX/canvas.renderer.width) * 2 - 1; var y = -(ev.clientY/canvas.renderer.height) * 2 + 1;
+        var x = ((ev.clientX*dpr)/canvas.renderer.width) * 2 - 1; var y = -((ev.clientY)*dpr/canvas.renderer.height) * 2 + 1;
         var uv = calculateViewUV(x, y, canvas.renderer.projectionMatrix, canvas.renderer.camera.generateMatrix());
         var hoverDoorway = uv == null ? -1 : figureHoverDoorway(uv, canvas.WORLD.program.roomArrays);
         if (hoverDoorway != canvas.WORLD.program.roomArrays.hoverDoorway) {
