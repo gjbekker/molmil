@@ -29,7 +29,10 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     bond: molmil.commandLines.pyMol.bondCommand,
     stereo: molmil.commandLines.pyMol.stereoCommand,
     orient: molmil.commandLines.pyMol.orientCommand,
-    alter: molmil.commandLines.pyMol.alterCommand
+    alter: molmil.commandLines.pyMol.alterCommand,
+    indicate: molmil.commandLines.pyMol.indicateCommand,
+    png: molmil.commandLines.pyMol.pngCommand,
+    quit: molmil.commandLines.pyMol.quitCommand
   };
   this.altCommandIF = molmil.commandLines.pyMol.tryExecute;
 };
@@ -145,6 +148,29 @@ molmil.commandLines.pyMol.alterCommand = function(env, command) {
   catch (e) {console.error(e); return false;}
   return true;
 }
+
+molmil.commandLines.pyMol.pngCommand = function(env, command) {
+  command = command.match(/png[\s]*(.*)?[\s]*/);
+
+  try {molmil.commandLines.pyMol.png.apply(env, [command[1] ? command[1].trim() : null]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
+molmil.commandLines.pyMol.quitCommand = function(env, command) {
+  if (molmil.configBox.customExitFunction) molmil.configBox.customExitFunction();
+  else {} // ??
+  return true;
+}
+
+molmil.commandLines.pyMol.indicateCommand = function(env, command) {
+  command = command.match(/indicate[\s]*(.*)?[\s]*/);
+
+  try {molmil.commandLines.pyMol.indicate.apply(env, [command[1] ? command[1].trim() : null]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
 
 molmil.commandLines.pyMol.saveCommand = function(env, command) {
   command = command.match(/save[\s]+([a-zA-Z0-9_.]+)[\s]*(,[\s]*(.*))?/);
@@ -340,11 +366,6 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
   
   this.soupObject = this.soupObject || molmil.cli_soup || soup || this.cli_soup;
   if (expr == "all") return Object.values(this.soupObject.atomRef);
-  
-  var sub_expr_handler = function() { // define new way to handle this...
-  };
-  
-  new_expr
 
   expr = expr + " ";
   
@@ -364,9 +385,53 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     i = j;
   }
   
+  
+  var executeExpr = function (expr2exe) {
+    var list = [];
+    expr2exe = "for (var a in this.soupObject.atomRef) if ("+expr2exe+") list.push(this.soupObject.atomRef[a]);";
+    try{eval(expr2exe);}
+    catch(e) {(this.console || console).error("Unable to process PyMol command: "+e);}
+    return list;
+  }
+  
+  var gatherAhead = function(weak) {
+    var N = 0, sub_expr = "", sfs = false;
+    while (i < expr.length) {
+      if (expr[i] == "(") N++;
+      if (expr[i] == ")") N--;
+      if (N > -1) sub_expr += expr[i];
+      if (weak) {
+        if ((expr[i] == ")" && N <= 0)) break;
+      }
+      else {
+        if ((sfs && expr[i].match(/\s/)) || (expr[i] == ")" && N <= 0)) break;
+        if (! expr[i].match(/\s/)) sfs = true;
+      }
+      i++;
+    }
+    //if (N > -1) i++;
+    if (N < 0) i--;
+    else if (expr[i] == ")") i++;
+    return sub_expr;
+  };
+  
+  var gatherBehind = function() {
+    var N = 0, sub_expr = "", I = new_expr.length-1;
+    while (I > -1) {
+      if (new_expr[I] == ")") N++;
+      if (new_expr[I] == "(") N--;
+      sub_expr = new_expr.pop() + sub_expr;
+      if (N == 0) break;
+      I--;
+    }
+    return sub_expr;
+  };
+  
   // need to upgrade this parser in the future to something more flexible...
 
   var backboneAtoms = molmil.configBox.backboneAtoms4Display;
+  var TEMPLIST = [];
+
   for (i=0; i<expr.length; i++) {
     if (expr[i].match(/\s/) || expr[i] == ")") {
       toUpper_ = false, ss_ = false;
@@ -390,7 +455,25 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         else {key = "this.soupObject.atomRef[a].chain.entry.meta.id.toLowerCase() == '%s'"; toLower_ = true;}
       }
       else if (word == "around") {
-        //console.log(word, key, new_expr);
+        var atomList = []
+        molmil.fetchNearbyAtoms(executeExpr.apply(this, [gatherBehind()]), parseFloat(gatherAhead()), atomList, soup);
+        TEMPLIST.push(atomList);
+        new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1");
+      }
+      else if (word == "byobject") {
+        var atomList = molmil.autoGetAtoms(molmil.atoms2objects(molmil.quickSelect.apply(this, [gatherAhead(true)])));
+        TEMPLIST.push(atomList);
+        new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1")
+      }
+      else if (word == "bychain") {
+        var atomList = molmil.autoGetAtoms(molmil.atoms2chains(molmil.quickSelect.apply(this, [gatherAhead(true)])));
+        TEMPLIST.push(atomList);
+        new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1");
+      }
+      else if (word == "byres") {
+        var atomList = molmil.autoGetAtoms(molmil.atoms2residues(molmil.quickSelect.apply(this, [gatherAhead(true)])));
+        TEMPLIST.push(atomList);
+        new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1");
       }
       else if (word == "and") new_expr.push("&&");
       else if (word == "or") new_expr.push("||");
@@ -439,20 +522,11 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       i += pos == -1 ? tmp.length : pos;
     }
     
-    else if (expr[i] == "(" || expr[i] == "!") new_expr.push(expr[i]);
+    else if (expr[i] == "(" || expr[i] == ")" || expr[i] == "!") new_expr.push(expr[i]);
     else word += expr[i];
   }
-//console.log(new_expr);
-  new_expr = new_expr.join(" ");
 
-  //console.log(new_expr);
-
-  var list = [];
-  new_expr = "for (var a in this.soupObject.atomRef) if ("+new_expr+") list.push(this.soupObject.atomRef[a]);";
-  try{eval(new_expr);}
-  catch(e) {(this.console || console).error("Unable to process PyMol command: "+e);}
-  
-  return list;
+  return executeExpr.apply(this, [new_expr.join(" ")]);
 }
 
 molmil.commandLines.pyMol.viewport = function(width, height) {
@@ -602,6 +676,37 @@ molmil.commandLines.pyMol.orient = function(atoms) {
     else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
   }
   molmil.orient(atoms, this.cli_soup);
+  
+  return true;
+}
+
+molmil.commandLines.pyMol.indicate = function(atoms) {
+  if (typeof atoms != "object" && atoms != null) {
+    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
+    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+  }
+  
+  molmil.selectAtoms(atoms, false, this.cli_soup);
+  this.cli_canvas.renderer.updateSelection();
+  return true;
+}
+
+molmil.commandLines.pyMol.png = function(filename) {
+  if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", arguments.callee, this, [filename]);
+  if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) {
+    var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
+  }
+
+  var canvas = molmil.fetchCanvas();
+  
+  canvas.renderer.selectDataContext();
+  canvas.update = true;
+  canvas.renderer.render();
+  if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(filename, canvas.toDataURL(), "base64-png");
+  else canvas.toBlob(function(blob) {saveAs(blob, filename);});
+  canvas.renderer.selectDefaultContext();
+  if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
+  canvas.update = true; canvas.renderer.render();
   
   return true;
 }
@@ -958,6 +1063,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   }
   else if (key == "label_size") {
     molmil.defaultSettings_label.fontSize = parseFloat(value);
+  }
+  else if (key == "label_front") {
+    molmil.defaultSettings_label.alwaysFront = value == 1;
   }
   else if (key == "cartoon_smooth_loops") {
     value = parseInt(value);

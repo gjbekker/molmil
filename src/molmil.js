@@ -129,7 +129,7 @@ molmil.configBox = {
   imposterSpheres: false,
   BGCOLOR: [0.0, 0.0, 0.0, 1.0],
   
-  backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1, "CN": 1, "CM": 1},
+  backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1, "CN": 1, "CM": 1, "CH3": 1},
   projectionMode: 1, // 1: perspective, 2: orthographic
   colorMode: 1, // 1: rasmol, 2: jmol
   
@@ -723,13 +723,13 @@ molmil.viewer.prototype.selectObject = function(x, y, event) {
 // ** loads a file from a URL **
 molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) { // ignore format here...
   //load ../agora/data/base_adp.pdb
-  if (this.hasOwnProperty("__cwd__")) {
-    var r = new RegExp('^(?:[a-z]+:)?//', 'i');
-    if (! r.test(loc)) loc = this.__cwd__ + loc;
-  }
-  else if (molmil.hasOwnProperty("__cwd__")) {
+  if (molmil.hasOwnProperty("__cwd__")) {
     var r = new RegExp('^(?:[a-z]+:)?//', 'i');
     if (! r.test(loc)) loc = molmil.__cwd__ + loc;
+  }
+  else if (this.hasOwnProperty("__cwd__")) {
+    var r = new RegExp('^(?:[a-z]+:)?//', 'i');
+    if (! r.test(loc)) loc = this.__cwd__ + loc;
   }
 
   if (! format) format = molmil.guess_format(loc);
@@ -6820,7 +6820,7 @@ molmil.getProteinChains = function(obj) {
   else if (obj instanceof molmil.entryObject) {
     for (var c=0; c<obj.chains.length; c++) {if (! obj.chains[c].isHet && obj.chains[c].molecules.length && ! obj.chains[c].molecules[0].water) out.push(obj.chains[c]);}
   }
-  else if (obj instanceof molmil.chainObj) {
+  else if (obj instanceof molmil.chainObject) {
     if (! obj.isHet && obj.molecules.length && ! obj.molecules[0].water) out.push(obj);
   }
   return out
@@ -6833,6 +6833,24 @@ molmil.getResiduesForChain = function(chain, first, last) {
   }
   return out;
 }
+
+molmil.autoGetAtoms = function(array) {
+  var atomList = [];
+  if (! array instanceof Array) array = [array];
+  if (array.length == 0) return [];
+  
+  if (array[0] instanceof molmil.entryObject) {
+    var i, c;
+    for (i=0; i<array.length; i++) {
+      for (c=0; c<array[i].chains.length; i++) atomList = atomList.concat(array[i].chains.atoms);
+    }
+  }
+  else if (array[0] instanceof molmil.chainObject || array[0] instanceof molmil.molObject) {
+    for (var i=0; i<array.length; i++) atomList = atomList.concat(array[i].atoms);
+  }
+  return atomList;
+}
+
 
 molmil.setCanvas = function (soupObject, canvas) {
   soupObject.canvas = canvas;
@@ -7506,9 +7524,9 @@ molmil.commandLine = function(canvas) {
     this.logBox.scrollTop = this.logBox.scrollHeight;
     if (noPopup != true) this.logBox.icon.onclick(true);
   };
-  this.environment.console.runCommand = function(command) {
+  this.environment.console.runCommand = function(command, priority) {
     if (! molmil.isBalancedStatement(command)) return;
-    if (this.cli.environment.cli_canvas.commandLine.initDone === undefined) return molmil_dep.asyncStart(this.runCommand, [command], this, 10);
+    if (this.cli.environment.cli_canvas.commandLine.initDone === undefined) return molmil_dep.asyncStart(this.runCommand, [command, priority], this, 10);
     
     var sub_commands = [], startIdx = 0, idx=0, sc, tmpIdx;
     var n = 0;
@@ -7531,6 +7549,8 @@ molmil.commandLine = function(canvas) {
       startIdx = idx+1;
     }
     
+    if (priority) {var buffer = this.cli.commandBuffer; this.cli.commandBuffer = [];}
+    
     for (var i=0; i<sub_commands.length; i++) {
       sub_commands[i] = sub_commands[i].trim();
       this.logCommand(sub_commands[i]);
@@ -7538,6 +7558,7 @@ molmil.commandLine = function(canvas) {
       this.backlog.unshift(sub_commands[i]);
     }
     this.cli.eval("molmil.checkRebuild();");
+    if (priority) {for (var i=0; i<buffer.length; i++) this.cli.eval(buffer[i]);}
     
     /*
     if (command.indexOf("{") == -1 && command.indexOf(";") != -1) {
@@ -7693,11 +7714,14 @@ molmil.loadScript = function(url) {
   var cc = this.cli_canvas;
   var cli = cc.commandLine;
 
+  cc.molmilViewer.downloadInProgress = true;
+
   var request = molmil.xhr(url);
   request.ASYNC = true;
   request.OnDone = function() {
+    delete cc.molmilViewer.downloadInProgress;
     cc.molmilViewer.__cwd__ = cli.environment.scriptUrl = url.substr(0, url.lastIndexOf('/')) + "/";
-    cli.environment.console.runCommand(this.request.responseText.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, ""));
+    cli.environment.console.runCommand(this.request.responseText.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, ""), true);
   }
   for (var e in cc.molmilViewer.extraREST) request.AddParameter(e, cc.molmilViewer.extraREST[e]);
   for (var e in cc.molmilViewer.extraRESTHeaders) request.headers[e] = cc.molmilViewer.extraRESTHeaders[e];
@@ -7708,7 +7732,7 @@ molmil.commandLine.prototype.eval = function(command) {
   // instead of having two command lines (e.g. pymol & javascript), only have one command line (javascript), but rewrite the incoming /command/ from pymol --> javascript...
   command = command.trim();
   if (! command) return;
-
+  
   if (this.soup.downloadInProgress || ! this.initDone) {
     this.commandBuffer.push(command);
     if (this.commandBuffer.length == 1) this.wait4Download();
@@ -7728,7 +7752,9 @@ molmil.commandLine.prototype.wait4Download = function() {
   }
   
   var buffer = this.commandBuffer; this.commandBuffer = [];
-  for (var i=0; i<buffer.length; i++) this.eval(buffer[i]);
+  for (var i=0; i<buffer.length; i++) {
+    this.eval(buffer[i]);
+  }
 };
 
 molmil.commandLine.prototype.runCommand = function(command) { // note the /this/ stuff will not work properly... if there are many functions and internal /var/s...
@@ -8128,6 +8154,7 @@ molmil.fetchNearbyAtoms = function(obj, r, atomList, soup) {
     return atomList;
   }
   
+  
   if (obj instanceof molmil.entryObject) {
     for (var i=0; i<obj.chains; i++) molmil.fetchNearbyAtoms(obj.chains[i], r, atomList, soup);
     return atomList;
@@ -8142,10 +8169,12 @@ molmil.fetchNearbyAtoms = function(obj, r, atomList, soup) {
     atoms_ = obj.atoms;
     modelsXYZ2 = obj.chain.modelsXYZ[soup.renderer.modelId];
   }
+  else if (obj instanceof molmil.atomObject) {
+    atoms_ = [obj];
+    modelsXYZ2 = obj.chain.modelsXYZ[soup.renderer.modelId];
+  }
   else return atomList;
-  
-  
-  
+
   var i, j, c, r2 = r*r, xyz1, xyz2, atom1 = [0.0, 0.0, 0.0], atom2 = [0.0, 0.0, 0.0], modelsXYZ1, x, y, z, rr;
   
   for (j=0; j<atoms_.length; j++) {if (atoms_[j].element != "H")  atoms.push(atoms_[j]);}
@@ -8178,6 +8207,24 @@ molmil.fetchNearbyAtoms = function(obj, r, atomList, soup) {
   }
   
   return atomList;
+}
+
+molmil.atoms2objects = function(atomList, exclude) {
+  exclude = exclude || [];
+  var resRef = {}, i, resList = [];
+  for (i=0; i<exclude.length; i++) resRef[exclude[i].meta.idnr] = false;
+  for (i=0; i<atomList.length; i++) {if (! resRef.hasOwnProperty(atomList[i].chain.entry.meta.idnr)) resRef[atomList[i].chain.entry.meta.idnr] = atomList[i].chain.entry;}
+  for (i in resRef) {if (resRef[i] != false) resList.push(resRef[i]);}
+  return resList;
+}
+
+molmil.atoms2chains = function(atomList, exclude) {
+  exclude = exclude || [];
+  var resRef = {}, i, resList = [];
+  for (i=0; i<exclude.length; i++) resRef[exclude[i].CID] = false;
+  for (i=0; i<atomList.length; i++) {if (! resRef.hasOwnProperty(atomList[i].chain.CID)) resRef[atomList[i].chain.CID] = atomList[i].chain;}
+  for (i in resRef) {if (resRef[i] != false) resList.push(resRef[i]);}
+  return resList;
 }
 
 molmil.atoms2residues = function(atomList, exclude) {
