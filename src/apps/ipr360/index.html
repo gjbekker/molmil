@@ -171,7 +171,7 @@
       };
       
       canvas.addEventListener(molmil_dep.dBT.MFF ? "DOMMouseScroll" : "mousewheel", function(ev) {
-        var fov = molmil.configBox.camera_fovy + ev.deltaY * 0.05;
+        var fov = molmil.configBox.camera_fovy + (-ev.wheelDelta || ev.detail*40) * 0.05;
         molmil.configBox.camera_fovy = Math.min(Math.max(fov, 10), 75);
         mat4.perspective(canvas.renderer.projectionMatrix, molmil.configBox.camera_fovy*(Math.PI/180), canvas.renderer.width/canvas.renderer.height, molmil.configBox.zNear, molmil.configBox.zFar);
         canvas.update = true;
