@@ -40,8 +40,8 @@
     var molmil_settings = {};
 /*end_publish_erase*/  
 
-    molmil_settings.src = window.location.href.endsWith("/") ? window.location.href : window.location.href.split("/").slice(0, -1).join("/")+"/";
-
+    var url = window.location.href.replace(window.location.hash, "");
+    molmil_settings.src = url.endsWith("/") ? url : url.split("/").slice(0, -1).join("/")+"/";
   
     var canvas, cli;
   
