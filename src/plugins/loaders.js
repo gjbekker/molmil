@@ -313,6 +313,8 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var head = document.getElementsByTagName("head")[0];
   if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/misc.js", this.load_ccp4, this, [buffer, filename, settings])) return;
   
+  buffer = buffer.buffer; // make sure we have the arraybuffer itself...
+  
   if (! settings) settings = {sigma: 1.0};
   if (buffer instanceof molmil.polygonObject) {
     var struct = buffer;
@@ -350,6 +352,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
     sigma = (sigma*dev)+d[2];
   }
   
+  if (settings.color) settings.rgba = molmil.color2rgba(settings.color);
   var rgba = settings.rgba || [255, 255, 255, 255];
       
   var sz = a[0]*a[1]*a[2];
