@@ -1155,33 +1155,52 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   if (repr == "spheres") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 1;
+      atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
         atoms[i].molecule.showSC = true;
         atoms[i].molecule.chain.twoDcache = null;
+      }
+      else if (atoms[i].molecule.ligand) {
+        atoms[i].molecule.displayMode = 0;
+        atoms[i].molecule.display = true;
+        atoms[i].chain.display = true;
       }
     }
   }
   else if (repr == "ball_stick") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 2;
+      atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
         atoms[i].molecule.showSC = true;
         atoms[i].molecule.chain.twoDcache = null;
       }
+      else if (atoms[i].molecule.ligand) {
+        atoms[i].molecule.displayMode = 0;
+        atoms[i].molecule.display = true;
+        atoms[i].chain.display = true;
+      }
     }
   }
   else if (repr == "sticks") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 3;
+      atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
+        atoms[i].molecule.display = true;
         atoms[i].molecule.showSC = true;
         atoms[i].molecule.chain.twoDcache = null;
+      }
+      else if (atoms[i].molecule.ligand) {
+        atoms[i].molecule.displayMode = 0;
+        atoms[i].molecule.display = true;
+        atoms[i].chain.display = true;
       }
     }
   }
