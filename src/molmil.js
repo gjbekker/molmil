@@ -723,13 +723,13 @@ molmil.viewer.prototype.selectObject = function(x, y, event) {
 // ** loads a file from a URL **
 molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) { // ignore format here...
   //load ../agora/data/base_adp.pdb
-  if (molmil.hasOwnProperty("__cwd__")) {
-    var r = new RegExp('^(?:[a-z]+:)?//', 'i');
-    if (! r.test(loc)) loc = molmil.__cwd__ + loc;
-  }
-  else if (this.hasOwnProperty("__cwd__")) {
+  if (this.hasOwnProperty("__cwd__")) {
     var r = new RegExp('^(?:[a-z]+:)?//', 'i');
     if (! r.test(loc)) loc = this.__cwd__ + loc;
+  }
+  else if (molmil.hasOwnProperty("__cwd__")) {
+    var r = new RegExp('^(?:[a-z]+:)?//', 'i');
+    if (! r.test(loc)) loc = molmil.__cwd__ + loc;
   }
 
   if (! format) format = molmil.guess_format(loc);
@@ -7720,7 +7720,10 @@ molmil.loadScript = function(url) {
   request.ASYNC = true;
   request.OnDone = function() {
     delete cc.molmilViewer.downloadInProgress;
-    cc.molmilViewer.__cwd__ = cli.environment.scriptUrl = url.substr(0, url.lastIndexOf('/')) + "/";
+    var pathconv = url.split("=");
+    pathconv[pathconv.length-1] = pathconv[pathconv.length-1].substr(0, pathconv[pathconv.length-1].lastIndexOf('/'))
+    if (pathconv[pathconv.length-1]) pathconv[pathconv.length-1] += "/";
+    cc.molmilViewer.__cwd__ = cli.environment.scriptUrl = pathconv.join("=");
     cli.environment.console.runCommand(this.request.responseText.replace(/\/\*[\s\S]*?\*\/|([^:]|^)\/\/.*$/gm, ""), true);
   }
   for (var e in cc.molmilViewer.extraREST) request.AddParameter(e, cc.molmilViewer.extraREST[e]);
