@@ -636,9 +636,7 @@ molmil.viewer.prototype.waterToggle = function(show) {
   for (var m=0, c, a; m<this.structures.length; m++) {
     if (! this.structures[m].chains) continue;
     for (c=0; c<this.structures[m].chains.length; c++) {
-      for (a=0; a<this.structures[m].chains[c].atoms.length; a++) {
-        if (this.structures[m].chains[c].atoms[a].molecule.water && (this.showHydrogens || this.structures[m].chains[c].atoms[a].element != "H")) this.structures[m].chains[c].atoms[a].display = show;
-      }
+      if (this.structures[m].chains[c].molecules.length && this.structures[m].chains[c].molecules[0].water) this.structures[m].chains[c].display = show;
     }
   }
   this.showWaters = show;
@@ -1470,10 +1468,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     
       atom.label_alt_id = label_alt_id[a];
       if (atom.label_alt_id && atom.label_alt_id != "A") atom.display = false;
-      if (currentMol.water) {
-        atom.display = this.showWaters;
-        if (this.showWaters && atom.element == "H") atom.display = this.showHydrogens;
-      }
+      if (currentMol.water) currentChain.display = this.showWaters;
+      if (atom.element == "H") atom.display = this.showHydrogens;
       else if (atom.display) {
         currentChain.isHet = false;
         if (atom.atomName == "N") {currentMol.N = atom; currentMol.ligand = isLigand;}

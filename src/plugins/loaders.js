@@ -838,6 +838,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       currentMol = new molmil.molObject(molName, molID, currentChain);
       if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL") {
         currentMol.water = true; currentMol.ligand = false;
+        currentChain.display = this.showWaters;
         if (currentChain.molecules.length && ! currentChain.molecules[currentChain.molecules.length-1].water) {
           struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
           currentChain.CID = this.CID++;
@@ -879,13 +880,12 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     currentChain.modelsXYZ[0].push(x, y, z);
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
     if (atom.element == "H") atom.display = this.showHydrogens;
+    else atom.display = true;
    
     if (! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-      if (currentMol.water) atom.display = this.showWaters;
-      if (this.showWaters && atom.element == "H") atom.display = this.showHydrogens;
       //do special stuff for dna/rna
       //else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
-      else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom;}
+      if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom;}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
       else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
     }
@@ -945,6 +945,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         currentMol = new molmil.molObject(molName, molID, currentChain);
         if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL" || currentMol.name == "TIP3") {
           currentMol.water = true; currentMol.ligand = false;
+          currentChain.display = this.showWaters;
           if (currentChain.molecules.length && ! currentChain.molecules[currentChain.molecules.length-1].water) {
             struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
             currentChain.CID = this.CID++;
@@ -957,7 +958,6 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         currentChain.molecules.push(currentMol);
         currentMol.MID = this.MID++;
         cmid = molID;
-        //if (molName = "SOL" || molName == "WAT") currentMol.display = false;
       }
 
       if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
@@ -986,11 +986,10 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       
       currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
       if (atom.element == "H") atom.display = this.showHydrogens;
+      else atom.display = true;
       if (data[i].length >= 66) atom.Bfactor = parseFloat(data[i].substring(60, 66).trim());
 
       if (! molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-        if (currentMol.water) atom.display = this.showWaters;
-        if (this.showWaters && atom.element == "H") atom.display = this.showHydrogens;
         //do special stuff for dna/rna
         //else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom; currentMol.xna = true; currentMol.ligand = false; if (! currentMol.CA) {currentChain.isHet = false; currentMol.CA = atom;}}
         currentMol.ligand = true;
@@ -1006,7 +1005,6 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true;}
       }
       
-      if (atom.element == "H" || atom.element == "D") atom.display = false;
       currentChain.atoms.push(atom);
       atom.AID = this.AID++;
       this.atomRef[atom.AID] = atom;
@@ -1106,7 +1104,9 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
         struc.chains[c].name = (struc.chains[c].name ? struc.chains[c].name+" - " : "") + struc.chains[c].molecules[0].name;
         struc.chains[c].isHet = true;
         if (struc.chains[c].modelsXYZ[0].length > 300) struc.chains[c].display = false; // more than 100 atoms
+        else struc.chains[c].display = true;
       }
+      else struc.chains[c].display = true;
     }
   }
 
