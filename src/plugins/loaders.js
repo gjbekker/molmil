@@ -313,7 +313,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var head = document.getElementsByTagName("head")[0];
   if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/misc.js", this.load_ccp4, this, [buffer, filename, settings])) return;
   
-  buffer = buffer.buffer; // make sure we have the arraybuffer itself...
+  if (buffer.buffer) buffer = buffer.buffer; // make sure we have the arraybuffer itself...
   
   if (! settings) settings = {sigma: 1.0};
   if (buffer instanceof molmil.polygonObject) {
