@@ -1144,7 +1144,8 @@ molmil.commandLines.pyMol.origin = function(atoms) {
     
 molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   // atoms => all
-  if (atoms === undefined) atoms = Object.values(molmil.cli_soup.atomRef);
+  var soup = molmil.cli_soup;
+  if (atoms === undefined) atoms = Object.values(soup.atomRef);
   else if (typeof atoms != "object") {
     atoms = atoms.replace(/,/, '').trim();
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
@@ -1155,7 +1156,8 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   if (repr == "spheres") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 1;
-      atoms[i].display = true;
+      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
+      else atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
@@ -1172,7 +1174,8 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   else if (repr == "ball_stick") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 2;
-      atoms[i].display = true;
+      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
+      else atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
@@ -1189,7 +1192,8 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   else if (repr == "sticks") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 3;
-      atoms[i].display = true;
+      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
+      else atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
@@ -1207,6 +1211,8 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   else if (repr == "lines") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 4;
+      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
+      else atoms[i].display = true;
       atoms[i].chain.entry.display = true;
       if (atoms[i].molecule.CA == atoms[i]) {
         atoms[i].molecule.displayMode = 0;
