@@ -8659,6 +8659,9 @@ molmil.orient = function(atoms, soup, xyzs) {
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
   //else molmil.cli_soup.calculateCOG();  
 
+  soup.renderer.camera.x = 0.0;
+  soup.renderer.camera.y = 0.0;
+
   var mx = Math.sqrt(maxRadius)*2 + 5;
   if (molmil.configBox.projectionMode == 1) {
     var zmove = ((mx/Math.sin(molmil.configBox.camera_fovy*(Math.PI/180)))), aspect = soup.renderer.height/soup.renderer.width;
