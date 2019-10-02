@@ -1685,11 +1685,14 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
   for (c=0; c<struct.chains.length; c++) { // add some functionality to check whether no changes to the AU were made, and if not --> don't update this stuff...
     if (toggleIdentity.hasOwnProperty(struct.chains[c].name)) {
       asym_ids = toggleIdentity[struct.chains[c].name];
+      
       if (asym_ids instanceof Array) {
         b = false;
         for (i=0; i<asym_ids.length; i++) {
           if (toggleIdentity.hasOwnProperty(asym_ids[i])) {b = true; break;}
         }
+        
+        if (struct.chains[c].molecules[0].water && ! soup.showWaters) b = false; // make sure that waters are hidden...
         
         if (! b) {
           struct.chains[c].display = soup.sceneBU.displayedChains[struct.chains[c].name] = false;
