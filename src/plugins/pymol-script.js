@@ -692,17 +692,22 @@ molmil.commandLines.pyMol.indicate = function(atoms) {
 }
 
 molmil.commandLines.pyMol.png = function(filename) {
-  if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", arguments.callee, this, [filename]);
+  if (filename && ! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", arguments.callee, this, [filename]);
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) {
     var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
   }
 
   var canvas = molmil.fetchCanvas();
-  
   canvas.renderer.selectDataContext();
   canvas.update = true;
   canvas.renderer.render();
-  if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(filename, canvas.toDataURL(), "base64-png");
+  if (! filename) {
+    canvas.toBlob(function(blob) {
+      navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+      console.log("Image pasted to clipboard.");
+    });
+  }
+  else if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(filename, canvas.toDataURL(), "base64-png");
   else canvas.toBlob(function(blob) {saveAs(blob, filename);});
   canvas.renderer.selectDefaultContext();
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
@@ -1002,7 +1007,6 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
 }
 
 molmil.commandLines.pyMol.turn = function(axis, degrees) {
-  console.log(axis, parseFloat(degrees));
   if (axis == "x") this.cli_soup.renderer.camera.pitchAngle += parseFloat(degrees) || 0;
   else if (axis == "y") this.cli_soup.renderer.camera.headingAngle += parseFloat(degrees) || 0;
   else if (axis == "z") this.cli_soup.renderer.camera.rollAngle += parseFloat(degrees) || 0;
