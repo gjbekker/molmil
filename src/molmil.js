@@ -900,7 +900,25 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
       else return this.parseFunction(this.request.responseText, this.filename);
     };
   }
-  else {console.log("Unknown format: "+format); return;}
+  else {
+    var fakeObj = {filename: loc, readAsText: function() {}, readAsArrayBuffer: function() {}};
+    for (var j=0; j<this.canvas.inputFunctions.length; j++) {
+      if (this.canvas.inputFunctions[j](canvas, fakeObj)) {
+        request.inputFunction = this.canvas.inputFunctions[j];
+        request.parse = function() {
+          var fakeObj = {
+            filename: loc, 
+            readAsText: function() {fakeObj.onload({target: {result: request.request.responseText}});},
+            readAsArrayBuffer: function() {fakeObj.onload({target: {result: request.request.response}});}
+          };
+          this.inputFunction(canvas, fakeObj);
+        };
+        break;
+      }
+    }
+    if (request.inputFunction === undefined) {console.log("Unknown format: "+format); return;}
+  }
+
   request.ondone = ondone;
   request.OnDone = function() {
     delete this.target.downloadInProgress;
@@ -8028,9 +8046,11 @@ molmil.addLabel = function(text, settings, soup) {
   settings.textBaseline = settings.textBaseline || obj.settings.textBaseline;
   settings.textAlign = settings.textAlign || obj.settings.textAlign;
   
+  var resolutionScaler = soup.canvas.width/1920;
+  
   if (text != obj.text || settings.fontSize != obj.settings.fontSize || settings.color[0] != obj.settings.color[0] || settings.color[1] != obj.settings.color[1] || settings.color[2] != obj.settings.color[2]) {
     var textCtx = document.createElement("canvas").getContext("2d");
-    settings.fontSize *= 2; // render at a higher resolution
+    settings.fontSize *= 2*resolutionScaler; // render at a higher resolution
   
     var tmp = text.replace(/\\n/g, "\n").split(/\n/g), h, w, i;
     h = tmp.length*settings.fontSize; w = 0;
@@ -8092,9 +8112,9 @@ molmil.addLabel = function(text, settings, soup) {
     
     obj.status = false;
     obj.texture = textTex;
-    obj.texture.renderWidth = w;
-    obj.texture.renderHeight = h;
-    settings.fontSize *= .5; // render at a higher resolution
+    obj.texture.renderWidth = w/resolutionScaler;
+    obj.texture.renderHeight = h/resolutionScaler;
+    settings.fontSize /= 2*resolutionScaler; // render at a higher resolution
   }
   
   obj.text = text;
