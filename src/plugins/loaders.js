@@ -736,8 +736,62 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
 };
 
 // ** loads MDL MOL data **
+molmil.viewer.prototype.load_mdl3000 = function(data, filename) {
+  var name = data[0].trim() || filename, offset = 0, struc;
+  this.structures.push(struc = new molmil.entryObject({id: filename}));
+  
+  struc.chains.push(currentChain = new molmil.chainObject("", struc));
+  currentChain.CID = this.CID++;
+  
+  currentChain.molecules.push(currentMol = new molmil.molObject(name, 1, currentChain));
+  currentMol.MID = this.MID++;
+  
+  var i, mode = 0, tmp, atomList = {}, a1, a2;
+  for (i=0; i<data.length; i++) {
+    if (data[i] == "M V30 BEGIN ATOM") mode = 1;
+    else if (data[i] == "M V30 END ATOM") mode = 0;
+    else if (data[i] == "M V30 BEGIN BOND") mode = 2;
+    else if (data[i] == "M V30 END BOND") mode = 0;
+    else if (mode == 1) {
+      tmp = data[i].split(" ");
+      x = parseFloat(tmp[4]);
+      y = parseFloat(tmp[5]);
+      z = parseFloat(tmp[6]);
+      element = tmp[3];
+      
+      if (atomList[element] === undefined) atomList[element] = 1;
+      else atomList[element]++;
+      
+      Xpos = currentChain.modelsXYZ[0].length;
+      currentChain.modelsXYZ[0].push(x, y, z);
+      currentMol.atoms.push(atom=new molmil.atomObject(Xpos, element+atomList[element], element, currentMol, currentChain));
+      currentChain.atoms.push(atom);
+      if (atom.element == "H") atom.display = this.showHydrogens;
+      else atom.display = true;
+    
+      atom.AID = this.AID++;
+      this.atomRef[atom.AID] = atom;
+    }
+    else if (mode == 2) {
+      tmp = data[i].split(" ");
+      bt = parseInt(tmp[3]);
+      a1 = parseInt(tmp[4])-1;
+      a2 = parseInt(tmp[5])-1;
+      currentChain.bonds.push([currentMol.atoms[a1], currentMol.atoms[a2], bt]);
+    }
+  }
+
+  this.calculateCOG();
+  
+  molmil.resetColors(struc, this);
+
+  return struc;
+}
+
+// ** loads MDL MOL data **
 molmil.viewer.prototype.load_mdl = function(data, filename) {
   data = data.split("\n");
+  if (data[3].trim().endsWith("V3000")) return this.load_mdl3000(data, filename)
   var name = data[0].trim() || filename, offset = 0, struc;
   this.structures.push(struc = new molmil.entryObject({id: filename}));
   
@@ -871,7 +925,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       if (element.length == 2) {
         element = element[0].toUpperCase() + element[1].toLowerCase();
         if (! molmil.configBox.vdwR.hasOwnProperty(element)) element = element[0];
-        if (element[0] == "C") element = "C"; // hack...
+        if (element == "Ca") element = "C"; // hack...
       }
       else element = element[0].toUpperCase();
     }
@@ -1103,7 +1157,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
       if (struc.chains[c].molecules[0].water || struc.chains[c].molecules[0].ligand) {
         struc.chains[c].name = (struc.chains[c].name ? struc.chains[c].name+" - " : "") + struc.chains[c].molecules[0].name;
         struc.chains[c].isHet = true;
-        if (struc.chains[c].modelsXYZ[0].length > 300) struc.chains[c].display = false; // more than 100 atoms
+        if (struc.chains[c].modelsXYZ[0].length > molmil.configBox.chainHideCutoff) struc.chains[c].display = false; // more than 100 atoms
         else struc.chains[c].display = true;
       }
       else struc.chains[c].display = true;
