@@ -111,7 +111,18 @@
         canvas.update = true;
       };
       
-      molmil.autoSetup({environment: {LANGUAGE: LANGUAGE, initialRoom: null}, enable: ["cli", "cli-hash"]});
+      molmil.autoSetup({environment: {LANGUAGE: "en", initialRoom: null}, enable: ["cli"]});
+
+      window.onhashchange = function() {
+        var hash = window.location.hash ? window.location.hash.substr(1) : "";
+        if (hash) {
+          canvas.commandLine.environment.LANGUAGE = "en";
+          canvas.commandLine.environment.initialRoom = null;
+          canvas.commandLine.environment.console.runCommand(decodeURIComponent(hash));
+          canvas.WORLD.init();
+        }
+      }
+      
       
       canvas.commandLine.consoleBox.style.display = "none";
       
@@ -334,12 +345,17 @@
       }
       if (! canvas.commandLine.initDone) return setTimeout(function() {loadWorld(url, data);}, 100);
       
-      LANGUAGE = canvas.commandLine.environment.LANGUAGE || "en";
+      var hash = window.location.hash ? window.location.hash.substr(1) : "";
+      if (hash) canvas.commandLine.environment.console.runCommand(decodeURIComponent(hash));
       
       var world = jsyaml.load(data); canvas.WORLD = world;
       var a = document.createElement("a"); a.href = url;
       world.baseURL = a.href.split("/").slice(0, -1).join("/").trim()+"/";
       world.catalogue = {};
+      world.init = function() {
+        LANGUAGE = canvas.commandLine.environment.LANGUAGE || "en";
+        this.loadRoom(canvas.commandLine.environment.initialRoom || this["default-start"] || this.rooms[0].id);
+      };
       world.loadRoom = function(id) {
         if (id in this.catalogue) return this.setRoom(id);
         var image = new Image();
@@ -461,7 +477,7 @@
         
       };
       
-      world.loadRoom(canvas.commandLine.environment.initialRoom || world["default-start"] || world.rooms[0].id);
+      world.init();
     };
     
     function maxSizeImage(image, size) {
