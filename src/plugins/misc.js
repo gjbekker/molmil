@@ -1920,7 +1920,7 @@ molmil.findContacts = function(atoms1, atoms2, r, soup) {
   return contacts;
 }
 
-molmil.calcHbonds = function(group1, group2, soup) { // find H-bonds between group1 and group2
+molmil.calcHbonds = function(group1, group2, settings, soup) { // find H-bonds between group1 and group2
   soup = soup || molmil.cli_soup;
   if (! (group1 instanceof Array)) group1 = [group1];
   if (! (group2 instanceof Array)) group2 = [group2];
@@ -2018,7 +2018,7 @@ molmil.calcHbonds = function(group1, group2, soup) { // find H-bonds between gro
     }
   }
   // now create some 3D graphics to depict these bonds...
-  renderHbonds(pairs, soup);
+  renderHbonds(pairs, soup, settings);
   
   var i, atm, other, b, tmp = [];
   for (i=0; i<pairs.length; i++) {tmp.push(pairs[i][0]); tmp.push(pairs[i][1]);}

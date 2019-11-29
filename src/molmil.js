@@ -166,7 +166,8 @@ molmil.configBox = {
   groupColorLastH: 0,
   backsideColor: true,
   connect_cutoff: 0.35,
-  orientMODELs: false
+  orientMODELs: false,
+  chainHideCutoff: 300
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -7300,14 +7301,22 @@ molmil.calcHbonds = function(group1, group2, soup) { // find H-bonds between gro
   return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", this.calcHbonds, this, [group1, group2, soup]); 
 }
 
-function renderHbonds(pairs, soup) {
+function renderHbonds(pairs, soup, settings) {
   if (! pairs.length) return;
+  settings = settings || {};
+  var type = settings.type || "cylinder";
+  var radius = settings.radius || 0.0375;
+  var rgba = settings.rgba || [0, 0, 255, 255];
+  var N = (settings.breaks || 3)+1;
+  var lowQuality = settings.hasOwnProperty("lowQuality") ? settings.lowQuality : true;
+  if (type != "dotted-cylinder") N = null;
+  
   var objects = [], object, i;
   if (pairs[0][0] instanceof molmil.atomObject) {
-    for (i=0; i<pairs.length; i++) objects.push({lowQuality: true, type: "cylinder", coords: [molmil.getAtomXYZ(pairs[i][0], soup), molmil.getAtomXYZ(pairs[i][1], soup)], rgba: [0, 0, 255, 255], radius: 0.0375});
+    for (i=0; i<pairs.length; i++) objects.push({lowQuality: lowQuality, type: type, coords: [molmil.getAtomXYZ(pairs[i][0], soup), molmil.getAtomXYZ(pairs[i][1], soup)], rgba: rgba, radius: radius, N: N});
   }
   else {
-    for (i=0; i<pairs.length; i++) objects.push({lowQuality: true, type: "cylinder", coords: [pairs[i][0], pairs[i][1]], rgba: [0, 0, 255, 255], radius: 0.0375});
+    for (i=0; i<pairs.length; i++) objects.push({lowQuality: lowQuality, type: type, coords: [pairs[i][0], pairs[i][1]], rgba: rgba, radius: radius, N: N});
   }
   return molmil.geometry.generator(objects, soup, "Hydrogen bonds", {solid: true});
 }
