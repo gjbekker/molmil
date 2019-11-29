@@ -723,7 +723,7 @@ molmil.commandLines.pyMol.alter = function(atoms, options) {
   }
 
   if (options.b) {
-    for (var a=0; a<atoms.length; a++) atoms[a].bfactor = options.b; // maybe in the future change this so that this'll actually execute something...
+    for (var a=0; a<atoms.length; a++) atoms[a].Bfactor = parseFloat(options.b); // maybe in the future change this so that this'll actually execute something...
   }
   
   return true;
