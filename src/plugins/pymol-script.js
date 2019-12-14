@@ -387,6 +387,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
   
   
   var executeExpr = function (expr2exe) {
+    if (! expr2exe) return;
     var list = [];
     expr2exe = "for (var a in this.soupObject.atomRef) if ("+expr2exe+") list.push(this.soupObject.atomRef[a]);";
     try{eval(expr2exe);}
@@ -810,6 +811,9 @@ molmil.commandLines.pyMol.label = function(atoms, lbl) {
   var text = lbl, settings = {};
   
   //var info = molmil.calcCenter(atoms);
+  
+  
+  
   molmil.addLabel(text, {atomSelection: atoms, dz_: 2}, this.cli_soup);
 }
     
@@ -885,6 +889,7 @@ molmil.commandLines.pyMol.cartoon_color = function(clr, atoms, quiet) {
   else {
     if (typeof clr == "string") {
       var rgba = molmil.color2rgba(clr);
+      if (rgba == clr && this.colors.hasOwnProperty(clr)) rgba = this.colors[clr];
       if (rgba == clr) {
         rgba = JSON.parse(clr);
         if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3] || rgba[3] == 0 ? rgba[3] : 255];
@@ -952,9 +957,10 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
   else {
     if (typeof clr == "string") {
       var rgba = molmil.color2rgba(clr);
+      if (rgba == clr && this.colors.hasOwnProperty(clr)) rgba = this.colors[clr];
       if (rgba == clr) {
         rgba = JSON.parse(clr);
-        if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
+        if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3] || rgba[3] == 0 ? rgba[3] : 255];
       }
     }
     else var rgba = clr;
@@ -998,7 +1004,10 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
     for (var i=0; i<atoms.length; i++) atoms[i].displayMode = 0;
   }
   else if (repr == "solvent") {
-    this.cli_soup.waterToggle();
+    this.cli_soup.waterToggle(false);
+  }
+  else if (repr == "cell") {
+    this.cli_soup.hideCell();
   }
 
   this.cli_soup.renderer.rebuildRequired = true;
@@ -1044,6 +1053,17 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     molmil.shaderEngine.recompile(this.cli_soup.renderer);
     this.cli_soup.canvas.update = true;
   }
+  else if (key == "cartoon_highlight_color") {
+    if (value == -1) molmil.configBox.cartoon_highlight_color = -1;
+    else {
+      var rgba = molmil.color2rgba(value);
+      if (rgba == value) {
+        rgba = JSON.parse(value);
+        if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
+      }
+      molmil.configBox.cartoon_highlight_color = [rgba[0], rgba[1], rgba[2]];
+    }
+  }
   else if (key == "field_of_view") {
     molmil.configBox.camera_fovy = parseFloat(value);
     this.cli_soup.renderer.resizeViewPort();
@@ -1064,6 +1084,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   else if (key == "label_position") {
     value = value.replace('(', '').replace(')', '').split(",");
     molmil.defaultSettings_label.dx = parseFloat(value[0].trim()); molmil.defaultSettings_label.dy = -parseFloat(value[1].trim()); molmil.defaultSettings_label.dz = parseFloat(value[2].trim());
+  }
+  else if (key == "label_atom_center") {
+    molmil.defaultSettings_label.label_atom_center = value;
   }
   else if (key == "label_size") {
     molmil.defaultSettings_label.fontSize = parseFloat(value);
@@ -1148,6 +1171,7 @@ molmil.commandLines.pyMol.origin = function(atoms) {
     
 molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   // atoms => all
+
   var soup = molmil.cli_soup;
   if (atoms === undefined) atoms = Object.values(soup.atomRef);
   else if (typeof atoms != "object") {
@@ -1156,7 +1180,7 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
     //else atoms = molmil.commandLines.pyMol.select(atoms);
     else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
   }
-  
+
   if (repr == "spheres") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 1;
@@ -1266,11 +1290,20 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
       }
     }
   }
+  else if (repr == "hydro" || repr == "h.") {
+    this.cli_soup.hydrogenToggle(true);
+  }
+  else if (repr == "solvent") {
+    this.cli_soup.waterToggle(true);
+  }
   else if (repr == "visible") {
     for (var i=0; i<atoms.length; i++) {
       atoms[i].chain.entry.display = true;
       atoms[i].display = true;
     }
+  }
+  else if (repr == "cell") {
+    soup.showCell();
   }
   else {
     console.error(repr+" is unknown...");

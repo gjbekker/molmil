@@ -1997,23 +1997,25 @@ molmil.calcHbonds = function(group1, group2, settings, soup) { // find H-bonds b
   // now find matches between acceptors1-donors2 and acceptors2-donors1 (within 3A D-A and 45degrees D-H-A)
   
   var pairs = [];
+  
+  var hbond_distance = settings.hbond_distance || 2.5, hbond_angle = settings.hbond_angle || 120;
     
   for (i=0; i<acceptors1.length; i++) {
     for (j=0; j<donors2.length; j++) {
-      r = molmil.calcMMDistance(acceptors1[i], donors2[j][0], soup);
-      if (r < 3.5) {
+      r = molmil.calcMMDistance(acceptors1[i], donors2[j][1], soup);
+      if (r <= hbond_distance) {
         theta = molmil.calcMMAngle(acceptors1[i], donors2[j][1], donors2[j][0], soup);
-        if (theta > 135) pairs.push([acceptors1[i], donors2[j][1]]);
+        if (theta >= hbond_angle) pairs.push([acceptors1[i], donors2[j][1]]);
       }
     }
   }
     
   for (i=0; i<acceptors2.length; i++) {
     for (j=0; j<donors1.length; j++) {
-      r = molmil.calcMMDistance(acceptors2[i], donors1[j][0], soup);
-      if (r < 3.5) {
+      r = molmil.calcMMDistance(acceptors2[i], donors1[j][1], soup);
+      if (r <= hbond_distance) {
         theta = molmil.calcMMAngle(acceptors2[i], donors1[j][1], donors1[j][0], soup);
-        if (theta > 135) pairs.push([acceptors2[i], donors1[j][1]]);
+        if (theta >= hbond_angle) pairs.push([acceptors2[i], donors1[j][1]]);
       }
     }
   }
@@ -2021,10 +2023,24 @@ molmil.calcHbonds = function(group1, group2, settings, soup) { // find H-bonds b
   renderHbonds(pairs, soup, settings);
   
   var i, atm, other, b, tmp = [];
-  for (i=0; i<pairs.length; i++) {tmp.push(pairs[i][0]); tmp.push(pairs[i][1]);}
+  
+  var backboneAtoms = molmil.configBox.backboneAtoms4Display;
+  
+  var test = {}, tmp2 = {};
+  
+  for (i=0; i<pairs.length; i++) {
+    tmp2[pairs[i][0].molecule.MID] = pairs[i][0].molecule;
+    tmp2[pairs[i][1].molecule.MID] = pairs[i][1].molecule;
+    test[pairs[i][0].molecule.MID] = test[pairs[i][0].molecule.MID] || (pairs[i][0].atomName in backboneAtoms);
+    test[pairs[i][1].molecule.MID] = test[pairs[i][1].molecule.MID] || (pairs[i][1].atomName in backboneAtoms);
+    tmp.push(pairs[i][0]); 
+    tmp.push(pairs[i][1]);
+  }
+
+  for (i in test) molmil.displayEntry(tmp2[i], test[i] ? molmil.displayMode_Stick : molmil.displayMode_Stick_SC, soup);
+
   for (i=0; i<tmp.length; i++) {
     atm = tmp[i];
-    molmil.displayEntry(atm.molecule, molmil.displayMode_Stick, soup);
 
     if (atm.element != "H") continue;
     other = null;

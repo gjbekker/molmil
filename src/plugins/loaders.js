@@ -877,6 +877,9 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
   currentChain.CID = this.CID++;
   ccid = chainName; cmid = null;
   
+  struc.meta.cellLengths = data[data.length-1].trim().split(/[ ,]+/).map(function(x) {return parseFloat(x)*10;});
+  struc.meta.cellOrigins = [0.0, 0.0, 0.0];
+  
   for (i=2; i<data.length-1; i++) {
    
     molID = data[i].substring(0, 5).trim();
@@ -925,7 +928,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       if (element.length == 2) {
         element = element[0].toUpperCase() + element[1].toLowerCase();
         if (! molmil.configBox.vdwR.hasOwnProperty(element)) element = element[0];
-        if (element == "Ca") element = "C"; // hack...
+        if (["C", "N", "O", "H", "S"].includes(element.substr(0,1)) && ["a", "b", "g", "d", "e", "z"].includes(element.substr(1,1))) element = element.substr(0,1);
       }
       else element = element[0].toUpperCase();
     }
