@@ -5,7 +5,7 @@
 <body>
 
 <pre>
-Molmil: https://pdbj.org/molmil_alpha/
+Molmil:
 
 3D operations
 
@@ -105,8 +105,8 @@ show
   _repr_: spheres, ball_stick, sticks, lines, cartoon, ca-trace
 
 hide
-  Hide atoms: hide _repr, atom-list/expression
-  _repr_: hydro, all, cartoon, solvent
+  Hide atoms: hide _repr_, atom-list/expression
+  _repr_: hydro, all, cartoon, solvent, spheres, ball_stick, sticks
   
 turn
   Rotate the system: turn axis, degrees
@@ -173,6 +173,35 @@ edmap
 frame
   Select a specific frame (NMR-model / MD trajectory), starting from 1: frame modelId
   Select 10th frame: frame 10
+  
+bond
+  Create a bond between two atoms: bond selection1, selection2, bondOrder
+  Create a peptide bond between residue 32 and residue 1: bond resi 32 and name C and resi 1 and name N, 1
+  
+stereo
+  Set a stereo mode: stereo mode
+  Where mode is any of; off, crosseye, sidebyside, anaglyph
+  Enable sidebyside mode: stereo sidebyside
+  
+orient
+  Focus the camera on a specific selection with optimized orientation: orient selection
+  Orient on chain A: orient chain A
+  Orient on whole system: orient
+  
+alter
+  Alter properties of atoms: alter selection, setting=value
+  Set B-factor of residue: alter resi 32, b=0.5
+  
+indicate
+  Indicate the selection on the screen: indicate selection
+  Indicate chain A: indicate chain A
+  
+png
+  Output a PNG image to a file: png filename
+  Copy a PNG image onto the clipboard: png
+  
+quit
+  Exit molmil-app.
   
 </pre>
   
