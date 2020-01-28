@@ -1543,7 +1543,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var pdbx_PDB_ins_code = atom_site.pdbx_PDB_ins_code || [];
     var currentChain = null; var ccid = false; var currentMol = null; var cmid = false; var atom;
   
-    var struc = null, Xpos, cmnum, Xpos_first = {}, isLigand;
+    var struc = null, Xpos, cmnum, Xpos_first = {}, isLigand, alt_loc_handler = null;
   
     var polyTypes = {}, ligands = {};
     try {for (var i=0; i<pdb.entity_poly_seq.mon_id.length; i++) polyTypes[pdb.entity_poly_seq.mon_id[i]] = false;}
@@ -1562,15 +1562,17 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       if (Cartn_x[a] == null || (Cartn_x[a] == 0 && Cartn_y[a] == 0 && Cartn_z[a] == 0 && Cartn_x.length > 1)) continue;
       // split this up in structure loading (1st model) & coordinate only loading (2+ models)
     
+      if (label_alt_id[a]) {
+        if (alt_loc_handler == null) alt_loc_handler = label_alt_id[a];
+        else if (label_alt_id[a] != alt_loc_handler) continue; // deal with junk
+      }
+    
       if ((pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) || ! struc) {
         if (struc && ! molmil.configBox.loadModelsSeparately) break;
         this.structures.push(struc = new molmil.entryObject({id: entryId})); structs.push(struc);
         if (pdbx_PDB_model_num) struc.meta.modelnr = pdbx_PDB_model_num[a];
         cmnum = pdbx_PDB_model_num ? pdbx_PDB_model_num[a] : 0; ccid = cmid = false;
       }
-
-      // label_asym_id auth_asym_id
-      
       
       if (label_asym_id[a] != ccid || ! currentChain) {
         this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a], struc)); struc.chains.push(currentChain);
@@ -1602,13 +1604,12 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         else atom.element = atom.atomName.substring(offset, offset+1);
       }
       if (atom.element == "H") atom.display = this.showHydrogens;
-    
+
       isHet = true;
       if (group_PDB.length) {if (group_PDB[a] != "HETATM" || polyTypes.hasOwnProperty(currentMol.name)) isHet = false;}
       else if (label_seq_id[a] != null) isHet = false;
-    
+
       atom.label_alt_id = label_alt_id[a];
-      if (atom.label_alt_id && atom.label_alt_id != "A") atom.display = false;
       if (currentMol.water) currentChain.display = this.showWaters;
       if (atom.element == "H") atom.display = this.showHydrogens;
       else if (atom.display) {
@@ -1623,8 +1624,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
       }
       
       atom.Bfactor = B_iso_or_equiv[a] || 0.0;
-        
-      
+
       currentChain.atoms.push(atom);
       atom.AID = this.AID++;
       this.atomRef[atom.AID] = atom;
@@ -1698,7 +1698,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
      
       // deal with fract_transf_vector[1] somehow 
     }
-
+    
     var cid = 0, xyzs;
     for (; a<Cartn_x.length; a++) {
       if (pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) {
@@ -1761,9 +1761,11 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         }
         struc.chains[0].bondsOK = true;
       }
-      else {for (var i=0; i<struc.chains.length; i++ ) {
-        if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
-        else this.buildAminoChain(struc.chains[i]);}
+      else {
+        for (var i=0; i<struc.chains.length; i++ ) {
+          if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
+          else this.buildAminoChain(struc.chains[i]);
+        }
       }
   
       //var conf_type_id, beg_auth_asym_id, beg_auth_seq_id, end_auth_asym_id, end_auth_seq_id, start, end;
