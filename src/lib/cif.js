@@ -96,23 +96,26 @@ function renderChildCIFTree(target, jso) {
   var item;
   var keys = Object.keys(jso);
   var table = null, row;
-  if (jso[keys[0]] instanceof Array) {
+  if (jso[keys[0]] instanceof Array || "splice" in jso[keys[0]]) {
     var table = new drawTable(), row;
-    if (! target.showAll || jso[keys[0]].length < 10000) table.tbl.setClass("dTO eqSpacedTbl");
+    if (! target.parentNode.showAll || (jso[keys[0]].length < 10000 && ! target.parentNode.liteRenderer)) table.tbl.setClass("dTO eqSpacedTbl");
     table.tbl.border = "1";
     table.tbl.style.width = "";
     row = table.addRowXH(keys);
-    for (var i=0, j; i<(target.showAll ? jso[keys[0]].length : Math.min(jso[keys[0]].length, 25)); i++) {
+    for (var i=0, j; i<(target.parentNode.showAll ? jso[keys[0]].length : Math.min(jso[keys[0]].length, 25)); i++) {
       row = table.addRow();
-      for (j=0; j<keys.length; j++) row.addCell(jso[keys[j]][i]);
+      for (j=0; j<keys.length; j++) {
+        if (jso[keys[j]][i] instanceof Array) row.addCell(jso[keys[j]][i].toString());
+        else row.addCell(jso[keys[j]][i]);
+      }
     }
     target.pushNode(table.tbl);
-    if (! target.showAll && jso[keys[0]].length > 25) {
+    if (! target.parentNode.showAll && jso[keys[0]].length > 25) {
       row = target.pushNode("a", "Show all ("+jso[keys[0]].length+(jso[keys[0]].length > 2500 ? " rows, which will take some time to process and might cause your browser to become unresponsive. Alternatively, switch to flat file representation." : " rows")+")");
       row.targetObj = target; row.jso = jso; row.style.cursor = "pointer";
       row.onclick = function() {
         Clear(this.targetObj);
-        this.targetObj.showAll = true;
+        this.targetObj.parentNode.showAll = true;
         renderChildCIFTree(this.targetObj, this.jso);
       };
     }
@@ -180,18 +183,27 @@ function CIFparser() {
 }
 
 CIFparser.prototype.parse = function(data) {
+  this.error = null;
   var lines = data.split("\n"), line, buffer = [], multi_line_mode = false, Z;
   for (var i=0; i<lines.length; i++) {
-    Z = lines[i].substr(0, 1);
-    line = lines[i].trim();
-    if (Z == ";") {
-      if (multi_line_mode) this.setDataValue(buffer.join("\n"));
-      else buffer = [];
-      multi_line_mode = ! multi_line_mode;
-      line = line.substr(1).trim();
+    try {
+      Z = lines[i].substr(0, 1);
+      if (Z == "#") continue;
+      line = lines[i].trim();
+      if (Z == ";") {
+        if (multi_line_mode) this.setDataValue(buffer.join("\n"));
+        else buffer = [];
+        multi_line_mode = ! multi_line_mode;
+        line = line.substr(1).trim();
+      }
+      if (multi_line_mode) buffer.push(line);
+      else this.processContent(this.specialSplit(line));
     }
-    if (multi_line_mode) buffer.push(line);
-    else this.processContent(this.specialSplit(line));
+    catch (e) {
+      console.error(e);
+      this.error = i;
+      break;
+    }
   }
 };
 
@@ -225,7 +237,11 @@ CIFparser.prototype.processContent = function(content) {
     }
     else if (content[i][0] == "loop_" && ! content[i][1]) this.loopPointer = new _loop(this);
     else if (content[i][0].substr(0, 1) == "_" && ! content[i][1]) this.setDataName(content[i][0].substr(1));
-    else this.setDataValue(content[i][0]);
+    else {
+      if (! this.loopPointer && this.dataSet) continue;
+      //console.log(content[i][0]);
+      this.setDataValue(content[i][0]);
+    }
   }
 };
 
@@ -245,11 +261,12 @@ CIFparser.prototype.setDataName = function(name) {
     this.currentTarget[this.currentTarget.length-1][name[0]] = "";
     this.currentTarget.push([this.currentTarget[this.currentTarget.length-1], name[0]]);
   }
+  this.dataSet = false;
 };
 
 CIFparser.prototype.setDataValue = function(value) {
   if (this.loopPointer != null) this.loopPointer.pushValue(value);
-  else {var tmp = this.currentTarget[this.currentTarget.length-1]; tmp[0][tmp[1]] = [value];}
+  else {var tmp = this.currentTarget[this.currentTarget.length-1]; tmp[0][tmp[1]] = [value]; this.dataSet = true;}
 };
 
 CIFparser.prototype.selectGlobal = function() {this.currentTarget = [this.data, this.data, null];};
@@ -268,7 +285,18 @@ CIFparser.prototype.endData = function() {this.currentTarget = this.currentTarge
 
 CIFparser.prototype.endFrame = function() {this.currentTarget = this.currentTarget.slice(0, 3);};
 
-function loadCIFdic() {
+function parseCIFdictionary(data) {
+  var ref = data[Object.keys(data)[0]], name, dic = {};
+  for (var e in ref) {
+    if (typeof ref[e] != "object" || ref[e] instanceof Array || ! ref[e].hasOwnProperty("item_type")) continue;
+    name = Partition(e.substr(6), ".");
+    if (! dic.hasOwnProperty(name[0])) dic[name[0]] = {};
+    dic[name[0]][name[2]] = ref[e].item_type.code[0].trim()
+  }
+  return dic;
+}
+
+function loadCIFdic(dic, doReturn) {
   var dic = {};
   var request = new molmil_dep.CallRemote("GET");
   try {
@@ -311,8 +339,9 @@ function loadCIFdic() {
         if (! typing.hasOwnProperty(e)) typing[e] = {};
         typing[e][e2] = parseFloatRange;
       }
-   }
+    }
   }
+  if (doReturn) return typing;
   __CIFDICT__ = typing;
 }
 
