@@ -1000,8 +1000,14 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
     //for (var i=0; i<atoms.length; i++) atoms[i].molecule.displayMode = atoms[i].chain.displayMode = 0;
     for (var i=0; i<atoms.length; i++) atoms[i].chain.displayMode = 0;
   }
+  else if (repr == "spheres") {
+    for (var i=0; i<atoms.length; i++) if (atoms[i].displayMode == 1) atoms[i].displayMode = 0;
+  }
+  else if (repr == "ball_stick") {
+    for (var i=0; i<atoms.length; i++) if (atoms[i].displayMode == 2) atoms[i].displayMode = 0;
+  }
   else if (repr == "sticks") {
-    for (var i=0; i<atoms.length; i++) atoms[i].displayMode = 0;
+    for (var i=0; i<atoms.length; i++) if (atoms[i].displayMode == 3) atoms[i].displayMode = 0;
   }
   else if (repr == "solvent") {
     this.cli_soup.waterToggle(false);
