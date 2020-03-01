@@ -1816,6 +1816,7 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
       }
       
       newStruc = new molmil.entryObject({id: "bu_"+cpID, "idnr": struct.meta.idnr+"."+cpID});
+      newStruc.soup = soup;
 
       for (i=0; i<asym_ids.length; i++) {
         for (c=0; c<struct.chains.length; c++) {
