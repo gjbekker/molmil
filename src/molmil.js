@@ -1537,8 +1537,6 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var pdbx_PDB_model_num = atom_site.pdbx_PDB_model_num;
     var group_PDB = atom_site.group_PDB || [];
     var B_iso_or_equiv = atom_site.B_iso_or_equiv || [];
-    
-    // add bfactor loading ; atom.Bfactor
   
     var pdbx_PDB_ins_code = atom_site.pdbx_PDB_ins_code || [];
     var currentChain = null; var ccid = false; var currentMol = null; var cmid = false; var atom;
@@ -1619,8 +1617,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         else if (atom.atomName == "C") {currentMol.C = atom; currentMol.ligand = isLigand;}
         else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = isLigand; currentMol.xna = false; }
         //do special stuff for dna/rna
-        else if (! isHet && atom.atomName == "P" && ! currentMol.O) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
-        else if (! isHet && atom.atomName == "O3'" && ! currentMol.O) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "P" && ! (currentMol.O || currentMol.N || currentMol.CA)) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "O3'" && ! (currentMol.O || currentMol.N || currentMol.CA)) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
       }
       
       atom.Bfactor = B_iso_or_equiv[a] || 0.0;
