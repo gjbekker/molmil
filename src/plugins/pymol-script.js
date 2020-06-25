@@ -173,7 +173,7 @@ molmil.commandLines.pyMol.indicateCommand = function(env, command) {
 
 
 molmil.commandLines.pyMol.saveCommand = function(env, command) {
-  command = command.match(/save[\s]+([a-zA-Z0-9_.]+)[\s]*(,[\s]*(.*))?/);
+  command = command.match(/save[\s]+([a-zA-Z0-9_.\-]+)[\s]*(,[\s]*(.*))?/);
   try {molmil.commandLines.pyMol.save.apply(env, [command[1], command[2]||""]);}
   catch (e) {console.error(e); return false;}
   return true;
@@ -437,7 +437,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     if (expr[i].match(/\s/) || expr[i] == ")") {
       toUpper_ = false, ss_ = false;
       if (word == "name") {key = "this.soupObject.atomRef[a].atomName == '%s'"; toUpper_ = true;}
-      else if (word == "index") key = "this.soupObject.atomRef[a].AID == %s-1";
+      else if (word == "index") key = "this.soupObject.atomRef[a].AID == %s";
       else if (word == "symbol") key = "this.soupObject.atomRef[a].element == '%s'";
       else if (word == "resn") {key = "this.soupObject.atomRef[a].molecule.name.toLowerCase() == '%s'"; toLower_ = true;}
       else if (word == "resi") key = "this.soupObject.atomRef[a].molecule.RSID == %s";
@@ -450,6 +450,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "b") key = "this.soupObject.atomRef[a].Bfactor %s %s";
       else if (word == "hydro") new_expr.push("this.soupObject.atomRef[a].molecule.water == true");
       else if (word == "hetatm") new_expr.push("this.soupObject.atomRef[a].molecule.ligand == true");
+      else if (word == "snfg") new_expr.push("this.soupObject.atomRef[a].molecule.SNFG == true");
       else if (word == "model") {
         // two modes, by name & by number (1-...)
         if (expr[i+1] == "#") key = "this.soupObject.atomRef[a].chain.entry.meta.idnr == '%s'";
@@ -483,6 +484,9 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       }
       else if (word == "sidechain") {
         new_expr.push("(! this.soupObject.atomRef[a].molecule.ligand && ! this.soupObject.atomRef[a].molecule.water && ! this.soupObject.atomRef[a].molecule.xna && ((this.soupObject.atomRef[a].molecule.name == 'PRO' && this.soupObject.atomRef[a].atomName == 'N') || ! backboneAtoms.hasOwnProperty(this.soupObject.atomRef[a].atomName)))");
+      }
+      else if (word == "xna") {
+        new_expr.push("(this.soupObject.atomRef[a].molecule.xna)");
       }
       else if (this[word]) new_expr.push("this."+word+".indexOf(this.soupObject.atomRef[a]) != -1");
       else if (key && word) {
@@ -841,7 +845,9 @@ molmil.commandLines.pyMol.cartoon_color = function(clr, atoms, quiet) {
   }
   else if (clr == "chain") {
     var hash = {}, mols, list, i, j;
-    for (i=0; i<atoms.length; i++) hash[atoms[i].molecule.chain.CID] = atoms[i].molecule.chain;
+    for (i=0; i<atoms.length; i++) {
+      if (! atoms[i].molecule.ligand && ! atoms[i].molecule.water) hash[atoms[i].molecule.chain.CID] = atoms[i].molecule.chain;
+    }
     if (Object.keys(hash).length > 1) list = molmil.interpolateBR(Object.keys(hash).length);
     else list = [[0, 0, 255, 255]];
     j = 0;
@@ -951,6 +957,12 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
       tmp = 1-((values[i]-min)*diffInv); ///TODO
       atoms[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); atoms[i].rgba[0] *= 255; atoms[i].rgba[1] *= 255; atoms[i].rgba[2] *= 255; atoms[i].rgba.push(255);
       if (atoms[i].molecule.CA == atoms[i]) atoms[i].molecule.rgba = atoms[i].rgba;
+    }
+    this.cli_soup.renderer.rebuildRequired = true;
+  }
+  else if (clr == "snfg") {
+    for (var i=0; i<atoms.length; i++) {
+      atoms[i].molecule.rgba = atoms[i].rgba = (molmil.SNFG[atoms[i].molecule.name] || molmil.SNFG.__UNKNOWN__).rgba.slice();
     }
     this.cli_soup.renderer.rebuildRequired = true;
   }
@@ -1177,6 +1189,7 @@ molmil.commandLines.pyMol.origin = function(atoms) {
     
 molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   // atoms => all
+  var backboneAtoms = molmil.configBox.backboneAtoms4Display;
 
   var soup = molmil.cli_soup;
   if (atoms === undefined) atoms = Object.values(soup.atomRef);
@@ -1263,6 +1276,37 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
         atoms[i].molecule.displayMode = 3;
         atoms[i].molecule.showSC = false;
         atoms[i].molecule.chain.displayMode = 3;
+      }
+    }
+  }
+  else if (repr == "rocket") {
+    for (var i=0; i<atoms.length; i++) {
+      atoms[i].displayMode = 0;
+      atoms[i].chain.display = atoms[i].chain.entry.display = true;
+      if (atoms[i].molecule.CA == atoms[i]) {
+        atoms[i].molecule.displayMode = 31;
+        atoms[i].molecule.showSC = false;
+        atoms[i].molecule.chain.displayMode = 4;
+      }
+      else if (atoms[i].molecule.SNFG) {
+        atoms[i].molecule.displayMode = 31;
+        atoms[i].molecule.chain.displayMode = 4;
+        atoms[i].displayMode = 3;
+      }
+    }
+  }
+  else if (repr == "snfg-icon") {
+    for (var i=0; i<atoms.length; i++) {
+      atoms[i].displayMode = 0;
+      atoms[i].chain.display = atoms[i].chain.entry.display = true;
+      if (atoms[i].molecule.SNFG) {
+        atoms[i].molecule.displayMode = 31;
+        atoms[i].molecule.chain.displayMode = 4;
+        atoms[i].displayMode = 3;
+      }
+      else if (atoms[i].molecule.snfg_con && ! backboneAtoms.hasOwnProperty(atoms[i].atomName)) {
+        atoms[i].displayMode = 3;
+        atoms[i].molecule.showSC = true;
       }
     }
   }
