@@ -6618,6 +6618,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
     }
     return;
   }
+  settings = settings || {};
 
   if (soup && ((soup.SCstuff && dm%1 == 0) || (! soup.SCstuff && dm%1 != 0))) molmil.geometry.reInitChains = true;
 
@@ -6643,19 +6644,22 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       }
     }
     else if (dm == molmil.displayMode_Default) {
+      var atmDM = settings.newweb ? 2 : 3;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        chain.displayMode = 3;
+        if (settings.newweb && chain.molWeight < 550) chain.displayMode = 1;
+        else chain.displayMode = 3;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
-          if ((mol.ligand && ! mol.SNFG) || mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 3;}
+          if ((mol.ligand && ! mol.SNFG) || mol.water) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
           else if (mol.xna) for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
-          else if (mol.weirdAA && ! mol.SNFG) { 
+          else if (mol.weirdAA && ! mol.SNFG) {
             for (a=0; a<mol.atoms.length; a++) {
               if (backboneAtoms.hasOwnProperty(mol.atoms[a].atomName)) mol.atoms[a].displayMode = 0;
               else mol.atoms[a].displayMode = 3;
             }
           }
+          else if (! mol.SNFG && (mol.ligand || chain.molWeight < 550)) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
           else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
           mol.displayMode = 3;
           mol.showSC = mol.weirdAA;
@@ -7182,13 +7186,15 @@ molmil.quickModelColor = function(type, options, soup) {
         }
       }
     }
-    
   };
-  
   
   if (type == "blue-red") {
     var list = molmil.interpolateBR(soup.structures.length);
     for (var i=0; i<list.length; i++) applyColor(soup.structures[i], list[i]);
+  }
+  if (type == "chain") {
+    var list = molmil.configBox.bu_colors;
+    for (var i=0; i<soup.structures.length; i++) applyColor(soup.structures[i], list[i]);
   }
   
   if (molmil.cli_soup) molmil.cli_soup.renderer.rebuildRequired = true;
