@@ -2916,7 +2916,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   var obj, Xpos, xyzRef, norm_upvec = vec3.create(), uvsi;
   var a2, a3, xyz = vec3.create(), xyz2 = vec3.create(), xyz3 = vec3.create(), v1 = vec3.create(), v2 = vec3.create(), v3 = vec3.create();
   
-  var nor = 0, nob = 0, stat, snfg_nov = 0, snfg_noi = 0, snfg_nos = 0, snfg_nob = 0;
+  var nor = 0, nob = 0, stat, snfg_nov = 0, snfg_noi = 0, snfg_nos = 0, snfg_nob = 0, modelId = this.modelId;
 
   // add code for SNFG...
   // fixed number of vertices, except for spheres
@@ -2973,7 +2973,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     }
 
     if (chain.SNFG && (chain.displayMode == 3 || chain.displayMode == 4)) {
-      xyzRef = chain.modelsXYZ[this.modelId || 0];
+      xyzRef = chain.modelsXYZ[modelId || 0];
       for (var m=0; m<chain.molecules.length; m++) {
         if (! chain.molecules[m].SNFG) continue;
         obj = {center: [0, 0, 0], id: snfg_objs.length};
@@ -3038,9 +3038,37 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
       }
     }
     if (chain.displayMode > 1 && (chain.displayMode != molmil.displayMode_ChainSurfaceCG || chain.displayMode != molmil.displayMode_ChainSurfaceSimple)) {
-      if (! chain.twoDcache || this.reInitChains) molmil.prepare2DRepr(chain, this.modelId || 0);
+      if (! chain.twoDcache || this.reInitChains) molmil.prepare2DRepr(chain, modelId || 0);
       nor += chain.molecules.length;
     }
+  }
+  
+  var assignSNFG_obj = function(mol) {
+    mol.SNFG_obj = {center: [0, 0, 0]};
+    xyzRef = mol.chain.modelsXYZ[modelId || 0];
+    for (var a=0; a<mol.atoms.length; a++) {
+      Xpos = mol.atoms[a].xyz;
+      mol.SNFG_obj.center[0] += xyzRef[Xpos];
+      mol.SNFG_obj.center[1] += xyzRef[Xpos+1];
+      mol.SNFG_obj.center[2] += xyzRef[Xpos+2];
+    }
+    mol.SNFG_obj.center[0] /= mol.atoms.length;
+    mol.SNFG_obj.center[1] /= mol.atoms.length;
+    mol.SNFG_obj.center[2] /= mol.atoms.length;
+    
+    var nearest = [1e9, -1], dx, dy, dz, r2;
+    
+    for (var a=0; a<mol.atoms.length; a++) {
+      Xpos = mol.atoms[a].xyz;
+      
+      dx = xyzRef[Xpos]-mol.SNFG_obj.center[0]; dy = xyzRef[Xpos+1]-mol.SNFG_obj.center[1]; dz = xyzRef[Xpos+2]-mol.SNFG_obj.center[2];
+      r2 = dx*dx + dy*dy + dz*dz;
+      if (r2 < nearest[0]) nearest = [r2, Xpos];
+    }
+    Xpos = nearest[1];
+    mol.SNFG_obj.center[0] = xyzRef[Xpos];
+    mol.SNFG_obj.center[1] = xyzRef[Xpos+1];
+    mol.SNFG_obj.center[2] = xyzRef[Xpos+2];
   }
   
   for (var c=0; c<chains.length; c++) {
@@ -3053,18 +3081,22 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
         obj.center = chain.branches[m][0].SNFG_obj.center;
         // what to do if it's connected to a protein? -> get the Calpha instead...
         if (chain.branches[m][0].CA) {
-          xyzRef = chain.branches[m][0].chain.modelsXYZ[this.modelId || 0];
+          xyzRef = chain.branches[m][0].chain.modelsXYZ[modelId || 0];
           Xpos = chain.branches[m][0].CA.xyz;
           xyz[0] = xyzRef[Xpos]; xyz[1] = xyzRef[Xpos+1]; xyz[2] = xyzRef[Xpos+2];
           obj.backvec = [xyz[0]-chain.branches[m][1].SNFG_obj.center[0], xyz[1]-chain.branches[m][1].SNFG_obj.center[1], xyz-chain.branches[m][1].SNFG_obj.center[2]]; 
         }
         else if (chain.branches[m][1].CA) {
-          xyzRef = chain.branches[m][1].chain.modelsXYZ[this.modelId || 0];
+          xyzRef = chain.branches[m][1].chain.modelsXYZ[modelId || 0];
           Xpos = chain.branches[m][1].CA.xyz;
           xyz[0] = xyzRef[Xpos]; xyz[1] = xyzRef[Xpos+1]; xyz[2] = xyzRef[Xpos+2];
           obj.backvec = [chain.branches[m][0].SNFG_obj.center[0]-xyz[0], chain.branches[m][0].SNFG_obj.center[1]-xyz[1], chain.branches[m][0].SNFG_obj.center[2]-xyz[2]]; 
         }
-        else obj.backvec = [chain.branches[m][0].SNFG_obj.center[0]-chain.branches[m][1].SNFG_obj.center[0], chain.branches[m][0].SNFG_obj.center[1]-chain.branches[m][1].SNFG_obj.center[1], chain.branches[m][0].SNFG_obj.center[2]-chain.branches[m][1].SNFG_obj.center[2]]; 
+        else {
+          if (! chain.branches[m][0].SNFG_obj) assignSNFG_obj(chain.branches[m][0]);
+          if (! chain.branches[m][1].SNFG_obj) assignSNFG_obj(chain.branches[m][1]);
+          obj.backvec = [chain.branches[m][0].SNFG_obj.center[0]-chain.branches[m][1].SNFG_obj.center[0], chain.branches[m][0].SNFG_obj.center[1]-chain.branches[m][1].SNFG_obj.center[1], chain.branches[m][0].SNFG_obj.center[2]-chain.branches[m][1].SNFG_obj.center[2]]; 
+        }
         obj.length = vec3.length(obj.backvec);
         vec3.normalize(obj.backvec, obj.backvec);
         if (chain.displayMode == 3) snfg_objs.push(obj);
@@ -6656,7 +6688,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
           else if (mol.weirdAA && ! mol.SNFG) {
             for (a=0; a<mol.atoms.length; a++) {
               if (backboneAtoms.hasOwnProperty(mol.atoms[a].atomName)) mol.atoms[a].displayMode = 0;
-              else mol.atoms[a].displayMode = 3;
+              else mol.atoms[a].displayMode = atmDM;
             }
           }
           else if (! mol.SNFG && (mol.ligand || chain.molWeight < 550)) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
@@ -6669,7 +6701,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
         for (a=0; a<chain.showBBatoms.length; a++) {
-          if (! chain.showBBatoms[a].molecule.SNFG && ! chain.showBBatoms[a].molecule.snfg_con) chain.showBBatoms[a].displayMode = 3;
+          if (! chain.showBBatoms[a].molecule.SNFG && ! chain.showBBatoms[a].molecule.snfg_con) chain.showBBatoms[a].displayMode = atmDM;
           else if (chain.showBBatoms[a].molecule.snfg_con) chain.showBBatoms[a].molecule.showSC = true;
         }
       }
@@ -9448,7 +9480,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   if (! isNaN(sf)) mat4.getRotation(soup.renderer.camera.QView, matrix);
   
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
-  //else molmil.cli_soup.calculateCOG();  
+  else molmil.cli_soup.calculateCOG();  
 
   soup.renderer.camera.x = 0.0;
   soup.renderer.camera.y = 0.0;
