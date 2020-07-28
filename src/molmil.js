@@ -1223,7 +1223,8 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
 
 // ** connects amino bonds within a chain object **
 molmil.viewer.prototype.buildAminoChain = function(chain) {
-  if (chain.isHet || (chain.molecules.length && (chain.molecules[0].water || chain.molecules[0].SNFG))) return;
+  if (chain.isHet || (chain.molecules.length && (chain.molecules[0].water))) return;
+  if (chain.molecules[0].SNFG) return this.buildSNFG(chain);
   if (chain.molecules.length == 1 && chain.molecules[0].xna) {
     chain.molecules[0].ligand = chain.isHet = true; chain.molecules[0].xna = false;
     delete chain.molecules[0].N;
@@ -1317,6 +1318,8 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
 molmil.viewer.prototype.buildSNFG = function(chain) {
   chain.SNFG = true;
   chain.branches = [];
+  if (chain.bonds.length == 0) return this.buildBondList(chain);
+  
   for (var i=0; i<chain.bonds.length; i++) {
     if (chain.bonds[i][0].molecule != chain.bonds[i][1].molecule) {
       chain.bonds[i][0].molecule.weirdAA = chain.bonds[i][1].molecule.weirdAA = false;
@@ -1336,10 +1339,9 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   
   var extensive = false;
   
-  if (rebuild || chain.bonds.length == 0) this.buildAminoChain(chain);
+  if ((rebuild || chain.bonds.length == 0) && ! chain.SNFG) this.buildAminoChain(chain);
   
   // bonds
-
   var xyzRef = chain.modelsXYZ[0], ligand = false;
   chain.bondsOK = true;
   if (chain.struct_conn && chain.struct_conn.length) {
@@ -2912,7 +2914,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
   
   var bonds2draw = this.bonds2draw; var lines2draw = this.lines2draw; var bondRef = this.bondRef;
   var snfg_objs = this.snfg_objs = [], upvec_scan = {};
-  
+
   var obj, Xpos, xyzRef, norm_upvec = vec3.create(), uvsi;
   var a2, a3, xyz = vec3.create(), xyz2 = vec3.create(), xyz3 = vec3.create(), v1 = vec3.create(), v2 = vec3.create(), v3 = vec3.create();
   
@@ -2971,7 +2973,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
         if (chain.molecules[0].displayMode == 3 && chain.molecules[m].outer && chain.molecules[m].CA) xna2draw.push([chain.molecules[m].CA, chain.molecules[m].outer]);
       }
     }
-
+    
     if (chain.SNFG && (chain.displayMode == 3 || chain.displayMode == 4)) {
       xyzRef = chain.modelsXYZ[modelId || 0];
       for (var m=0; m<chain.molecules.length; m++) {
