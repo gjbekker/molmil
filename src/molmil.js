@@ -9482,10 +9482,6 @@ molmil.orient = function(atoms, soup, xyzs) {
   if (! isNaN(sf)) mat4.getRotation(soup.renderer.camera.QView, matrix);
   
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
-  else molmil.cli_soup.calculateCOG();  
-
-  soup.renderer.camera.x = 0.0;
-  soup.renderer.camera.y = 0.0;
 
   var mx = Math.sqrt(maxRadius)*2 + 5;
   if (molmil.configBox.projectionMode == 1) {

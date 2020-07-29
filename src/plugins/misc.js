@@ -1624,10 +1624,9 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         try {soup.BUcache[asym_ids[i]][displayMode][4] = [[A[0], A[1], A[2]], [B[0], B[1], B[2]]];}
         catch (e) {}
       }
-      
       if (! no_identity) {
         if (COM[3] != 0) {
-          COM_avg[0] += COM[0]; COM_avg[1] += COM[1]; COM_avg[2] += COM[2]; COM_avg[3] += 1;
+          COM_avg[0] += COM[0]*COM[3]; COM_avg[1] += COM[1]*COM[3]; COM_avg[2] += COM[2]*COM[3]; COM_avg[3] += COM[3];
           if (A[0] < xMin) xMin = A[0];
           if (A[1] < yMin) yMin = A[1];
           if (A[2] < zMin) zMin = A[2];
@@ -1644,7 +1643,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         for (c=0; c<program.matrices.length; c++) {
           if (COM[3] == 0) continue;
           vec3.transformMat4(COM_tmp, COM, program.matrices[c]);
-          COM_avg[0] += COM_tmp[0]; COM_avg[1] += COM_tmp[1]; COM_avg[2] += COM_tmp[2]; COM_avg[3] += 1;
+          COM_avg[0] += COM_tmp[0]*COM[3]; COM_avg[1] += COM_tmp[1]*COM[3]; COM_avg[2] += COM_tmp[2]*COM[3]; COM_avg[3] += COM[3];
           vec3.transformMat4(COM_tmp, A, program.matrices[c]);
           if (COM_tmp[0] < xMin) xMin = COM_tmp[0];
           if (COM_tmp[1] < yMin) yMin = COM_tmp[1];
@@ -1660,7 +1659,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
   }
   
   if (COM_avg[3]) {COM_avg[0] /= COM_avg[3]; COM_avg[1] /= COM_avg[3]; COM_avg[2] /= COM_avg[3];}
-      
+  
   if (! soup.skipCOGupdate) {
     soup.COR[0] = COM_avg[0];
     soup.COR[1] = COM_avg[1];
@@ -2158,14 +2157,14 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     dz = object.coords[1][2]-object.coords[0][2];
     dij = Math.sqrt((dx*dx) + (dy*dy) + (dz*dz));
     dx /= dij; dy /= dij; dz /= dij;
+
     angle = Math.acos(-dz);
     mat4.identity(rotationMatrix);
     mat4.rotate(rotationMatrix, rotationMatrix, angle, [dy, -dx, 0.0]);
     for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p; // a2
-      
+
     for (v=0; v<tmpObj.vertices.length; v+=3, vP8+=28) {
       vec3.transformMat4(vertex, [tmpObj.vertices[v]*r, tmpObj.vertices[v+1]*r, tmpObj.vertices[v+2]*dij*2], rotationMatrix);
-      //vec3.transformMat4(vertex, [(tmpObj.vertices[v]*r)+offsetX, (tmpObj.vertices[v+1]*r)+offsetY, (tmpObj.vertices[v+2]+offsetZ)*dij], rotationMatrix);
       vec3.transformMat4(normal, [tmpObj.normals[v], tmpObj.normals[v+1], tmpObj.normals[v+2]], rotationMatrix);
 
       vBuffer[vP++] = vertex[0]+object.coords[1][0];
