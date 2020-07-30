@@ -9484,12 +9484,18 @@ molmil.orient = function(atoms, soup, xyzs) {
   if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
 
   var mx = Math.sqrt(maxRadius)*2 + 5;
-  if (molmil.configBox.projectionMode == 1) {
-    var zmove = ((mx/Math.sin(molmil.configBox.camera_fovy*(Math.PI/180)))), aspect = soup.renderer.height/soup.renderer.width;
-    if (aspect > 1) zmove *= aspect;
-    soup.renderer.camera.z = -zmove;
+  
+  while (true) {
+    if (molmil.configBox.projectionMode == 1) {
+      var zmove = ((mx/Math.sin(molmil.configBox.camera_fovy*(Math.PI/180)))), aspect = soup.renderer.height/soup.renderer.width;
+      if (aspect > 1) zmove *= aspect;
+      soup.renderer.camera.z = -zmove;
+    }
+    else if (molmil.configBox.projectionMode == 2) soup.renderer.camera.z = -((mx/Math.min(soup.renderer.width, soup.renderer.height))*molmil.configBox.zFar*(.5))-molmil.configBox.zNear-1;
+    if (Math.abs(soup.renderer.camera.z) < molmil.configBox.zFar*.5) break;
+    molmil.configBox.zFar = Math.abs(soup.renderer.camera.z)*3;
+    soup.renderer.resizeViewPort();
   }
-  else if (molmil.configBox.projectionMode == 2) soup.renderer.camera.z = -((mx/Math.min(soup.renderer.width, soup.renderer.height))*molmil.configBox.zFar*(.5))-molmil.configBox.zNear-1;
 }
 
 molmil.superpose = function(A, B, C, modelId) {
