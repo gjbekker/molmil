@@ -3221,10 +3221,12 @@ function findResidueRings(molObj) {
     if (molObj.chain.bonds[i][1].AID in bondInfo) bondInfo[molObj.chain.bonds[i][1].AID].push(molObj.chain.bonds[i][0]);
   }
 
-  var ringlist = {};
+  var ringlist = {}, N = 0;
   var scancyclic = function(atom, seq) {
+    N++;
     var newseq = seq.slice(), b, bonds = bondInfo[atom.AID], midx; newseq.push(atom.AID);
     if (bonds === undefined) return;
+    if (N > 1e6) return; // give up on broken mess...
     for (b=0; b<bonds.length; b++) {
       midx = newseq.indexOf(bonds[b].AID);
       if (midx == -1) scancyclic(bonds[b], newseq);
