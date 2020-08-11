@@ -367,5 +367,6 @@ if (!Array.prototype.includes) {
   });
 }
 
+if(!Object.values) {Object.values = function(obj) {return Object.keys(obj).map(function(key) {return obj[key];});}}
 
 molmil_dep.init();

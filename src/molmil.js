@@ -6520,8 +6520,8 @@ molmil.handle_molmilViewer_mouseMove = function (event) {
 }
 
 molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing in vr mode...
-  //if (molmil.vrDisplay) console.log(event);
-  event.target.renderer.TransZ -= (event.wheelDelta || -event.detail*40);
+  event.target.renderer.TransZ -= (event.wheelDelta || -event.detail*40 || event.deltaY*40 || event.deltaX*40);
+  if (molmil_dep.dBT.MSIE) event.target.renderer.TransZ /= 50;
   event.target.update = true;
   try {event.preventDefault();}
   catch (e) {}
