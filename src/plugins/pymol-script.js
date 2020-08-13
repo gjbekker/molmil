@@ -443,6 +443,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "resi") key = "this.soupObject.atomRef[a].molecule.RSID == %s";
       else if (word == "resid") key = "this.soupObject.atomRef[a].molecule.id == %s";
       else if (word == "ss") {key = "this.soupObject.atomRef[a].molecule.sndStruc == %s"; ss_ = true;}
+      else if (word == "entity") key = "this.soupObject.atomRef[a].molecule.chain.entity_id == %s";
       else if (word == "chain") {
         if (this.cif_use_auth) key = "this.soupObject.atomRef[a].molecule.chain.authName == '%s'";
         else key = "this.soupObject.atomRef[a].molecule.chain.name == '%s'";

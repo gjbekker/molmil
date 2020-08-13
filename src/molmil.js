@@ -1673,6 +1673,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         currentChain.CID = this.CID++;
         ccid = label_asym_id[a]; currentMol = null;
         Xpos_first[currentChain] = currentChain.modelsXYZ[0].length;
+        currentChain.entity_id = label_entity_id[a];
       }
 
       if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1) {
