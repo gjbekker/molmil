@@ -96,8 +96,8 @@ molmil.commandLines.pyMol.deleteCommand = function(env, command) {
 
 
 molmil.commandLines.pyMol.edmapCommand = function(env, command) {
-  command = command.match(/edmap[\s]+(.*?)[\s]*,[\s]*([0-9_.]+)/);
-  try {molmil.commandLines.pyMol.edmap.apply(env, [command[1].trim(), command[2].trim()]);}
+  command = command.match(/edmap[\s]+(.*?)[\s]*,[\s]*([0-9_.]+)(,[\s]*([0-9a-zA-Z\-]+))?/);
+  try {molmil.commandLines.pyMol.edmap.apply(env, [command[1].trim(), command[2].trim(), command[4] ? command[4].trim() : null]);}
   catch (e) {console.error(e); return false;}
   return true;
 }
@@ -735,7 +735,7 @@ molmil.commandLines.pyMol.alter = function(atoms, options) {
   return true;
 }
 
-molmil.commandLines.pyMol.edmap = function(atoms, border) {
+molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
     //else atoms = molmil.commandLines.pyMol.select(atoms);
@@ -754,13 +754,13 @@ molmil.commandLines.pyMol.edmap = function(atoms, border) {
   
   var sigma = 1.0;
   var solid = false;
-  var rgba = this.mesh_color || [0, 255, 255, 255];
-  
+  var rgba = this.mesh_color || mode == "fo-fc" ? [255, 0, 255, 255] : [0, 255, 255, 255];
 
   var request = new molmil_dep.CallRemote("POST");
   request.AddParameter("xyz", JSON.stringify(XYZ));
   request.AddParameter("border", border*.5);
   request.AddParameter("pdbid", atoms[0].chain.entry.meta.id);
+  if (mode) request.AddParameter("mode", mode);
   request.timeout = 0; request.ASYNC = true; request.responseType = "arraybuffer";
   request.console = this.console;
   request.OnDone = function() {
