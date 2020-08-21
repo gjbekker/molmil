@@ -752,7 +752,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
   
   border = parseFloat(border);
   
-  var sigma = 1.0;
+  var sigma = this.edmap_sigma || 1.0;
   var solid = false;
   var rgba = this.mesh_color || mode == "fo-fc" ? [255, 0, 255, 255] : [0, 255, 255, 255];
 
@@ -1127,6 +1127,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     else if (value.toLowerCase() == "backward") this.cli_soup.animation.motionMode = 2;
     else if (value.toLowerCase() == "swing") this.cli_soup.animation.motionMode = 3;
     else if (value.toLowerCase() == "swing-once") this.cli_soup.animation.motionMode = 3.5;
+  }
+  else if (key == "edmap_sigma") {
+    this.edmap_sigma = parseFloat(value);
   }
   else if (key == "mesh_color") {
     var rgba = molmil.color2rgba(value);
