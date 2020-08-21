@@ -597,8 +597,24 @@ molmil.commandLines.pyMol.findseq = function(seq, target, selName) {
 molmil.commandLines.pyMol.delete = function(atoms) {
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    //else atoms = molmil.commandLines.pyMol.select(atoms);
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    else {
+      if (atoms.startsWith("mesh ")) {
+        var idnr = atoms.split("mesh ")[1].trim();
+        var files = this.cli_soup.structures;
+        
+        for (var i=0; i<files.length; i++) {
+          if (files[i].meta.idnr == idnr && files[i] instanceof molmil.polygonObject) {
+            var pnames = Object.keys(files[i].programs);
+            for (var p=0; p<pnames.length; p++) this.cli_soup.renderer.removeProgram(files[i].programs[pnames[p]]);
+            files.splice(i, 1);
+            this.cli_soup.renderer.canvas.update = true;
+            return;
+          }
+        }
+        return console.error("Unknown mesh...");
+      }
+      else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    }
   }
   
   var soup = this.cli_soup, deleted=false;
@@ -774,9 +790,11 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
     settings.rgba = rgba; // make this changable...
     settings.skipCOG = true;
     settings.alphaMode = false;
-    var struct = soup.load_ccp4(this.request.response, "???", settings);
+    var struct = soup.load_ccp4(this.request.response, "edmap mesh", settings);
     struct.meta.idnr = "#"+(soup.SID++);
+    delete soup.downloadInProgress;
   };
+  soup.downloadInProgress = true;
   request.OnError = function() {this.console.error("Unable to retrieve map...");};
   request.Send("https://pdbj.org/rest/edmap2");
 }
