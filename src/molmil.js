@@ -609,6 +609,7 @@ molmil.entryObject.prototype.toString = function() {return "Entry "+(this.meta.i
 molmil.polygonObject = function (meta) {
   this.programs = [];
   this.meta = meta || {};
+  this.display = true;
 };
 
 molmil.defaultSettings_label = {dx: 0.0, dy: 0.0, dz: 0.0, color: [0, 255, 0], fontSize: 20};
@@ -1084,8 +1085,8 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     request.parseFunction = format;
     if (settings.responseType) request.responseType = settings.responseType;
     request.parse = function() {
-      if (settings.responseType == "arraybuffer" || settings.responseType == "json") return this.parseFunction(this.request.response, this.filename);
-      else return this.parseFunction(this.request.responseText, this.filename);
+      if (settings.responseType == "arraybuffer" || settings.responseType == "json") return this.parseFunction.apply(this.target, [this.request.response, this.filename]);
+      else return this.parseFunction.apply(this.target, [this.request.responseText, this.filename])
     };
   }
   else {
@@ -1615,7 +1616,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var label_seq_id = atom_site.label_seq_id || []; // residue id
     var label_comp_id = atom_site.label_comp_id || atom_site.comp_id || atom_site.model_id || []; // residue name
 
-    var label_asym_id = atom_site.label_asym_id || []; // chain label
+    var label_asym_id = atom_site.label_asym_id || atom_site.auth_asym_id; // chain label
     var auth_asym_id = atom_site.auth_asym_id || label_asym_id; // chain name
   
     var label_alt_id = atom_site.label_alt_id || [];
@@ -2087,7 +2088,7 @@ molmil.viewer.prototype.calculateCOG = function(atomList) {
           } 
         }
       }
-      else if (struct instanceof molmil.polygonObject) {
+      else if (struct instanceof molmil.polygonObject && struct.meta.COR) {
         this.avgX += struct.meta.COR[0];
         this.avgY += struct.meta.COR[1];
         this.avgZ += struct.meta.COR[2];
@@ -6458,7 +6459,7 @@ molmil.handle_molmilViewer_mouseUp = function (event) {
       else activeCanvas.molmilViewer.resetCOR();
       activeCanvas.renderer.modelViewMatrix = activeCanvas.renderer.camera.generateMatrix();
     }
-    if (activeCanvas.isFullScreen) var offset = {x: event.screenX, y: event.screenY};
+    if (document.fullscreenElement) var offset = {x: event.screenX, y: event.screenY};
     else var offset = molmil.getOffset(event);
     var dpr = window.devicePixelRatio || 1;
     activeCanvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);
@@ -6563,7 +6564,7 @@ molmil.handle_molmilViewer_touchHold = function () {
   if (! molmil.longTouchTID) return;
   if (molmil.previousTouchEvent) {
     if (Math.sqrt((Math.pow(molmil.previousTouchEvent.touches[0].clientX - molmil.touchList[0][0], 2)) + (Math.pow(molmil.previousTouchEvent.touches[0].clientY - molmil.touchList[0][1], 2))) < 1) {
-      if (molmil.activeCanvas.isFullScreen) var offset = {x: molmil.previousTouchEvent.touches[0].screenX, y: molmil.previousTouchEvent.touches[0].screenY};
+      if (document.fullscreenElement) var offset = {x: molmil.previousTouchEvent.touches[0].screenX, y: molmil.previousTouchEvent.touches[0].screenY};
       else var offset = molmil.getOffset(molmil.previousTouchEvent.touches[0]);
       var dpr = window.devicePixelRatio || 1;
       molmil.activeCanvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);
@@ -6609,7 +6610,7 @@ molmil.handle_molmilViewer_touchMove = function (event) {
 molmil.handle_molmilViewer_touchEnd = function () {
   if (molmil.previousTouchEvent && molmil.touchMode == 1) {
     if (Math.sqrt((Math.pow(molmil.previousTouchEvent.touches[0].clientX - molmil.touchList[0][0], 2)) + (Math.pow(molmil.previousTouchEvent.touches[0].clientY - molmil.touchList[0][1], 2))) < 1) {
-      if (molmil.activeCanvas.isFullScreen) var offset = {x: molmil.previousTouchEvent.touches[0].screenX, y: molmil.previousTouchEvent.touches[0].screenY};
+      if (document.fullscreenElement) var offset = {x: molmil.previousTouchEvent.touches[0].screenX, y: molmil.previousTouchEvent.touches[0].screenY};
       else var offset = molmil.getOffset(molmil.previousTouchEvent.touches[0]);
       var dpr = window.devicePixelRatio || 1;
       molmil.activeCanvas.renderer.soup.selectObject(offset.x*dpr, offset.y*dpr, event);

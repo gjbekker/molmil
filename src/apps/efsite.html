@@ -57,7 +57,7 @@ var molmil_settings = {
 };
     var canvas, canvas2, pdbid, efID, chainsList, preMode;
     
-    var efAPI = "https://pdbj.org/rest/displayEFSiteFile?format=efvet&id=";
+    var efAPI = "https://pdbj.org/eF-site/rest/showefvet?id=";
     var mpbfAPI = "https://pdbj.org/rest/displayEFSiteFile";
     var credentials = null;
   
@@ -177,7 +177,7 @@ var molmil_settings = {
       total_prop[0] /= total_prop[2]; total_prop[1] /= total_prop[2];
       
       //console.log("Protein total charge: ", total_prop[0].toFixed(2));
-      console.log("Protein average hydrophobicity: ", (total_prop[1]*100).toFixed(2), "%");
+      //console.log("Protein average hydrophobicity: ", (total_prop[1]*100).toFixed(2), "%");
       
       offset = 0;
 
@@ -189,8 +189,9 @@ var molmil_settings = {
       }
     
       // upload data to gpu & register render programs
-      var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas2.renderer, {solid: true});
+      var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas2.renderer, {solid: true, storeVertices: true});
       canvas2.renderer.programs.push(program);
+      struct.programs.push(program);
 
       setupOptions([]); // protein/xna
         
@@ -320,6 +321,15 @@ var molmil_settings = {
     }
   
     window.onresize = function() {
+      if (document.fullscreenElement) {
+        var sc = document.fullscreenElement.getElementsByTagName("canvas")[0];
+        var dpr = window.devicePixelRatio || 1;
+        var w = (window.innerWidth || document.documentElement.clientWidth) * dpr;
+        var h = (window.innerHeight || document.documentElement.clientHeight) * dpr;
+        sc.setSize(w, h);
+        return;
+      }
+
       if (canvas && window.innerHeight != screen.height) {
         var dpr = window.devicePixelRatio || 1;
         var w = ((window.innerWidth || document.documentElement.clientWidth)/3) * dpr;
@@ -420,8 +430,16 @@ var molmil_settings = {
         }
         
         if (chainsList.length) {
+          var chainsList2 = null;
+          if (chainsList.indexOf('.') >= 0) {
+            chainsList2 = chainsList.split('.');
+          }
           for (var c=0, m, mol, a; c<canvas.molmilViewer.structures[0].chains.length; c++) {
-            if (chainsList.indexOf(canvas.molmilViewer.structures[0].chains[c].authName) == -1) {canvas.molmilViewer.structures[0].chains.splice(c, 1); c--;}
+            if (chainsList2 != null) {
+              if (chainsList2.indexOf(canvas.molmilViewer.structures[0].chains[c].authName) == -1) {canvas.molmilViewer.structures[0].chains.splice(c, 1); c--;}
+            } else {
+              if (chainsList.indexOf(canvas.molmilViewer.structures[0].chains[c].authName) == -1) {canvas.molmilViewer.structures[0].chains.splice(c, 1); c--;}
+            }
           }
         }
         else {
@@ -881,7 +899,7 @@ function mmjsonGroupData(obj, field) {
     
     <center>
       <span>
-        <a href="https://pdbj.org/eF-site" id="goto_top">Goto eF-site top</a>
+        <a href="https://pdbj.org/eF-site/" id="goto_top">Goto eF-site top</a>
         <img src="https://pdbj.org/eF-site/img/title_small.jpg" style="vertical-align: bottom; margin-right: 1em;" />
         <span id="pdbid_container"></span>
       </span>

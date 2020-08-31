@@ -46,37 +46,6 @@ molmil.UI.prototype.init=function() {
   cont.menu = cont.pushNode("div"); cont.menu.style.display = "none";
   cont.menu.className = "molmil_UI_RM";
   (this.canvas ? this.canvas.parentNode : document.body).appendChild(cont);
-  
-  // also set full screen handlers
-
-  var CANVAS = this.canvas
-
-  var fullScreenChange = function(e) {
-    var canvas = document.molmil_FSC;
-    if (canvas != CANVAS) return;
-    var dpr = window.devicePixelRatio || 1;
-    if (! canvas.isFullScreen) {
-      canvas.renderer.width = canvas.width = screen.width*dpr;
-      canvas.renderer.height = canvas.height = screen.height*dpr;
-      canvas.style.width = screen.width+"px";
-      canvas.style.height = screen.height+"px";
-      canvas.isFullScreen = true;
-    }
-    else {
-      canvas.renderer.width = canvas.width = canvas.defaultSize[0] * dpr;
-      canvas.renderer.height = canvas.height = canvas.defaultSize[1] * dpr;
-      canvas.style.width = canvas.defaultSize[0]+"px";
-      canvas.style.height = canvas.defaultSize[1]+"px";
-      canvas.isFullScreen = false;
-      document.molmil_FSC = null;
-    }
-    canvas.renderer.resizeViewPort(); canvas.update = true; canvas.renderer.render();
-  };
-  
-  document.addEventListener("webkitfullscreenchange", fullScreenChange, false);
-  document.addEventListener("mozfullscreenchange", fullScreenChange, false);
-  document.addEventListener("MSFullscreenChange", fullScreenChange, false);
-  document.addEventListener("fullscreenchange", fullScreenChange, false);
 };
 
 molmil.UI.prototype.deleteEntry=function(entry) {
@@ -509,11 +478,9 @@ molmil.UI.prototype.showLM=function(icon) {
     e.canvas = this.canvas; e.LM = icon;
     e.title = "Enables full screen mode";
     e.onclick = function() {
-      var rfs = this.canvas.requestFullScreen || this.canvas.webkitRequestFullScreen || this.canvas.mozRequestFullScreen || this.canvas.msRequestFullscreen || null;
-      if (rfs) {
-        document.molmil_FSC = this.canvas;
-        rfs.call(this.canvas);
-      }
+      var cc = this.canvas.parentNode;
+      var rfs = cc.requestFullScreen || cc.webkitRequestFullScreen || cc.mozRequestFullScreen || cc.msRequestFullscreen || null;
+      if (rfs) rfs.call(cc);
       this.LM.onclick();
     };
   }
