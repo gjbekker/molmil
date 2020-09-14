@@ -946,21 +946,21 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
       else var jso = request.request.response;
       if (typeof jso != "object" && jso != null) jso = JSON.parse(this.request.responseText);
       else if (jso == null) {throw "";}
-      return this.target.load_PDBx(jso, this.pdbid, this.filename);
+      return this.target.load_PDBx(jso, this.pdbid, settings);
     };
   }
   else if (format == 2 || (format+"").toLowerCase() == "mmcif") {
     if (! window.CIFparser) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructure, this, [loc, format, ondone, settings]); 
     preloadLoadersJS = [];
     request.parse = function() {
-      return this.target.load_mmCIF(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename);
+      return this.target.load_mmCIF(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, settings);
     };
   }
   else if (format == 3 || (format+"").toLowerCase() == "pdbml") {
     if (! window.loadPDBML) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructure, this, [loc, format, ondone, settings]); 
     preloadLoadersJS = [];
     request.parse = function() {
-      return this.target.load_PDBML(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseXML, this.filename);
+      return this.target.load_PDBML(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseXML, settings);
     };
   }
   else if (format == 4 || (format+"").toLowerCase() == "pdb") {
@@ -1162,14 +1162,14 @@ molmil.viewer.prototype.loadMyPrestoTrj = function(buffer, fxcell) {
 molmil.viewer.prototype.loadStructureData = function(data, format, filename, ondone, settings) {
   if (! format) format = molmil.guess_format(filename);
   var structures;
-  if (format == 1 || (format+"").toLowerCase() == "mmjson") structures = this.load_PDBx(typeof data == "string" ? JSON.parse(data) : data, filename);
+  if (format == 1 || (format+"").toLowerCase() == "mmjson") structures = this.load_PDBx(typeof data == "string" ? JSON.parse(data) : data, settings);
   else if (format == 2 || (format+"").toLowerCase() == "cif") {
     if (! window.CIFparser) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructureData, this, [data, format, filename, ondone, settings]); 
-    structures = this.load_mmCIF(data, filename);
+    structures = this.load_mmCIF(data, settings);
   }
   else if (format == 3 || (format+"").toLowerCase() == "pdbml") {
     if (! window.loadPDBML) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructureData, this, [data, format, filename, ondone, settings]); 
-    structures = this.load_PDBML(data, filename);
+    structures = this.load_PDBML(data, settings);
   }
   else if (format == 4 || (format+"").toLowerCase() == "pdb") structures = this.load_PDB(data, filename);
   else if ((format+"").toLowerCase() == "mmtf") {
@@ -1324,8 +1324,14 @@ molmil.viewer.prototype.buildSNFG = function(chain) {
   for (var i=0; i<chain.bonds.length; i++) {
     if (chain.bonds[i][0].molecule != chain.bonds[i][1].molecule) {
       chain.bonds[i][0].molecule.weirdAA = chain.bonds[i][1].molecule.weirdAA = false;
-      if (chain.bonds[i][0].molecule.CA) chain.bonds[i][0].molecule.snfg_con = true;
-      else if (chain.bonds[i][1].molecule.CA) chain.bonds[i][1].molecule.snfg_con = true;
+      if (chain.bonds[i][0].molecule.CA) {
+        chain.bonds[i][0].molecule.snfg_con = chain.bonds[i][1].molecule;
+        chain.bonds[i][1].molecule.res_con = chain.bonds[i][0].molecule
+      }
+      else if (chain.bonds[i][1].molecule.CA) {
+        chain.bonds[i][1].molecule.snfg_con = chain.bonds[i][0].molecule;
+        chain.bonds[i][0].molecule.res_con = chain.bonds[i][1].molecule;
+      }
       chain.branches.push([chain.bonds[i][0].molecule, chain.bonds[i][1].molecule]);
     }
   }
@@ -1576,24 +1582,25 @@ molmil.viewer.prototype.load_polygonXML = function(xml, filename, settings) {
 };
 
 // ** loads mmcif data **
-molmil.viewer.prototype.load_mmCIF = function(data) {
+molmil.viewer.prototype.load_mmCIF = function(data, settings) {
   var jso = loadCIF(data);
-  return this.load_PDBx(jso);
+  return this.load_PDBx(jso, settings);
 };
 
 // ** loads pdbml data **
-molmil.viewer.prototype.load_PDBML = function(xml) {
+molmil.viewer.prototype.load_PDBML = function(xml, settings) {
   if (typeof xml == "string") {
     var parser = new DOMParser();
     xml = parser.parseFromString(xml, "text/xml");
   }
   var jso = loadPDBML(xml);
-  return this.load_PDBx(jso);
+  return this.load_PDBx(jso, settings);
 };
 
 // ** loads PDBx formatted data such as mmcif, pdbml and mmjson **
-molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated for the new model system
+molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should be updated for the new model system
   var entries = Object.keys(mmjso), structs = [], offset, isHet;
+  settings = settings || {};
   for (var e=0; e<entries.length; e++) {
 
     //var entryId = Object.keys(mmjso)[0].substr(5).split("-")[0];
@@ -1616,7 +1623,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     var label_seq_id = atom_site.label_seq_id || []; // residue id
     var label_comp_id = atom_site.label_comp_id || atom_site.comp_id || atom_site.model_id || []; // residue name
 
-    var label_asym_id = atom_site.label_asym_id || atom_site.auth_asym_id; // chain label
+    var label_asym_id = atom_site.label_asym_id || atom_site.auth_asym_id || []; // chain label
     var auth_asym_id = atom_site.auth_asym_id || label_asym_id; // chain name
   
     var label_alt_id = atom_site.label_alt_id || [];
@@ -1667,8 +1674,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
         cmnum = pdbx_PDB_model_num ? pdbx_PDB_model_num[a] : 0; ccid = cmid = false;
       }
       
-      if (label_asym_id[a] != ccid || ! currentChain) {
-        this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a], struc)); struc.chains.push(currentChain);
+      if ((label_asym_id && label_asym_id[a] != ccid) || ! currentChain) {
+        this.chains.push(currentChain = new molmil.chainObject(label_asym_id[a] || "", struc)); struc.chains.push(currentChain);
         currentChain.authName = auth_asym_id[a]; // afterwards get rid of this and set chain.name to auth_asym_id[a]...
         currentChain.labelName = label_asym_id[a];
         currentChain.CID = this.CID++;
@@ -2012,7 +2019,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso) { // this should be updated 
     }
     
     this.pdbxData = pdb;
-    delete pdb.atom_site;
+    if (! settings.skipDeleteJSO) delete pdb.atom_site;
   }
 
   return structs;

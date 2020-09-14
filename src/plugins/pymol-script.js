@@ -1011,6 +1011,8 @@ molmil.commandLines.pyMol.set_color = function(name, rgba) {
 }
 
 molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
+  var backboneAtoms = molmil.configBox.backboneAtoms4Display;
+  
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
     //else atoms = molmil.commandLines.pyMol.select(atoms);
@@ -1026,6 +1028,15 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
   }
   else if (repr == "cartoon") {
     for (var i=0; i<atoms.length; i++) atoms[i].molecule.displayMode = atoms[i].chain.displayMode = 0;
+  }
+  else if (repr == "snfg-icon") {
+    for (var i=0; i<atoms.length; i++) {
+      if (atoms[i].molecule.SNFG) atoms[i].molecule.displayMode = atoms[i].chain.displayMode = atoms[i].displayMode = 0;
+      else if (atoms[i].molecule.snfg_con && ! backboneAtoms.hasOwnProperty(atoms[i].atomName)) {
+        atoms[i].displayMode = 0;
+        atoms[i].molecule.showSC = false;
+      }
+    }
   }
   else if (repr == "coarse-surface") {
     //for (var i=0; i<atoms.length; i++) atoms[i].molecule.displayMode = atoms[i].chain.displayMode = 0;
@@ -1291,15 +1302,24 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
     }
   }
   else if (repr == "cartoon") {
+    var resshow = {};
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 0;
       atoms[i].chain.display = atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
+      if (atoms[i].molecule.CA == atoms[i] || atoms[i].molecule.SNFG) {
         atoms[i].molecule.displayMode = 3;
         atoms[i].molecule.showSC = false;
         atoms[i].molecule.chain.displayMode = 3;
       }
+      if (atoms[i].molecule.SNFG && atoms[i].molecule.res_con) resshow[atoms[i].molecule.res_con.MID] = atoms[i].molecule.res_con;
     }
+    for (var i in resshow) {
+      resshow[i].showSC = true;
+      for (var a=0; a<resshow[i].atoms.length; a++) {
+        if (! backboneAtoms.hasOwnProperty(resshow[i].atoms[a].atomName)) resshow[i].atoms[a].displayMode = 0;
+      }
+    }
+    molmil.geometry.reInitChains = true;
   }
   else if (repr == "rocket") {
     for (var i=0; i<atoms.length; i++) {
@@ -1316,8 +1336,10 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
         atoms[i].displayMode = 3;
       }
     }
+    molmil.geometry.reInitChains = true;
   }
   else if (repr == "snfg-icon") {
+    var resshow = {};
     for (var i=0; i<atoms.length; i++) {
       atoms[i].displayMode = 0;
       atoms[i].chain.display = atoms[i].chain.entry.display = true;
@@ -1325,10 +1347,13 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
         atoms[i].molecule.displayMode = 31;
         atoms[i].molecule.chain.displayMode = 4;
         atoms[i].displayMode = 3;
+        if (atoms[i].molecule.res_con) resshow[atoms[i].molecule.res_con.MID] = atoms[i].molecule.res_con;
       }
-      else if (atoms[i].molecule.snfg_con && ! backboneAtoms.hasOwnProperty(atoms[i].atomName)) {
-        atoms[i].displayMode = 3;
-        atoms[i].molecule.showSC = true;
+    }
+    for (var i in resshow) {
+      resshow[i].showSC = true;
+      for (var a=0; a<resshow[i].atoms.length; a++) {
+        if (! backboneAtoms.hasOwnProperty(resshow[i].atoms[a].atomName)) resshow[i].atoms[a].displayMode = resshow[i].atoms[a].displayMode || 3;
       }
     }
   }
