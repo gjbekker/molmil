@@ -12,7 +12,7 @@
       height: 100%;
       margin: 0px;
       padding: 0px;
-      overflow:auto;
+      overflow:hidden;
       
       -webkit-touch-callout: none;
       -webkit-user-select: none;
@@ -43,7 +43,7 @@
 /*end_publish_erase*/  
 
     var url = window.location.href.replace(window.location.hash, "");
-    molmil_settings.src = url.endsWith("/") ? url : url.split("/").slice(0, -1).join("/")+"/";
+    molmil_settings.src = url.endsWith && url.endsWith("/") ? url : url.split("/").slice(0, -1).join("/")+"/";
   
     var canvas, cli;
   
@@ -70,8 +70,7 @@
       molmil.autoSetup();
       
     }
-    
-
+    window.onbeforeunload = function(e) {if (e) e.returnValue = "..."; return "...";};
   </script>
   
   </head>
