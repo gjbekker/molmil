@@ -522,8 +522,8 @@ var molmil_settings = {
               if (fgroup.sequence.length) fgroup.sequence += ", ";
               for (c=residx; c<=residx2; c++) {
                 mol = canvas.molmilViewer.getMolObject4ChainAlt(chains, c);
-                fgroup.sequence += aaCode[mol.name] || "";
-                fgroup.residueList.push(mol);
+                if (! mol) continue;
+                fgroup.sequence += aaCode[mol.name] || ""; fgroup.residueList.push(mol);
               }
 
               tmp.push([chainid+": "+residues[r].beg_auth_seq_id+(residues[r].beg_auth_seq_id != residues[r].end_auth_seq_id ? "-"+residues[r].end_auth_seq_id : "")]);
@@ -676,7 +676,7 @@ var molmil_settings = {
         request.OnDone = processEFvet;
         request.OnError = function() {
           canvas2.parentNode.style.display = "none";
-          var msg = document.getElementById("infoBox").pushNode("div", "Electrostatic surface calculation in progress...");
+          var msg = document.getElementById("infoBox").pushNode("div", "Electrostatic surface data is unavailable...");
           msg.style.color = "red";
         }
         request.Send(efAPI+efID);
@@ -690,7 +690,7 @@ var molmil_settings = {
         };
         request.OnError = function() {
           canvas2.parentNode.style.display = "none";
-          var msg = document.getElementById("infoBox").pushNode("div", "Electrostatic surface calculation in progress...");
+          var msg = document.getElementById("infoBox").pushNode("div", "Electrostatic surface data is unavailable...");
           msg.style.color = "red";
         }
         if (preMode && credentials) {

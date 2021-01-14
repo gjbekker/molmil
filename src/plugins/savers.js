@@ -2,34 +2,66 @@ function isNumber(n) {
   return ! isNaN(parseFloat(n)) && isFinite(n);
 }
 
+// loop over it normally; soup->structs->chains->molecules->atoms, then check if aid is in atomSelection; if not --> skip
+
 molmil.savePDB = function(soup, atomSelection, modelId, file) {
-  if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
-  var out = "", atom, gname, aid, aname, rname, cname, rid, x, y, z;
-  for (var i=0; i<atomSelection.length; i++) {
-    atom = atomSelection[i];
-    gname = "ATOM  ";
-    if (atom.molecule.ligand) gname = "HETATM";
-    
-    aid = (i+1)%99999;
+  if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
+  var info = new Set(atomSelection);
+  
+  var s, c, a, atom, aid = 1, out = "", gname, aname, rname, cname, rid, x, y, z, prevChain = null;
+  var saveModel = function(modelId_) {
+    for (s=0; s<soup.structures.length; s++) {
+      for (c=0; c<soup.structures[s].chains.length; c++) {
+        for (a=0; a<soup.structures[s].chains[c].atoms.length; a++) {
+          atom = soup.structures[s].chains[c].atoms[a];
+          if (! info.has(atom)) continue;
+          if (prevChain && atom.chain != prevChain) {
+            out += "TER\n"
+          }
+          prevChain = atom.chain;
+          aid = aid%99999;
+        
+          gname = "ATOM  ";
+          if (atom.molecule.ligand) gname = "HETATM";
 
-    aname = atom.atomName.substr(0,4);
+          aname = atom.atomName.substr(0,4);
     
-    if (! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
+          if (! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
     
-    rname = atom.molecule.name;
+          rname = atom.molecule.name;
     
-    rid = (atom.molecule.RSID||"").substr(0,4);
+          rid = (atom.molecule.RSID||"").substr(0,4);
 
-    cname = (atom.chain.name||"").substr(0,2);
+          cname = (atom.chain.authName || atom.chain.name || "").substr(0,2);
 
-    x = atom.chain.modelsXYZ[modelId][atom.xyz].toFixed(3);
-    y = atom.chain.modelsXYZ[modelId][atom.xyz+1].toFixed(3);
-    z = atom.chain.modelsXYZ[modelId][atom.xyz+2].toFixed(3);
+          x = atom.chain.modelsXYZ[modelId_][atom.xyz].toFixed(3);
+          y = atom.chain.modelsXYZ[modelId_][atom.xyz+1].toFixed(3);
+          z = atom.chain.modelsXYZ[modelId_][atom.xyz+2].toFixed(3);
     
-    out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + "\n";
+          out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + "\n";
+        
+          aid++;
+        }
+      }
+    }
+  };
+  
+
+  if (modelId == "all") {
+    var nmod = soup.structures[0].chains[0].modelsXYZ.length;
+    for (var i=0; i<nmod; i++) {
+      out += "MODEL" + ((i+1)+'').padStart(9) + "\n";
+      saveModel(i);
+      out += "ENDMDL\n";
+    }
   }
-  var blob = new Blob([out], {type: "text/plain;charset=utf-8"});
-  saveAs(blob, file);
+  else saveModel(modelId);
+
+  if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(file, out, "utf8");
+  else {
+    var blob = new Blob([out], {type: "text/plain;charset=utf-8"});
+    saveAs(blob, file);
+  }
 }
 
 // ** generates a PLY file **
@@ -51,7 +83,14 @@ molmil.exportPLY = function(soup) {
   if (molmil.geometry.buffer3) meshes.push(molmil.geometry.buffer3);
   if (molmil.geometry.buffer4) meshes.push(molmil.geometry.buffer4);
   for (var i=0; i<soup.structures.length; i++) {
-    if (soup.structures[i] instanceof molmil.polygonObject && soup.structures[i].data) meshes.push(soup.structures[i].data);
+    if (soup.structures[i] instanceof molmil.polygonObject) {
+      for (var p=0; p<soup.structures[i].programs.length; p++) {
+        if (soup.structures[i].programs[p].data) {
+          var tmp = soup.structures[i].programs[p].data;
+          meshes.push({vertexSize: tmp.vertexSize, vertexBuffer: tmp.vertices, indexBuffer: tmp.indices});
+        }
+      }
+    }
   }
   // output
   

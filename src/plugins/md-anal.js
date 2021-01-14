@@ -307,7 +307,7 @@ molmil.viewer.prototype.loadGromacsXTC = function(buffer) {
     
     for (c=0; c<frame.natoms*3; c++) frame.x[c] *= 10;
     
-    this.frameInfo.push([frame.step, frame.time]);
+    this.frameInfo.push([frame.step, frame.time, frame.box]);
     
     if (offset >= buffer.byteLength) break;
   }

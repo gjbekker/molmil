@@ -18,7 +18,9 @@
     "positionOffset": -1,
     "scaleFactor": -1,
     "color": -1,
-    "renderMode": -1
+    "renderMode": -1,
+    "disableFog": -1, 
+    "bg_color": -1
   }
 }
 //#vertex
@@ -94,9 +96,14 @@ precision highp int;
 varying float fogFactor;
 varying float Pz;
 uniform vec3 color;
+uniform vec4 bg_color;
 
 #ifdef ENABLE_SLAB
 uniform float slabNear, slabFar;
+#endif
+
+#ifdef ENABLE_FOG
+uniform bool disableFog;
 #endif
 
 varying vec2 ex_FragTexCoord;
@@ -109,15 +116,16 @@ void main() {
   if (Pz < slabNear || Pz > slabFar+1.0) discard; // later change the slabFar functionality to a more fog-like function..
 #endif
 
-
   vec4 fragColor = texture2D(textureMap, ex_FragTexCoord)*vec4(color, 1.0);
 
 #ifdef ENABLE_FOG
-  if (fragColor.a > 0.0) gl_FragColor = mix(backgroundColor, fragColor, fogFactor);
+  if (fragColor.a > 0.0 && ! disableFog) gl_FragColor = mix(backgroundColor, fragColor, fogFactor);
   else gl_FragColor = fragColor;
 #else
   gl_FragColor = fragColor;
 #endif
+
+  if (fragColor.a == 0.0) gl_FragColor = bg_color;
 
 
 #ifdef ENABLE_SLAB

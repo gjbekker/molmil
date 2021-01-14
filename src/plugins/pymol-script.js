@@ -658,7 +658,8 @@ molmil.commandLines.pyMol.frame = function(modelId) {
   if (! modelId) return; // weird modelId
   modelId--;
 
-  this.cli_soup.renderer.selectFrame(modelId, 0);
+  if (this.cli_soup && this.cli_soup.animation) this.cli_soup.animation.go2Frame(modelId);
+  else this.cli_soup.renderer.selectFrame(modelId, 0);
 };
 
 molmil.commandLines.pyMol.bond = function(atom1, atom2, order) {
@@ -802,9 +803,8 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
 molmil.commandLines.pyMol.save = function(file, command) {
   command = command.split(","); var selection= "all", state, format=null;
   if (command.length > 1) selection = command[1].trim() || "all";
-  if (command.length > 2) state = parseInt(command[2].trim());
+  if (command.length > 2) state = command[2].trim() == "all" ? "all" : parseInt(command[2].trim());
   if (command.length > 3) format = command[3].trim();
-  
   var soup = this.cli_soup;
   
   if (! format) format = molmil.guess_format(file);
@@ -1057,6 +1057,9 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
   else if (repr == "cell") {
     this.cli_soup.hideCell();
   }
+  else if (repr == "label") {
+    // ....
+  }
 
   this.cli_soup.renderer.rebuildRequired = true;
   
@@ -1121,6 +1124,14 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     if (value.toLowerCase() == "on") molmil.configBox.projectionMode = 2
     else molmil.configBox.projectionMode = 1;
   }
+  else if (key == "label_bg_color") {
+    var rgba = molmil.color2rgba(value);
+    if (rgba == value) {
+      rgba = JSON.parse(value);
+      if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
+    }
+    molmil.defaultSettings_label.bg_color = [rgba[0], rgba[1], rgba[2]];
+  }  
   else if (key == "label_color") {
     var rgba = molmil.color2rgba(value);
     if (rgba == value) {
@@ -1128,6 +1139,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
       if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
     }
     molmil.defaultSettings_label.color = [rgba[0], rgba[1], rgba[2]];
+  }
+  else if (key == "label_border") {
+    molmil.defaultSettings_label.addBorder = value.toLowerCase() == "on";
   }
   else if (key == "label_position") {
     value = value.replace('(', '').replace(')', '').split(",");

@@ -2409,6 +2409,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     
   }
   var program = molmil.geometry.build_simple_render_program(vBuffer, iBuffer, soup.renderer, programOptions);
+  program.idname = name;
   soup.renderer.addProgram(program);
   soup.renderer.initBuffers();
   soup.canvas.update = true;

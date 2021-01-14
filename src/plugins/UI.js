@@ -866,11 +866,12 @@ molmil.UI.prototype.animationPopUp=function() {
   popup.pushNode("hr");
   
   this.soup.animation.initialise(popup);
-  
+
   if (this.soup.frameInfo) {
     var slider = popup.pushNode("input");
     slider.type = "range";
-    slider.value = slider.min = 0;
+    slider.value = this.soup.animation.frameNo;
+    slider.min = 0;
     slider.max = this.soup.frameInfo.length-1;
     slider.soup = this.soup;
     slider.oninput = function(e) {this.soup.animation.go2Frame(parseInt(this.value));};
@@ -882,7 +883,8 @@ molmil.UI.prototype.animationPopUp=function() {
   else {
     var slider = popup.pushNode("input");
     slider.type = "range";
-    slider.value = slider.min = 0;
+    slider.value = this.soup.animation.frameNo;
+    slider.min = 0;
     slider.max = this.soup.chains[0].modelsXYZ.length-1;
     slider.soup = this.soup;
     slider.oninput = function(e) {this.soup.animation.go2Frame(parseInt(this.value));};
@@ -891,6 +893,7 @@ molmil.UI.prototype.animationPopUp=function() {
     var timeBox = popup.pushNode("span", "0");
     popup.timeBox = timeBox;
   }
+  this.soup.animation.updateInfoBox();
   
   popup.pushNode("br");
   
@@ -1329,7 +1332,7 @@ molmil.UI.prototype.savePNG=function() {
 }
 
 
-molmil.UI.prototype.videoRenderer=function() {
+molmil.UI.prototype.videoRenderer=function(justStart) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
   
   var videoID = null;
@@ -1338,13 +1341,17 @@ molmil.UI.prototype.videoRenderer=function() {
   this.canvas.renderer.onRenderFinish = function() {
     if (! videoID) return;
     if (pixels == null) pixels = new Uint8Array(this.canvas.width * this.canvas.width * 4);
-    var req = new molmil_dep.CallRemote("POST");
-    req.AddParameter("id", videoID);
-    req.AddParameter("data", canvas.toDataURL());
+    
+    if (window.addFrame) addFrame(canvas.toDataURL());
+    else {
+      var req = new molmil_dep.CallRemote("POST");
+      req.AddParameter("id", videoID);
+      req.AddParameter("data", canvas.toDataURL());
+      req.Send(molmil.settings.molmil_video_url+"addFrame");
+    }
           
     this.canvas.renderer.gl.readPixels(0, 0, this.canvas.width, this.canvas.height, this.canvas.renderer.gl.RGBA, this.canvas.renderer.gl.UNSIGNED_BYTE, pixels);
-          
-    req.Send(molmil.settings.molmil_video_url+"addFrame");
+
   };
   
   var popup = molmil_dep.dcE("div");
@@ -1371,11 +1378,14 @@ molmil.UI.prototype.videoRenderer=function() {
   popup.endVideo = function() {
     if (this.canvas.molmilViewer.animation.playing) molmil_dep.asyncStart(this.endVideo, [], this, 250);
     else {
-      var req = new molmil_dep.CallRemote("GET");
-      req.AddParameter("id", videoID);
-      req.Send(molmil.settings.molmil_video_url+"deInitVideo");
-      console.log(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
-      window.open(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
+      if (window.finalizeVideo) finalizeVideo();
+      else {
+        var req = new molmil_dep.CallRemote("GET");
+        req.AddParameter("id", videoID);
+        req.Send(molmil.settings.molmil_video_url+"deInitVideo");
+        console.log(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
+        window.open(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
+      }
       videoID = null;
     }
   }
@@ -1387,14 +1397,15 @@ molmil.UI.prototype.videoRenderer=function() {
     if (w%2 == 1) w--;
     if (h%2 == 1) h--;
     if (w != this.canvas.width || h != this.canvas.height) {this.canvas.width = w; this.canvas.height = h; this.canvas.renderer.resizeViewPort();}
-    
-    
-    var req = new molmil_dep.CallRemote("GET");
-    req.AddParameter("w", this.canvas.width);
-    req.AddParameter("h", this.canvas.height);
-    req.Send(molmil.settings.molmil_video_url+"initVideo");
-    videoID = req.request.responseText;
-    //canvas.renderer.selectDataContext();
+    if (window.initVideo) {videoID = 1; initVideo(molmil.configBox.video_path, this.canvas.width, this.canvas.height, molmil.configBox.video_framerate);}
+    else {
+      var req = new molmil_dep.CallRemote("GET");
+      req.AddParameter("w", this.canvas.width);
+      req.AddParameter("h", this.canvas.height);
+      req.Send(molmil.settings.molmil_video_url+"initVideo");
+      videoID = req.request.responseText;
+      //canvas.renderer.selectDataContext();
+    }
     this.canvas.molmilViewer.animation.beginning();
     this.canvas.molmilViewer.animation.play();
     this.popup.endVideo();
@@ -1410,6 +1421,8 @@ molmil.UI.prototype.videoRenderer=function() {
   popup.cancel.popup = popup;
   
   this.LM.parentNode.pushNode(popup);
+  
+  if (justStart) popup.record.onclick();
 }
 
 // ** drag-and-drop support for various files **
@@ -1781,6 +1794,10 @@ molmil.bindCanvasInputs = function(canvas) {
 
 // ** video support **
 molmil.initVideo = function(UI) {
+  if (window.initVideo) {
+    molmil_dep.asyncStart(UI.videoRenderer, [], UI, 0);
+    return;
+  }
   var request = new molmil_dep.CallRemote("POST");request.ASYNC = true; request.UI = UI;
   request.OnDone = function() {
     var jso = JSON.parse(this.request.responseText);
@@ -1808,6 +1825,7 @@ molmil.animationObj = function (soup) {
 molmil.animationObj.prototype.initialise = function(infoBox) { // redo
   this.renderer.animationMode = true;
   this.number_of_frames = this.soup.structures.length ? this.soup.structures[0].number_of_frames : 0;
+  this.frameNo = this.renderer.modelId;
   this.init = true;
   this.infoBox = infoBox;
 };

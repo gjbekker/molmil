@@ -287,7 +287,9 @@ molmil.configBox = {
   cartoon_highlight_color: [255, 255, 255, 255],
   connect_cutoff: 0.35,
   orientMODELs: false,
-  chainHideCutoff: 300
+  chainHideCutoff: 300, 
+  video_framerate: 15,
+  video_path: "video.mp4"
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -1392,7 +1394,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
         }
       }
     }
-    else if (chain.molecules[m1].ligand) {
+    else if (chain.molecules[m1].ligand && ! chain.molecules[m1].water) {
       var altchain, altxyzRef;
       for (c=0; c<chain.entry.chains.length; c++) { // for every chain
         altchain = chain.entry.chains[c];
@@ -2042,14 +2044,14 @@ molmil.viewer.prototype.calculateCOG = function(atomList) {
   var poss = [], ALTs = [];
   
   this.geomRanges = [0, 0, 0, 0, 0, 0];
-  var struct, chain, s, c, m, a, xyz;
+  var struct, chain, s, c, m, a, xyz, modelId = this.renderer.modelId;
   
   //molmil.polygonObject
   
   if (atomList) {
     for (a=0; a<atomList.length; a++) {
       Xpos = atomList[a].xyz;
-      xyzRef = atomList[a].chain.modelsXYZ[0];
+      xyzRef = atomList[a].chain.modelsXYZ[modelId];
       xyz = [xyzRef[Xpos], xyzRef[Xpos+1], xyzRef[Xpos+2]];
       this.avgX += xyz[0];
       this.avgY += xyz[1];
@@ -2064,7 +2066,7 @@ molmil.viewer.prototype.calculateCOG = function(atomList) {
       if (struct instanceof molmil.entryObject) {
         for (c=0; c<struct.chains.length; c++) {
           chain = struct.chains[c];
-          xyzRef = chain.modelsXYZ[0];
+          xyzRef = chain.modelsXYZ[modelId];
           if (chain.molecules.length && chain.molecules[0].water) continue;
       
           for (m=0; m<chain.molecules.length; m++) {
@@ -2180,7 +2182,7 @@ molmil.viewer.prototype.ssAssign = function(chainObj) {
 // ** center of rotation manipulation **
 
 molmil.viewer.prototype.setCOR=function(selection) {
-  var modelId = this.renderer.modelId
+  var modelId = this.renderer.modelId;
   if (this.lastKnowAS) resetCOR();
   this.lastKnownAS = null;
   if (! this.atomSelection.length && ! selection) return;
@@ -2208,7 +2210,12 @@ molmil.viewer.prototype.resetCOR=function() {
   this.lastKnownAS = null;
 }
 
+molmil.viewer.prototype.hideCell=function() {
+  this.renderer.removeProgramByName("molmil.Cell");
+};
+
 molmil.viewer.prototype.showCell=function() {
+  this.hideCell();
   for (var i=0; i<this.structures.length; i++) {
     if (this.structures[i].meta.cellLengths) { // for now, just support a simple box...
       var cell = this.structures[i].meta.cellLengths;
@@ -2253,7 +2260,7 @@ molmil.viewer.prototype.showCell=function() {
       objects.push({type: "cylinder", coords: [POSs[3], POSs[5]], rgba: [0, 0, 0, 255], radius: 0.15});
       objects.push({type: "cylinder", coords: [POSs[3], POSs[6]], rgba: [0, 0, 0, 255], radius: 0.15});
       
-      return molmil.geometry.generator(objects, this, "Cell", {solid: true});
+      return molmil.geometry.generator(objects, this, "molmil.Cell", {solid: true});
       
     }
   }
@@ -5422,6 +5429,12 @@ molmil.render.prototype.removeProgram = function(program) {
   if (ndx > -1) this.programs.splice(ndx, 1);
 }
 
+molmil.render.prototype.removeProgramByName = function(idname) {
+  var ndx = -1;
+  for (var i=0; i<this.programs.length; i++) if (this.programs[i].idname == idname) ndx = i;
+  if (ndx > -1) this.programs.splice(ndx, 1);
+}
+
 molmil.render.prototype.reloadSettings=function() {
   this.QLV = molmil.localStorageGET("molmil.settings_QLV");
   if (this.QLV == null) {
@@ -5504,6 +5517,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   if (molmil.vrDisplay && molmil.vrDisplay.capabilities.hasExternalDisplay) glAttribs.preserveDrawingBuffer = true;
   
   if (molmil.configBox.webGL2) {
+    console.log('test');
     if (window.WebGL2RenderingContext) {
       this.defaultContext = canvas.getContext("webgl2", glAttribs);
       if (! this.defaultContext) molmil.configBox.webGL2 = false;
@@ -5666,6 +5680,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
       this.renderer.gl.uniform3f(this.shader.uniforms.COR, COR[0], COR[1], COR[2]);
       this.renderer.gl.uniform1f(this.shader.uniforms.focus, this.renderer.fogStart);
       this.renderer.gl.uniform1f(this.shader.uniforms.fogSpan, this.renderer.fogSpan);
+      this.renderer.gl.uniform1f(this.shader.uniforms.disableFog, false);
       if (this.renderer.settings.slab) {
         this.renderer.gl.uniform1f(this.shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
         this.renderer.gl.uniform1f(this.shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
@@ -5707,9 +5722,20 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx, N[i].settings.dy, N[i].settings.dz);
         this.renderer.gl.uniform3f(this.shader.uniforms.color, N[i].settings.color[0]/255, N[i].settings.color[1]/255, N[i].settings.color[2]/255);
         
-        if (N[i].settings.alwaysFront) this.renderer.gl.disable(this.renderer.gl.DEPTH_TEST);
+        
+        
+        if (N[i].settings.bg_color) this.renderer.gl.uniform4f(this.shader.uniforms.bg_color, N[i].settings.bg_color[0]/255, N[i].settings.bg_color[1]/255, N[i].settings.bg_color[2]/255, (N[i].settings.bg_color[3]||255)/255);
+        else this.renderer.gl.uniform4f(this.shader.uniforms.bg_color, 0, 0, 0, 0);
+        
+        if (N[i].settings.alwaysFront) {
+          this.renderer.gl.disable(this.renderer.gl.DEPTH_TEST);
+          this.renderer.gl.uniform1f(this.shader.uniforms.disableFog, true);
+        }
         this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, 6, this.renderer.gl.INDEXINT, i*24);
-        if (N[i].settings.alwaysFront) this.renderer.gl.enable(this.renderer.gl.DEPTH_TEST);
+        if (N[i].settings.alwaysFront) {
+          this.renderer.gl.enable(this.renderer.gl.DEPTH_TEST);
+          this.renderer.gl.uniform1f(this.shader.uniforms.disableFog, false);
+        }
       }
     
       this.renderer.gl.disable(this.renderer.gl.BLEND);
@@ -8774,8 +8800,8 @@ molmil.addLabel = function(text, settings, soup) {
   settings.fontSize = settings.fontSize || obj.settings.fontSize; settings.color = settings.color || obj.settings.color;
   settings.textBaseline = settings.textBaseline || obj.settings.textBaseline;
   settings.textAlign = settings.textAlign || obj.settings.textAlign;
-  
-  var resolutionScaler = soup.canvas.width/1920;
+
+  var resolutionScaler = Math.max(soup.canvas.width/1920, soup.canvas.height/1080);
   
   if (text != obj.text || settings.fontSize != obj.settings.fontSize || settings.color[0] != obj.settings.color[0] || settings.color[1] != obj.settings.color[1] || settings.color[2] != obj.settings.color[2]) {
     var textCtx = document.createElement("canvas").getContext("2d");
@@ -8793,14 +8819,14 @@ molmil.addLabel = function(text, settings, soup) {
     w = (w*settings.fontSize*.6)+6;
     
     var Yoffset = 0;
-    /*
-    if (settings.addBorder) {
-      h = tmp.length*settings.fontSize*1.5;
+    
+    if (obj.settings.addBorder) {
+      h = tmp.length*settings.fontSize*1.25;
       w += settings.fontSize*.5;
       h += settings.fontSize*.5;
-      Yoffset += settings.fontSize*.5;
+      Yoffset += settings.fontSize*.375;
     }
-    */
+    
     
     textCtx.canvas.width = w; textCtx.canvas.height = h;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
@@ -8818,15 +8844,13 @@ molmil.addLabel = function(text, settings, soup) {
       for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
     }
     
-    /*
-    if (settings.addBorder) {
+    if (obj.settings.addBorder) {
       textCtx.beginPath();
       textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, (textCtx.canvas.width*.5)-settings.fontSize*.05, (textCtx.canvas.height*.5)-settings.fontSize*.05, 0, 0, Math.PI * 2, false);
-      textCtx.strokeStyle = "white";
       textCtx.lineWidth = settings.fontSize*.1;
       textCtx.stroke();
     }
-    */
+    
 
     var gl = soup.renderer.gl;
     var textTex = gl.createTexture();
