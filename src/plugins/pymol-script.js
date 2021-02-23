@@ -1132,6 +1132,14 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     }
     molmil.defaultSettings_label.bg_color = [rgba[0], rgba[1], rgba[2]];
   }  
+  else if (key == "label_outline_color") {
+    var rgba = molmil.color2rgba(value);
+    if (rgba == value) {
+      rgba = JSON.parse(value);
+      if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
+    }
+    molmil.defaultSettings_label.outline_color = [rgba[0], rgba[1], rgba[2]];
+  }
   else if (key == "label_color") {
     var rgba = molmil.color2rgba(value);
     if (rgba == value) {

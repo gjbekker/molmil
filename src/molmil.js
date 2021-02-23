@@ -5720,12 +5720,6 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         
         this.renderer.gl.uniform2f(this.shader.uniforms.sizeOffset, N[i].texture.renderWidth, N[i].texture.renderHeight);
         this.renderer.gl.uniform3f(this.shader.uniforms.positionOffset, N[i].settings.dx, N[i].settings.dy, N[i].settings.dz);
-        this.renderer.gl.uniform3f(this.shader.uniforms.color, N[i].settings.color[0]/255, N[i].settings.color[1]/255, N[i].settings.color[2]/255);
-        
-        
-        
-        if (N[i].settings.bg_color) this.renderer.gl.uniform4f(this.shader.uniforms.bg_color, N[i].settings.bg_color[0]/255, N[i].settings.bg_color[1]/255, N[i].settings.bg_color[2]/255, (N[i].settings.bg_color[3]||255)/255);
-        else this.renderer.gl.uniform4f(this.shader.uniforms.bg_color, 0, 0, 0, 0);
         
         if (N[i].settings.alwaysFront) {
           this.renderer.gl.disable(this.renderer.gl.DEPTH_TEST);
@@ -8797,9 +8791,7 @@ molmil.addLabel = function(text, settings, soup) {
     };
   }
   
-  settings.fontSize = settings.fontSize || obj.settings.fontSize; settings.color = settings.color || obj.settings.color;
-  settings.textBaseline = settings.textBaseline || obj.settings.textBaseline;
-  settings.textAlign = settings.textAlign || obj.settings.textAlign;
+  var saa = Object.keys(obj.settings); for (var i=0; i<saa.length; i++) {if (! settings.hasOwnProperty(saa[i])) settings[saa[i]] = obj.settings[saa[i]];}
 
   var resolutionScaler = Math.max(soup.canvas.width/1920, soup.canvas.height/1080);
   
@@ -8820,7 +8812,7 @@ molmil.addLabel = function(text, settings, soup) {
     
     var Yoffset = 0;
     
-    if (obj.settings.addBorder) {
+    if (settings.addBorder) {
       h = tmp.length*settings.fontSize*1.25;
       w += settings.fontSize*.5;
       h += settings.fontSize*.5;
@@ -8830,8 +8822,16 @@ molmil.addLabel = function(text, settings, soup) {
     
     textCtx.canvas.width = w; textCtx.canvas.height = h;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
-    textCtx.fillStyle = 'white';
     textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
+    
+    if (settings.bg_color) {
+      textCtx.fillStyle = molmil.rgb2hex(settings.bg_color[0], settings.bg_color[1], settings.bg_color[2]);
+      textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, textCtx.canvas.width*.5, textCtx.canvas.height*.5, 0, 0, Math.PI * 2, false);
+      textCtx.lineWidth = 0;
+      textCtx.fill();      
+    }
+    
+    textCtx.fillStyle = molmil.rgb2hex(settings.color[0], settings.color[1], settings.color[2]);
 
     if (settings.textAlign == "left") {
       for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], 0, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
@@ -8843,14 +8843,16 @@ molmil.addLabel = function(text, settings, soup) {
       textCtx.textAlign = settings.textAlign = "center";
       for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
     }
-    
-    if (obj.settings.addBorder) {
+
+
+    if (settings.addBorder) {
+      if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
+      else textCtx.strokeStyle = "#000000";
       textCtx.beginPath();
       textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, (textCtx.canvas.width*.5)-settings.fontSize*.05, (textCtx.canvas.height*.5)-settings.fontSize*.05, 0, 0, Math.PI * 2, false);
       textCtx.lineWidth = settings.fontSize*.1;
       textCtx.stroke();
     }
-    
 
     var gl = soup.renderer.gl;
     var textTex = gl.createTexture();
