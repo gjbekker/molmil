@@ -15,7 +15,8 @@
     "backgroundColor": -1,
     "slabNear": -1,
     "slabFar": -1,
-    "slabColor": -1
+    "slabColor": -1,
+    "alpha": -1
   }
 }
 //#vertex
@@ -98,6 +99,10 @@ varying vec4 ex_Colour;
 varying vec3 ex_Colour;
 #endif
 
+#ifdef ALPHA_SET
+uniform float alpha;
+#endif
+
 const vec3 lightPos = vec3(50.0,50.0,100.0);
 
 varying float fogFactor;
@@ -135,7 +140,9 @@ void main() {
 #endif
   
 #ifdef ALPHA_MODE
-  vec4 color = vec4(vec3(lambertian), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
+  vec4 color = vec4(vec3(max(lambertian*ex_Colour.a, 0.2)), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
+#elif defined(ALPHA_SET)
+  vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0)*alpha;
 #else
   vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0);
 #endif
@@ -159,6 +166,12 @@ void main() {
 #ifdef ALPHA_MODE
   gl_FragColor.a = 1.0 - pow(max(1.0-ex_Colour.a,0.0), 1.0/max(abs(normal.z),0.01));
 #endif
+
+#ifdef ALPHA_SET
+  gl_FragColor.a = 1.0 - pow(max(1.0-alpha,0.0), 1.0/max(abs(normal.z),0.01));
+# endif
+
+
 
  #ifdef ENABLE_SLABCOLOR
   if (gl_FrontFacing == false) gl_FragColor = slabColor;

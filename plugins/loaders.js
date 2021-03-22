@@ -374,8 +374,6 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var head = document.getElementsByTagName("head")[0];
   if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/misc.js", this.load_ccp4, this, [buffer, filename, settings])) return;
   
-  if (buffer.buffer) buffer = buffer.buffer; // make sure we have the arraybuffer itself...
-  
   if (! settings) settings = {sigma: 1.0};
   if (buffer instanceof molmil.polygonObject) {
     var struct = buffer;
@@ -384,6 +382,7 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
     struct.programs = [];
   }
   else {
+    if (buffer.buffer) buffer = buffer.buffer; // make sure we have the arraybuffer itself...
     var struct = new molmil.polygonObject({filename: filename}); this.structures.push(struct);
     struct.options = []; struct.type = "isosurface"
     struct.buffer = buffer;
@@ -541,10 +540,10 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
     if (vertices[v2+2] < geomRanges[4]) geomRanges[4] = vertices[v2+2];
     if (vertices[v2+2] > geomRanges[5]) geomRanges[5] = vertices[v2+2];
     
-    vertices8[v3+24] = rgba[0];
-    vertices8[v3+25] = rgba[1];
-    vertices8[v3+26] = rgba[2];
-    vertices8[v3+27] = rgba[3];
+    vertices8[v3+24] = 255;
+    vertices8[v3+25] = 255;
+    vertices8[v3+26] = 255;
+    vertices8[v3+27] = 255;
   }
    
   var indices = new Int32Array(surf.faces.length*3);
@@ -563,7 +562,9 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   }
 
   struct.meta.COR = hihi; struct.meta.geomRanges = geomRanges;
-  
+
+  settings.wireframeIdxs = line_indices;
+  settings.triangleIdxs = indices;
   var program = molmil.geometry.build_simple_render_program(vertices, settings.solid ? indices : line_indices, this.renderer, settings);
   this.renderer.addProgram(program);
   struct.programs.push(program);
@@ -586,19 +587,35 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename, settings) {
   var offset = 0;
   var offsetCOR = settings.offsetCOR || null;
 
+  var primaryObject = {structures: [], options: [], meta: {filename: filename}};
+  this.structures.push(primaryObject);
+
   while (offset < buffer.byteLength) {
     var COR = [0, 0, 0, 0];
     var metadata = new Int32Array(buffer, offset, 4); offset += 16;
 
-    if (metadata[0] == 0) break
+    if (metadata[0] == 0) break;
     if (metadata[3]) {
       var name = molmil.decodeUtf8(new Uint8Array(buffer, offset, metadata[3])); offset += metadata[3] + (metadata[3]%4 != 0 ? 4-metadata[3]%4 : 0); // padding has to be skipped
     }
     else var name = "";
    
     var vertices_offset = offset;
-    var vertices = new Float32Array(buffer, offset, 7*metadata[1]); offset += 7*metadata[1]*4;
-    var indices = new Int32Array(buffer, offset, metadata[2]*3); offset += metadata[2]*3*4;
+    
+    if (metadata[0] == 3) {
+      var vertices = new Float32Array(buffer, offset, 7*metadata[1]);
+      offset += 7*metadata[1]*4;
+      var indices = new Int32Array(buffer, offset, metadata[2]*3); offset += metadata[2]*3*4;
+    }
+    else if (metadata[0] == 6) {
+      var vertices = new Float32Array(buffer, offset, 7*metadata[1]); 
+      var tmp = new Int32Array(buffer, offset, 7*metadata[1]);
+      tmp.forEach(function(x, i) {if (i%7 != 6) vertices[i] = x*.001;});
+      offset += 7*metadata[1]*4;
+      var indices = new Int32Array(buffer, offset, metadata[2]*3); offset += metadata[2]*3*4;
+    }
+    else {console.error("Unsupported MPBF type", metadata[0]); break;}
+    
 
     if (offsetCOR != null) {
       for (var i=0; i<vertices.length; i+=7) {
@@ -625,8 +642,8 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename, settings) {
       if (vertices[i+2] > geomRanges[5]) geomRanges[5] = vertices[i+2];
     }
     
-    var struct = new molmil.polygonObject({filename: filename, COR: COR}); this.structures.push(struct);
-    struct.options = [];
+    var struct = new molmil.polygonObject({COR: COR});
+    primaryObject.structures.push(struct);
     struct.meta.geomRanges = geomRanges;
     
     
@@ -635,10 +652,11 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename, settings) {
     struct.programs.push(program);
             
     // also add an entry to the structures menu for easy enabling/disabling
-    struct.options.push([name, program]);
+    primaryObject.options.push([name, program]);
 
     if (molmil.configBox.skipClearGeometryBuffer) {
       struct.data = struct.data || {};
+      struct.data.buffer = buffer;
       struct.data.vertexBuffer = vertices;
       struct.data.indexBuffer = indices;
       struct.data.vertexSize = 7;
@@ -653,7 +671,7 @@ molmil.viewer.prototype.load_MPBF = function(buffer, filename, settings) {
   
   if (molmil.geometry.onGenerate) molmil_dep.asyncStart(molmil.geometry.onGenerate[0], molmil.geometry.onGenerate[1], molmil.geometry.onGenerate[2], 0);
   
-  return struct;
+  return primaryObject;
   
 }
 

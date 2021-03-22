@@ -8,6 +8,12 @@
  *   See https://github.com/gjbekker/molmil/blob/master/LICENCE.md
  */
 
+:root {
+  --BACKGROUND_COLOR: 0, 0, 0;
+  --BACKGROUND_ALPHA: 0.5;
+  --FOREGROUND_COLOR: 255, 255, 255;
+}
+
 #console {
   border: 1px solid #888;
   width: 50%;
@@ -80,17 +86,6 @@
   vertical-align: top;
 }
 
-.molmil_popup_outer {
-  z-index: 20;
-  position: absolute;
-  top: 50%;
-  left: 50%; 
-}
-
-.entryLoaded .molmil_popup_outer {
-  display: none;
-}
-
 .molmil_popup_inner {
   position: relative;
   top: -50%;
@@ -106,6 +101,8 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+  
+  font-family: verdana, meiryo, sans-serif, Arial Unicode MS, Cambria Math;
 }
 
 .molmil_UI_LB {
@@ -136,6 +133,7 @@
   cursor: pointer;
   pointer-events: auto;
   padding: 0.5em;
+  color: rgb(var(--FOREGROUND_COLOR));
 }
 
 .molmil_UI_cl_input {
@@ -147,6 +145,11 @@
   width: calc(100% - 2em);
   pointer-events: auto;
   height: 1em;
+  
+
+  background-color: rgb(var(--BACKGROUND_COLOR));
+  color: rgb(var(--FOREGROUND_COLOR));
+  display: none;
 }
 
 .molmil_UI_cl_logbox {
@@ -165,6 +168,20 @@
   -ms-user-select: text !important;
   -o-user-select: text !important;
   user-select: text !important;
+  
+  backdrop-filter: blur(4px);
+  
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  color: rgb(var(--FOREGROUND_COLOR));
+  background-color: rgba(var(--BACKGROUND_COLOR), 0.25);
+  display: none;
+  
+  overflow: initial;
+  pointer-events: auto;
+}
+
+.molmil_UI_cl_logbox:hover {
+  background-color: rgba(var(--BACKGROUND_COLOR), 0.85);
 }
 
 .molmil_UI_LB_icon {
@@ -175,6 +192,8 @@
   width: 4em;
   height: 4em;
   display: inline-block;
+  backdrop-filter: blur(4px);
+  color: rgb(var(--FOREGROUND_COLOR));
 }
 
 .molmil_UI_RB {
@@ -191,12 +210,21 @@
   border-right: 0px;
   padding: .33em .5em 1em .5em;
   display: inline-block;
-  
+  backdrop-filter: blur(4px);
 }
 
-.molmil_UI_RB_icon:hover, .molmil_UI_LB_icon:hover {
-  background-color: silver;
+.molmil_UI_LB_icon:hover {
+  background-color: rgba(var(--BACKGROUND_COLOR), .67);
   cursor: pointer;
+  border-width: 2px;
+  margin: -1px;
+}
+
+.molmil_UI_RB_icon:hover {
+  background-color: rgba(var(--BACKGROUND_COLOR), .67);
+  cursor: pointer;
+  border-width: 2px;
+  margin: -1px 0 -1px -1px;
 }
 
 .molmil_UI_RM {
@@ -259,7 +287,7 @@
 }
 
 .optCat_k:hover {
-  color: black;
+  color: rgb(var(--FOREGROUND_COLOR));
 }
 
 .optCat_k+span {
@@ -351,6 +379,7 @@
   font-size: .8em;
   z-index: 9999;
   border-spacing: 0;
+  font-family: verdana, meiryo, sans-serif, Arial Unicode MS, Cambria Math;
 }
 
 #molmil_UI_complexMenu > tr:nth-child(1) > td {
@@ -397,4 +426,233 @@
 [contenteditable] {
     -webkit-user-select: text;
     user-select: text;
+}
+
+#styleif {
+  position: absolute;
+  top: 0;
+  
+  width: calc(100% - 20em);
+  left: 10em;
+  
+  pointer-events: none;
+  color: rgb(var(--FOREGROUND_COLOR));
+}
+
+#styleif > div {
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+}
+
+#styleif:hover > div {
+  background-color: rgba(var(--BACKGROUND_COLOR), .67);
+  backdrop-filter: blur(8px);
+}
+
+#styleif > :nth-child(1) {
+  height: 0px;
+
+  opacity: 0;
+  visibility: hidden;
+  
+  transition: opacity 0.3s ease-out;
+  font-size: .75em;
+}
+
+#styleif > :nth-child(1).visible {
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  border-top: none;
+  border-bottom-left-radius: 1em;
+  border-bottom-right-radius: 1em;
+  
+  padding: .33em .67em .33em .67em;
+  
+  opacity: 1;
+  visibility: visible;
+  height: 20em;
+  overflow: auto;
+  resize: vertical;
+  max-height: calc(100% - 10em);
+}
+
+#styleif > :nth-child(1) h1 {
+  margin: 0;
+}
+
+#styleif > :nth-child(1) hr {
+  margin-left: calc(-.75em + 1px);
+  margin-right: calc(-.75em + 1px);
+  background-color: rgb(var(--FOREGROUND_COLOR));
+  height: 1px;
+  border-width: 0;
+}
+
+#styleif > :nth-child(1) ul {
+  margin-top: 0;
+}
+
+#styleif > :nth-child(1) li {
+  list-style-type: none;
+  padding: .25em;
+  display: inline-block;
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  margin: .25em;
+  border-radius: 1em;
+}
+
+#styleif > :nth-child(1) li:hover {
+  cursor: pointer;
+  color: #C8323A;
+  border-color: #C8323A;
+}
+
+#styleif > :nth-child(2) {
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  border-top: none;
+  border-bottom-left-radius: 1em;
+  border-bottom-right-radius: 1em;
+  padding: .25em .5em .5em .5em;
+  
+  display: inline-block;
+  
+  margin-left: 50%;
+  transform: translate(-50%, 0);
+}
+
+#styleif > :nth-child(2):hover {
+  color: #C8323A;
+  cursor: pointer;
+}
+
+
+#styleif > :nth-child(3) {
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  border-radius: 1em;
+  padding: .25em;
+  margin-top: .25em;
+  
+  display: inline-block;
+  
+  margin-left: 50%;
+  transform: translate(-50%, 0);
+  
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease-out;
+}
+
+#styleif > :nth-child(3).visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+
+#styleif > :nth-child(3) > div {
+  padding: .25em;
+}
+
+
+
+
+#styleif > :nth-child(3) > div:hover {
+  color: #C8323A;
+  cursor: pointer;
+}
+
+canvas {
+  /*background-color: rgba(var(--BACKGROUND_COLOR), var(--BACKGROUND_ALPHA));*/
+}
+
+#styleif form {
+}
+
+#nw_edmap_dl {
+  margin-left: 1em;  
+}
+
+#nw_edmap_dl a {
+  margin-right: 1em;
+}
+
+#nw_edmap_dl a:hover {
+  color: #C8323A;
+}
+
+#nw_edmap_dl div {
+  display: inline-block;
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+  padding: 0 .25em 0 .25em;
+}
+
+#nw_edmap_dl div > :nth-child(1):hover, #nw_edmap_dl div > :nth-child(2):hover {
+  cursor: pointer;
+  color: #C8323A;
+}
+
+#nw_edmap_dl div > :nth-child(1) {
+}
+
+#nw_edmap_dl div > :nth-child(2) {
+  margin: 0 0 0 .25em;
+  display: inline-block;
+  font-size: 2em;
+}
+
+
+.dragdiv {
+  position: absolute;
+  z-index: 11;
+  background-color: white;
+  border: 1px solid rgb(var(--FOREGROUND_COLOR));
+  padding: 1em;
+}
+
+.dragdiv > :first-child {
+  padding: 0 1em 1em 1em;
+  margin: 0 -1em 1em -1em;
+  cursor: move;
+  z-index: 12;
+  border-bottom: 1px solid rgb(var(--FOREGROUND_COLOR));
+  font-weight: bold;
+}
+
+#nw_site_tbl {
+  width: 100%;
+  font-size: inherit;
+  margin-bottom: 2em;
+}
+
+#nw_site_tbl td[rowspan]{
+  vertical-align: top;
+  width: 2em;
+}
+
+#nw_site_tbl input {
+  cursor: pointer;
+}
+
+#nw_site_tbl td[colspan]{
+  background-color: rgb(0, 51, 102);
+  font-weight: bold;
+  padding: .25em;
+  cursor: pointer;
+}
+
+#nw_site_tbl td:not([rowspan]):nth-child(1){
+  color: rgb(204, 0, 0);
+  width: 8em;
+}
+
+#nw_align table {
+  font-family: monospace;
+  white-space: pre;
+}
+
+#nw_align .nw_align_align {
+  color: grey;
+}
+
+#nw_align table b {
+  color: green;
 }

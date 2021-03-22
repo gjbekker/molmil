@@ -12,6 +12,8 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     move: molmil.commandLines.pyMol.moveCommand,
     fetch: molmil.commandLines.pyMol.fetchCommand,
     "fetch-cc": molmil.commandLines.pyMol.fetchCCCommand,
+    "fetch-chain": molmil.commandLines.pyMol.fetchChainCommand,
+    efsite: molmil.commandLines.pyMol.efsiteCommand,
     load: molmil.commandLines.pyMol.loadCommand,
     mplay: molmil.commandLines.pyMol.mplayCommand,
     mstop: molmil.commandLines.pyMol.mstopCommand,
@@ -32,6 +34,9 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     alter: molmil.commandLines.pyMol.alterCommand,
     indicate: molmil.commandLines.pyMol.indicateCommand,
     png: molmil.commandLines.pyMol.pngCommand,
+    repr: molmil.commandLines.pyMol.reprCommand,
+    "style-if": molmil.commandLines.pyMol.styleifCommand,
+    align: molmil.commandLines.pyMol.alignCommand,
     quit: molmil.commandLines.pyMol.quitCommand
   };
   this.altCommandIF = molmil.commandLines.pyMol.tryExecute;
@@ -157,6 +162,27 @@ molmil.commandLines.pyMol.pngCommand = function(env, command) {
   return true;
 }
 
+molmil.commandLines.pyMol.reprCommand = function(env, command) {
+  command = command.match(/repr[\s]+([^\s,]+)[\s]*(,[\s]*(.*))?/), options = {};
+  try {molmil.commandLines.pyMol.repr.apply(env, [(command[1]||"").trim(), (command[2]||"").trim().trim().substr(1).trim()]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
+molmil.commandLines.pyMol.styleifCommand = function(env, command) {
+  command = command.match(/style-if[\s]*(.*)?[\s]*/);
+  try {molmil.commandLines.pyMol.styleif.apply(env, [command[1] ? command[1].trim() : null]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
+molmil.commandLines.pyMol.alignCommand = function(env, command) {
+  command = command.match(/align[\s]+(.*),[\s]*(.*)[\s]*/);
+  try {molmil.commandLines.pyMol.align.apply(env, [command[1], command[2]]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
 molmil.commandLines.pyMol.quitCommand = function(env, command) {
   if (molmil.configBox.customExitFunction) molmil.configBox.customExitFunction();
   else {} // ??
@@ -276,10 +302,12 @@ molmil.commandLines.pyMol.fetchCommand = function(env, command) {
   var cmd = command.match(/fetch[\s]+([a-zA-Z0-9]{4})/);
   if (cmd != null) {
     var cb = function(soup, struc) {
+      struc.meta.pdbid = cmd[1].trim().toLowerCase();
       if (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints)) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
       else molmil.displayEntry(struc, 1);
       molmil.colorEntry(struc, 1);
       soup.renderer.rebuildRequired = true;
+      env.fileObjects[cmd[1].trim()] = struc;
     };
     
     try {molmil.loadPDB(cmd[1], cb);}
@@ -288,6 +316,88 @@ molmil.commandLines.pyMol.fetchCommand = function(env, command) {
   else return false;
   return true;
 }
+
+molmil.commandLines.pyMol.fetchChainCommand = function(env, command) {
+  var cmd = command.match(/fetch-chain[\s]+(.*?)$/);
+  if (cmd != null) {
+    var cb = function(soup, struc) {
+      if (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints)) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
+      else molmil.displayEntry(struc, 1);
+      molmil.colorEntry(struc, 1);
+      soup.renderer.rebuildRequired = true;
+      env.fileObjects[cmd[1].trim()] = struc;
+    };
+    
+    try {molmil.loadPDBchain(cmd[1].trim(), cb);}
+    catch (e) {console.error(e); return false;}
+  }
+  else return false;
+  return true;
+}
+
+molmil.commandLines.pyMol.efsiteCommand = function(env, command) {
+  var cmd = command.match(/efsite[\s]+(.*?)$/);
+  
+  if (cmd != null) {
+    var efsite_id = cmd[1];
+    
+    var pdbid = cmd[1].split("-")[0].split("_")[0], proteinStruc;
+    
+    var pdb_cb = function(soup, struc) {
+      // delete whatever chains are not required...
+      // if nmr structure, set the correct model id
+      struc.meta.pdbid = pdbid;
+      var model_id = 0, auth_chains = [];
+      
+      if (cmd[1].indexOf("_") != -1) model_id = parseInt(cmd[1].split("_")[1].split("-")[0])-1;
+      if (cmd[1].indexOf("-") != -1) auth_chains = cmd[1].split("-")[1].split(",").filter(function(x){return x.trim();});
+      
+      if (auth_chains.length) {
+        for (var c=0; c<struc.chains.length; c++) {
+          if (! auth_chains.includes(struc.chains[c].authName)) {
+            struc.chains.splice(c, 1);
+            c--;
+          }
+        }
+      }
+      
+      if (model_id) molmil.geometry.modelId = soup.renderer.modelId = model_id;
+      proteinStruc = struc;
+    };
+    
+    var mpbf_cb = function(soup, obj) {
+      if (proteinStruc === undefined) return molmil_dep.asyncStart(mpbf_cb, [], null, 100);
+      obj.structures.forEach(function(obj) {
+        obj.programs[0].settings.alphaSet = 0.5;
+        if (proteinStruc.structureTransform != null) {
+          var normalMat = molmil.normalFromMat3(proteinStruc.structureTransform, mat3.create());
+          for (var i=0; i<obj.data.vertexBuffer.length; i+=7) {
+            temp = new Float32Array(obj.data.buffer, obj.data.vertices_offset+(i*4), 3);
+            vec3.transformMat3(temp, temp, proteinStruc.structureTransform);
+            
+            temp = new Float32Array(obj.data.buffer, obj.data.vertices_offset+(i*4)+12, 3);
+            vec3.transformMat3(temp, temp, normalMat);
+          }
+        }
+        obj.programs[0].rebuild(proteinStruc.structureTransform != null);
+      });
+      soup.renderer.rebuildRequired = true;
+    }
+
+    molmil.loadPDB(pdbid, pdb_cb);
+    molmil.cli_soup.loadStructure(molmil.settings.data_url+"efsite/data_web/"+efsite_id+".mpbf", "mpbf", mpbf_cb, {});
+    
+    return true;
+  }
+  else return false;
+  
+  /*
+   - fetch pdb entry -> delete chains that are not required
+   - fetch efsite entry -> do extra handling if required
+  */
+}
+
+
 
 molmil.commandLines.pyMol.fetchCCCommand = function(env, command) {
   var cmd = command.match(/fetch-cc[\s]+([a-zA-Z0-9]*)/);
@@ -384,7 +494,6 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     expr = expr.substring(0, i) + "(" + expr.substring(i, j) + ")" + expr.substring(j);
     i = j;
   }
-  
   
   var executeExpr = function (expr2exe) {
     if (! expr2exe) return;
@@ -715,7 +824,10 @@ molmil.commandLines.pyMol.indicate = function(atoms) {
 }
 
 molmil.commandLines.pyMol.png = function(filename) {
+  if (! filename && ! navigator.clipboard) filename = "image.png";
+  
   if (filename && ! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", arguments.callee, this, [filename]);
+  console.log(molmil.configBox.keepBackgroundColor);
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) {
     var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
   }
@@ -736,6 +848,64 @@ molmil.commandLines.pyMol.png = function(filename) {
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
   canvas.update = true; canvas.renderer.render();
   
+  return true;
+}
+
+molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
+  mode = mode.trim();
+  var optionsObj = {};
+  options.split(",").map(function(x) {return x.split("=").map(function(y) {return y.trim();})}).filter(function(x){return x[0];}).forEach(function (x) {optionsObj[x[0]] = x[1];});
+  // some kind of options parser...
+
+  var soup = this.cli_soup;
+  
+  if (mode == "au") {
+    molmil.orient(null, soup);
+    return molmil.quickModelColor("newweb-au", {do_styling: true}, soup);
+  }
+  else if (mode == "bu") {
+    // make sure that misc.js has been loaded => this will be so much easier to do when async/await is used instead of the current mess...
+    if (! molmil.figureOutAssemblyId) { // download misc.js & block execution
+      soup.downloadInProgress++;
+      return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", molmil.commandLines.pyMol.repr, this, [mode, options, true]);
+    }
+    if (afterDL) delete soup.downloadInProgress--; // unblock execution
+    
+    molmil.quickModelColor("newweb-au", {do_styling: true}, soup);
+    
+    optionsObj.assembly_id = optionsObj.assembly_id || molmil.figureOutAssemblyId(soup.pdbxData, soup.BUassemblies);
+    if (! optionsObj.displayMode) {
+      var sceneBU = molmil.buCheck(optionsObj.assembly_id, 3, 2, null, soup);
+      if (sceneBU.NOC > 1 && sceneBU.isBU && (sceneBU.type == 2 || sceneBU.size > 30000)) optionsObj.displayMode = optionsObj.displayMode || 5;
+      else optionsObj.displayMode = optionsObj.displayMode || 3;
+    }
+    optionsObj.colorMode = optionsObj.colorMode || 2;
+    molmil.selectBU(optionsObj.assembly_id, optionsObj.displayMode, optionsObj.colorMode, {orient: true}, soup.structures.slice(-1)[0], soup);
+    return;
+  }
+  else if (mode == "objects") {
+    molmil.orient(null, soup);
+    return molmil.quickModelColor("chain", {carbonOnly: true}, soup);
+  }
+  else {
+    molmil.orient(null, soup);
+    return molmil.quickModelColor(mode, {}, soup);
+  }
+  this.console.log("repr command is to be implemented", mode, options);
+}
+
+molmil.commandLines.pyMol.styleif = function(cmds) {
+  if (! this.cli_soup.canvas.setupDone) return molmil_dep.asyncStart(molmil.commandLines.pyMol.styleif, [cmds], this, 100);
+  cmds = cmds.split(",").map(function(x){return x.trim()})
+  this.cli_soup.UI.styleif(cmds[0], cmds.slice(1));
+}
+
+molmil.commandLines.pyMol.align = function(obj1, obj2) {
+  if (! (obj1 in this.fileObjects)) return this.console.log("Unknown object", obj1);
+  if (! (obj2 in this.fileObjects)) return this.console.log("Unknown object", obj2);
+  
+  // maybe later implement something smart so that specific chains can be extracted, e.g. obj1:A, obj2:B
+  molmil.align(this.fileObjects[obj1].chains[0], this.fileObjects[obj2].chains[0]);
   return true;
 }
 
@@ -793,9 +963,9 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
     settings.alphaMode = false;
     var struct = soup.load_ccp4(this.request.response, "edmap mesh", settings);
     struct.meta.idnr = "#"+(soup.SID++);
-    delete soup.downloadInProgress;
+    soup.downloadInProgress--;
   };
-  soup.downloadInProgress = true;
+  soup.downloadInProgress++;
   request.OnError = function() {this.console.error("Unable to retrieve map...");};
   request.Send("https://pdbj.org/rest/edmap2");
 }

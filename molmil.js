@@ -26,14 +26,20 @@ molmil.vrOrient = [0, 0, 0, 0];
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
-  src: "/molmil/",
-  pdb_url: "https://pdbj.org/rest/displayPDBfile?format=mmjson-all&id=__ID__",
-  comp_url: "https://pdbj.org/rest/displayCOMPfile?format=mmjson&id=__ID__",
+  src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
+  pdb_url: "http://192.168.39.64:8082/pdbjplus/data/pdb/mmjson/__ID__.json",
+  pdb_chain_url: "http://192.168.39.64:8082/pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
+  comp_url: "http://192.168.39.64:8082/pdbjplus/data/cc/mmjson/__ID__.json",
+  data_url: "http://192.168.39.64:8082/",
+  newweb_rest: "http://192.168.39.64/rest/newweb/",
+  
+  /* deprecate the below */
   promodeE_check_url: "https://pdbj.org/rest/quick_search?fields=5&query=__ID__",
   promodeE_base_structure_url: "https://pdbj.org/rest/displayPromodeEfile?format=min&id=__ID__",
   promodeE_mode_vectors_url: "https://pdbj.org/rest/displayPromodeEfile?format=vec&id=__ID_____MODE__",
   promodeE_animation_url: "https://pdbj.org/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
   
+  /* change the implementation to force usage of molmil-app */
   molmil_video_url: "http://127.0.0.1:8080/app/",
   dependencies: ["lib/gl-matrix-min.js"],
 };
@@ -263,9 +269,12 @@ molmil.configBox = {
     ["shaders/atomSelection.glsl"], 
 //    ["shaders/imposterPoints.glsl", "points", "", ["EXT_frag_depth"]], // upgrade this to webgl2...
     ["shaders/lines.glsl", "lines_uniform_color", "#define UNIFORM_COLOR 1\n"],
+    ["shaders/alpha_dummy.glsl", "alpha_dummy", ""],
     ["shaders/standard.glsl", "standard_alpha", "#define ALPHA_MODE 1\n"],
+    ["shaders/standard.glsl", "standard_alphaSet", "#define ALPHA_SET 1\n"],
     ["shaders/standard.glsl", "standard_uniform_color", "#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
+    ["shaders/standard.glsl", "standard_alphaSet_uniform_color", "#define ALPHA_SET 1\n#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_slab", "#define ENABLE_SLAB 1\n"], // standard_slab
     ["shaders/standard.glsl", "standard_slabColor", "#define ENABLE_SLAB 1\n#define ENABLE_SLABCOLOR 1\n"], // standard_slabColor
     //["shaders/imposterPoints.glsl", "points_uniform_color", "#define UNIFORM_COLOR 1\n", ["EXT_frag_depth"]],  // upgrade this to webgl2...
@@ -366,86 +375,38 @@ molmil.initSettings = function () {
   cifDicLocJSON = "https://pdbj.org/molmil-data/mmcif_pdbx_v50_summary.json";
   cifDicLoc = "https://pdbj.org/molmil-data/mmcif_pdbx_v50.dic";
   
-  var colors, cmode = molmil.settings_COLORS || molmil.localStorageGET("molmil.settings_COLORS", 1);
-  if (cmode == 2) {
-    colors = {
-      DUMMY: [255, 20, 147],
-      H: [255, 255, 255],
-      D: [255, 255, 255],
-      C: [144,144,144],
-      N: [48,80,248],
-      O: [255,13,13],
-      S: [255,255,48],
-      Cl: [31,240,31],
-      B: [255,181,181],
-      P: [255,128,0],
-      Fe: [224,102,51],
-      Ba: [0,201,0],
-      Mg: [138,255,0],
-      Zn: [125,128,176],
-      Cu: [200,128,51],
-      Ni: [80,208,80],
-      Br: [165, 42, 42],
-      Ca: [61,255,0],
-      Mn: [156,122,199],
-      Al: [191,166,166],
-      Ti: [191,194,199],
-      Cr: [138,153,199],
-      Ag: [192,192,192],
-      F: [144,224,80],
-      Si: [240,200,160],
-      Au: [255,209,35],
-      I: [148,0,148],
-      Li: [204,128,255],
-      He: [217,255,255]
-    };
-  }
-  else if (cmode == 3) {
-    colors = {
-      DUMMY: [255, 127, 0],
-      H: [204, 204, 204],
-      D: [204, 204, 204],
-      C: [0,255,255],
-      N: [0,0,255],
-      O: [255,0,0],
-      P: [255,255,0],
-      S: [0,255,0],
-    };
-  }
-  else {
-    colors = {
-      DUMMY: [255, 20, 147],
-      H: [255, 255, 255],
-      D: [255, 255, 255],
-      C: [200, 200, 200],
-      N: [143, 143, 255],
-      O: [240, 0, 0],
-      S: [255, 200, 50],
-      Cl: [0, 255, 0],
-      Na: [0, 0, 255],
-      B: [0, 255, 0],
-      P: [255, 165, 0],
-      Fe: [255, 165, 0],
-      Ba: [255, 165, 0],
-      Mg: [34, 139, 34],
-      Zn: [165, 42, 42],
-      Cu: [165, 42, 42],
-      Ni: [165, 42, 42],
-      Br: [165, 42, 42],
-      Ca: [128, 128, 144],
-      Mn: [128, 128, 144],
-      Al: [128, 128, 144],
-      Ti: [128, 128, 144],
-      Cr: [128, 128, 144],
-      Ag: [128, 128, 144],
-      F: [218, 165, 32],
-      Si: [218, 165, 32],
-      Au: [218, 165, 32],
-      I: [160, 32, 240],
-      Li: [178, 34, 34],
-      He: [255, 192, 203]
-    };
-  }
+  var colors = {
+    DUMMY: [255, 20, 147],
+    H: [255, 255, 255],
+    D: [255, 255, 255],
+    C: [200, 200, 200],
+    N: [143, 143, 255],
+    O: [240, 0, 0],
+    S: [255, 200, 50],
+    Cl: [0, 255, 0],
+    Na: [0, 0, 255],
+    B: [0, 255, 0],
+    P: [255, 165, 0],
+    Fe: [255, 165, 0],
+    Ba: [255, 165, 0],
+    Mg: [34, 139, 34],
+    Zn: [165, 42, 42],
+    Cu: [165, 42, 42],
+    Ni: [165, 42, 42],
+    Br: [165, 42, 42],
+    Ca: [128, 128, 144],
+    Mn: [128, 128, 144],
+    Al: [128, 128, 144],
+    Ti: [128, 128, 144],
+    Cr: [128, 128, 144],
+    Ag: [128, 128, 144],
+    F: [218, 165, 32],
+    Si: [218, 165, 32],
+    Au: [218, 165, 32],
+    I: [160, 32, 240],
+    Li: [178, 34, 34],
+    He: [255, 192, 203]
+  };
  
   molmil.configBox.elementColors = {};
   for (var e in colors) molmil.configBox.elementColors[e] = [colors[e][0], colors[e][1], colors[e][2], 255];
@@ -466,6 +427,14 @@ molmil.initSettings = function () {
     try {molmil.configBox.BGCOLOR = JSON.parse(tmp);}
     catch (e) {}
   }
+  
+  molmil.configBox.keepBackgroundColor = molmil.localStorageGET("molmil.settings_keepBackgroundColor") == 1;
+  
+  var fgcolor = molmil.hex2rgb(molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255)));
+
+  let root = document.documentElement;
+  root.style.setProperty("--BACKGROUND_COLOR", (molmil.configBox.BGCOLOR[0]*255).toFixed()+","+(molmil.configBox.BGCOLOR[1]*255).toFixed()+","+(molmil.configBox.BGCOLOR[2]*255).toFixed());
+  root.style.setProperty("--FOREGROUND_COLOR", (fgcolor[0]*255).toFixed()+","+(fgcolor[1]*255).toFixed()+","+(fgcolor[2]*255).toFixed());
 }
 
 // display modes
@@ -642,6 +611,7 @@ molmil.viewer = function (canvas) {
   this.defaultCanvas = [canvas, this.renderer];
   
   this.onAtomPick = function() {};
+  this.downloadInProgress = 0;
   
   this.clear();
 };
@@ -919,7 +889,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
 
   var preloadLoadersJS = [molmil.settings.src+"plugins/loaders.js"];
   
-  this.downloadInProgress = true;
+  this.downloadInProgress++;
   
   settings = settings || {};
   var gz = loc.substr(-3).toLowerCase() == ".gz" && ! settings.no_pako_gz;
@@ -1112,7 +1082,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
 
   request.ondone = ondone;
   request.OnDone = function() {
-    delete this.target.downloadInProgress;
+    this.target.downloadInProgress--;
     
     var structures = this.parse();
     if (! structures) return;
@@ -1608,6 +1578,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
     //var entryId = Object.keys(mmjso)[0].substr(5).split("-")[0];
     var entryId = entries[e].substr(5).split("-")[0];
     var pdb = mmjso[entries[e]];
+
     var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || null;
     
     if (! atom_site) continue;
@@ -1734,6 +1705,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       this.atomRef[atom.AID] = atom;
     }
     
+    if (pdb.meta_pdbjplus) {
+      currentChain.name = pdb.meta_pdbjplus.auth_asym_id;
+      currentChain.authName = pdb.meta_pdbjplus.label_asym_id;
+      struc.meta.pdbid = pdb.meta_pdbjplus.pdbid;
+    }
+    
+    struc.structureTransform = null;
     if (pdb.hasOwnProperty("atom_sites")) {
       var scaleN = [pdb.atom_sites["fract_transf_matrix[1][1]"], pdb.atom_sites["fract_transf_matrix[1][2]"], pdb.atom_sites["fract_transf_matrix[1][3]"], pdb.atom_sites["fract_transf_matrix[2][1]"], pdb.atom_sites["fract_transf_matrix[2][2]"], pdb.atom_sites["fract_transf_matrix[2][3]"], pdb.atom_sites["fract_transf_matrix[3][1]"], pdb.atom_sites["fract_transf_matrix[3][2]"], pdb.atom_sites["fract_transf_matrix[3][3]"]];
       
@@ -1787,8 +1765,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         R[8] += uvw[2]*uvw[2]*(1-rcos);
         
         mat3.transpose(R, R);
-        
-        
+        struc.structureTransform = R;
+
         var temp = [0, 0, 0], c, i;
         for (c=0; c<struc.chains.length; c++) {
           currentChain = struc.chains[c];
@@ -2021,6 +1999,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
     }
     
     this.pdbxData = pdb;
+    struc.meta.pdbxData = pdb;
     if (! settings.skipDeleteJSO) delete pdb.atom_site;
   }
 
@@ -2463,8 +2442,9 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   
   if (! settings.solid && ! settings.lines_render && ! program.rebuild) {settings.solid = true; program.toggleWF();}
   
-  program.rebuild = function() {
-    molmil.geometry.build_simple_render_program(null, null, this.renderer, this);
+  program.rebuild = function(resetBuffers) {
+    if (resetBuffers) molmil.geometry.build_simple_render_program(vertices_, indices_, this.renderer, this);
+    else molmil.geometry.build_simple_render_program(null, null, this.renderer, this);
   };
   
   program.angle = renderer.angle;
@@ -2472,13 +2452,21 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   program.point_shader = renderer.shaders.points;
   if (program.point_shader) program.point_attributes = program.point_shader.attributes;
   
-  if (settings.uniform_color) {
-    program.standard_shader = renderer.shaders.standard_uniform_color;
+  if (settings.uniform_color || settings.rgba) {
+    if (settings.alphaSet) {
+      program.pre_shader = renderer.shaders.alpha_dummy;
+      program.standard_shader = renderer.shaders.standard_alphaSet_uniform_color;
+    }
+    else program.standard_shader = renderer.shaders.standard_uniform_color;
     program.wireframe_shader = renderer.shaders.lines_uniform_color;
     program.point_shader = renderer.shaders.points_uniform_color;
   }
   else {
     if (settings.alphaMode) program.standard_shader = renderer.shaders.standard_alpha;
+    else if (settings.alphaSet) {
+      program.pre_shader = renderer.shaders.alpha_dummy;
+      program.standard_shader = renderer.shaders.standard_alphaSet;
+    }
     else if (settings.slab) {
       if (settings.slabColor) program.standard_shader = renderer.shaders.standard_slabColor;
       else program.standard_shader = renderer.shaders.standard_slab;
@@ -2490,6 +2478,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   }
 
   program.standard_attributes = program.standard_shader.attributes;
+  if (program.pre_shader) program.pre_attributes = program.pre_shader.attributes;
   program.wireframe_attributes = program.wireframe_shader.attributes;
   
   //program.point_attributes = program.point_shader.attributes;
@@ -2520,7 +2509,8 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     
     this.renderer.gl.enable(this.renderer.gl.DEPTH_TEST);
     
-    if (this.settings.uniform_color) this.renderer.gl.uniform3f(this.point_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
+    if (this.settings.rgba) this.renderer.gl.uniform3f(this.point_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255);
+    else if (this.settings.uniform_color) this.renderer.gl.uniform3f(this.point_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
     
     if (this.renderer.settings.slab) {
       this.renderer.gl.uniform1f(this.point_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
@@ -2537,14 +2527,14 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     if (this.settings.has_ID) {
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 28, 0);
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_radius, 1, this.renderer.gl.FLOAT, false, 28, 12);
-      molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 16);
+      if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 16);
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_ScreenSpaceOffset, 2, this.renderer.gl.SHORT, false, 28, 20);
       //molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_ID, 1, this.renderer.gl.FLOAT, false, 28, 24);
     }
     else {
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 24, 0);
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_radius, 1, this.renderer.gl.FLOAT, false, 24, 12);
-      molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 24, 16);
+      if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 24, 16);
       molmil.bindAttribute(this.renderer.gl, this.point_attributes.in_ScreenSpaceOffset, 2, this.renderer.gl.SHORT, false, 24, 20);
     }
     molmil.clearAttributes(this.renderer.gl);
@@ -2571,7 +2561,8 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     this.renderer.gl.uniform3f(this.wireframe_shader.uniforms.COR, COR[0], COR[1], COR[2]);
     this.renderer.gl.uniform1f(this.wireframe_shader.uniforms.focus, this.renderer.fogStart);
     this.renderer.gl.uniform1f(this.wireframe_shader.uniforms.fogSpan, this.renderer.fogSpan);
-    if (this.settings.uniform_color) this.renderer.gl.uniform3f(this.wireframe_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
+    if (this.settings.rgba) this.renderer.gl.uniform3f(this.wireframe_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255);
+    else if (this.settings.uniform_color) this.renderer.gl.uniform3f(this.wireframe_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
     
     if (this.renderer.settings.slab) {
       this.renderer.gl.uniform1f(this.wireframe_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
@@ -2587,25 +2578,25 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     if (this.settings.lines_render) {      
       if (this.settings.has_ID) {
         molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 20, 0);
-        if (! this.settings.uniform_color) molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 20, 12);
+        if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 20, 12);
         //molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_ID, 1, this.renderer.gl.FLOAT, false, 20, 16);
       }
       else {
         molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 16, 0);
-        molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 16, 12);
+        if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 16, 12);
       }
     }
     else {
       if (this.settings.has_ID) {
         molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 32, 0);
         //molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Normal, 3, this.renderer.gl.FLOAT, false, 32, 12);
-        molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 32, 24);
+        if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 32, 24);
         //molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_ID, 1, this.renderer.gl.FLOAT, false, 32, 28);
       }
       else {
         molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 28, 0);
         //molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Normal, 3, this.renderer.gl.FLOAT, false, 28, 12);
-        molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 24);
+        if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.wireframe_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 24);
       }
     }
     molmil.clearAttributes(this.renderer.gl);
@@ -2618,20 +2609,61 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     }
     else this.renderer.gl.drawElements(this.renderer.gl.LINES, this.nElements, this.renderer.gl.INDEXINT, 0);
   };
-     
-  program.standard_render = function(modelViewMatrix, COR, i) {
+  
+  program.alphaPre = function(modelViewMatrix, COR) {
+    this.renderer.gl.useProgram(this.pre_shader.program);
+    
+    this.renderer.gl.uniformMatrix4fv(this.pre_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.renderer.gl.uniformMatrix4fv(this.pre_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.renderer.gl.uniform3f(this.pre_shader.uniforms.COR, COR[0], COR[1], COR[2]);
+
+    this.renderer.gl.bindBuffer(this.renderer.gl.ARRAY_BUFFER, this.vertexBuffer); 
+    
+    molmil.resetAttributes(this.renderer.gl);
+    
+    if (this.settings.has_ID) {
+      molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 32, 0);
+    }
+    else {
+      molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 28, 0);
+    }
+    molmil.clearAttributes(this.renderer.gl);
+    
+    this.renderer.gl.bindBuffer(this.renderer.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+
+    this.renderer.gl.colorMask(false, false, false, false);
+
+    if (this.angle) { // angle sucks, it only allows a maximum of 3M "vertices" to be drawn per call...
+      var dv = 0, vtd;
+      while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, vtd, this.renderer.gl.INDEXINT, dv*4); dv += vtd;}
+    }
+    else this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, this.nElements, this.renderer.gl.INDEXINT, 0);
+    
+    this.renderer.gl.colorMask(true, true, true, true);
+  }
+  
+  program.standard_render = function(modelViewMatrix, COR, i, preMode) {
     if (! this.status) return;
+    if ((this.settings.alphaSet || this.settings.alphaMode) && preMode === undefined) {
+      if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
+      this.alphaPre(modelViewMatrix, COR);
+    }
     i = i || 0;
     var normalMatrix = mat3.create();
     mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-    this.renderer.gl.useProgram(this.standard_shader.program);
+    if (preMode) this.renderer.gl.useProgram(this.pre_shader.program);
+    else this.renderer.gl.useProgram(this.standard_shader.program);
     this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
     this.renderer.gl.uniformMatrix3fv(this.standard_shader.uniforms.normalMatrix, false, normalMatrix);
     this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
     this.renderer.gl.uniform3f(this.standard_shader.uniforms.COR, COR[0], COR[1], COR[2]);
     this.renderer.gl.uniform1f(this.standard_shader.uniforms.focus, this.renderer.fogStart);
     this.renderer.gl.uniform1f(this.standard_shader.uniforms.fogSpan, this.renderer.fogSpan);
-    if (this.settings.uniform_color) {
+    if (this.settings.rgba) {
+      if (this.settings.alphaMode) this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255, this.settings.rgba[3]/255);
+      else this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255);
+    }
+    else if (this.settings.uniform_color) {
       if (this.settings.alphaMode) this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255, this.uniform_color[i][3]/255);
       else this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
     }
@@ -2647,6 +2679,10 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
       this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
     }
+    
+    if ("alphaSet" in this.settings) {
+      this.renderer.gl.uniform1f(this.standard_shader.uniforms.alpha, this.settings.alphaSet);
+    }
   
         
     this.renderer.gl.bindBuffer(this.renderer.gl.ARRAY_BUFFER, this.vertexBuffer); 
@@ -2661,16 +2697,14 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     else {
       molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 28, 0);
       molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Normal, 3, this.renderer.gl.FLOAT, false, 28, 12);
-      if (! this.settings.uniform_color) molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 24);
+      if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 24);
     }
     molmil.clearAttributes(this.renderer.gl);
     
-    if (this.settings.alphaMode) { // it's not actually making the stuff transparent...
-      if (! molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
+    if (this.settings.alphaMode || "alphaSet" in this.settings) {
       this.renderer.gl.enable(this.renderer.gl.BLEND);
       this.renderer.gl.blendEquation(this.renderer.gl.FUNC_ADD); 
       this.renderer.gl.blendFunc(this.renderer.gl.SRC_ALPHA, this.renderer.gl.ONE_MINUS_SRC_ALPHA);
-      this.renderer.gl.depthMask(false);
     }
     
     this.renderer.gl.bindBuffer(this.renderer.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
@@ -2681,10 +2715,9 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     }
     else this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, this.nElements, this.renderer.gl.INDEXINT, 0);
     
-    if (this.settings.alphaMode) {
-      if (! molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
+    if (this.settings.alphaMode || "alphaSet" in this.settings) {
+      if (molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
       this.renderer.gl.disable(this.renderer.gl.BLEND);
-      this.renderer.gl.depthMask(true);
     }
     
   };
@@ -5918,11 +5951,11 @@ molmil.render.prototype.renderPicking = function() {
 
 molmil.render.prototype.renderPrograms = function(COR) {
   for (var p=0; p<this.programs.length; p++) {
-    if (this.programs[p].nElements && this.programs[p].status && ! this.programs[p].settings.alphaMode) this.programs[p].render(this.modelViewMatrix, COR);
+    if (this.programs[p].nElements && this.programs[p].status && ! (this.programs[p].settings.alphaMode || "alphaSet" in this.programs[p].settings)) this.programs[p].render(this.modelViewMatrix, COR);
   }
   
   for (var p=0; p<this.programs.length; p++) {
-    if (this.programs[p].nElements && this.programs[p].status && this.programs[p].settings.alphaMode) this.programs[p].render(this.modelViewMatrix, COR);
+    if (this.programs[p].nElements && this.programs[p].status && (this.programs[p].settings.alphaMode || "alphaSet" in this.programs[p].settings)) this.programs[p].render(this.modelViewMatrix, COR);
   }
   
   // pass1: render only opaque meshes (standard)
@@ -7257,9 +7290,59 @@ molmil.quickModelColor = function(type, options, soup) {
     var list = molmil.interpolateBR(soup.structures.length);
     for (var i=0; i<list.length; i++) applyColor(soup.structures[i], list[i]);
   }
-  if (type == "chain") {
+  else if (type == "chain") {
     var list = molmil.configBox.bu_colors;
     for (var i=0; i<soup.structures.length; i++) applyColor(soup.structures[i], list[i]);
+  }
+  else if (type == "newweb-au" || type == "newweb-au-sc") {
+    
+    var c, chain, a;
+    if (type == "newweb-au") {
+      for (c=0; c<soup.chains.length; c++) {
+        chain = soup.chains[c];
+        chain.molWeight = 0.0;
+        for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
+      }
+    }
+    molmil.displayEntry(soup.structures, molmil.displayMode_Default, false, soup, {newweb: true});
+    if (type == "newweb-au-sc") molmil.displayEntry(soup.structures, molmil.displayMode_Stick_SC, false, soup);
+    
+    var c, chain, m, mol, a, list;
+    for (c=0; c<soup.chains.length; c++) {
+      chain = soup.chains[c];
+      if (chain.molecules.length > 1) list = molmil.interpolateBR(chain.molecules.length);
+      else list = [[255, 255, 255, 255]];
+      for (m=0; m<chain.molecules.length; m++) {
+        mol = chain.molecules[m];
+        mol.rgba = list[m];
+        for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);
+      }
+    }
+  }
+  else if (type == "cartoon" || type == "cartoon-sc") {
+    molmil.displayEntry(soup.structures, molmil.displayMode_Default, false, soup);
+    if (type == "cartoon-sc") molmil.displayEntry(soup.structures, molmil.displayMode_Stick_SC, false, soup);
+    molmil.colorEntry(soup.structures, molmil.colorEntry_Default, null, false, soup);
+  }
+  else if (type == "cartoon-chainc" || type == "cartoon-chainc-sc") {
+    molmil.displayEntry(soup.structures, molmil.displayMode_Default, false, soup);
+    if (type == "cartoon-chainc-sc") molmil.displayEntry(soup.structures, molmil.displayMode_Stick_SC, false, soup);
+    molmil.colorEntry(soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, false, soup);
+  }
+  else if (type == "sticks" || type == "sticks-chainc") {
+    molmil.displayEntry(soup.structures, molmil.displayMode_Stick, false, soup);
+    if (type == "sticks-chainc") molmil.colorEntry(soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, false, soup);
+    else molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
+  }
+  else if (type == "lines" || type == "lines-chainc") {
+    molmil.displayEntry(soup.structures, molmil.displayMode_Wireframe, false, soup);
+    if (type == "lines-chainc") molmil.colorEntry(soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, false, soup);
+    else molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
+  }
+  else if (type == "neutral") {
+    molmil.displayEntry(soup.structures, molmil.displayMode_Default, false, soup);
+    molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
+    molmil.colorEntry(soup.structures, molmil.colorEntry_Custom+0.5, {rgba:[255, 255, 255, 255], carbonOnly: true}, false, soup);
   }
   
   if (molmil.cli_soup) molmil.cli_soup.renderer.rebuildRequired = true;
@@ -7343,18 +7426,20 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
       }
     }
     else if (cm == molmil.colorEntry_Custom || cm == molmil.colorEntry_Custom+.5) { // custom
+      if (! molmil_dep.isObject(setting)) setting = {rgba: setting};
+      var rgba = setting.rgba;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        chain.rgba = setting;
+        chain.rgba = rgba;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
-          if (cm == molmil.colorEntry_Custom) mol.rgba = setting;
-          for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = setting;
+          if (cm == molmil.colorEntry_Custom) mol.rgba = rgba;
+          for (a=0; a<mol.atoms.length; a++) if (! setting.carbonOnly || mol.atoms[a].element == "C") mol.atoms[a].rgba = rgba;
         }
       }
     }
     else if (cm == molmil.colorEntry_ChainAlt) {
-      list = molmil.configBox.bu_colors
+      list = molmil.configBox.bu_colors;
       var j = 0;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
@@ -7362,7 +7447,7 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
           mol.rgba = obj.chains[c].rgba;
-          for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = obj.chains[c].rgba;
+          for (a=0; a<mol.atoms.length; a++) if (! setting.carbonOnly || mol.atoms[a].element == "C") mol.atoms[a].rgba = obj.chains[c].rgba;
         }
         if (j >= list.length) j = 0;
       }
@@ -7425,11 +7510,13 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
       }
     }
     else if (cm == molmil.colorEntry_Custom || cm == molmil.colorEntry_Custom+.5) { // custom
-      obj.rgba = setting;
+      if (! molmil_dep.isObject(setting)) setting = {rgba: setting};
+      var rgba = setting.rgba;
+      obj.rgba = rgba;
       for (m=0; m<obj.molecules.length; m++) {
         mol = obj.molecules[m];
-        if (cm == molmil.colorEntry_Custom) mol.rgba = setting;
-        for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = setting;
+        if (cm == molmil.colorEntry_Custom) mol.rgba = setting.rgba;
+        for (a=0; a<mol.atoms.length; a++) if (! setting.carbonOnly || mol.atoms[a].element == "C") mol.atoms[a].rgba = setting.rgba;
       }
     }
     else if (cm == molmil.colorEntry_ABEGO && ! obj.isHet) {
@@ -7469,8 +7556,10 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
       if (cm == molmil.colorEntry_CPK) mol.rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, "C", molmil.configBox.elementColors.DUMMY);
     }
     else if (cm == molmil.colorEntry_Custom || cm == molmil.colorEntry_Custom+.5) { // custom
-      if (cm == molmil.colorEntry_Custom) obj.rgba = setting;
-      for (a=0; a<obj.atoms.length; a++) obj.atoms[a].rgba = obj.rgba;
+      if (! molmil_dep.isObject(setting)) setting = {rgba: setting};
+      var rgba = setting.rgba;
+      if (cm == molmil.colorEntry_Custom) obj.rgba = setting.rgba;
+      for (a=0; a<obj.atoms.length; a++) if (! setting.carbonOnly || obj.atoms[a].element == "C") obj.atoms[a].rgba = setting.rgba;
     }
   }
   else if (obj instanceof molmil.atomObject) {
@@ -7482,7 +7571,7 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
       obj.rgba = molmil_dep.getKeyFromObject(molmil.configBox.sndStrucColor, mol.sndStruc, molmil.configBox.sndStrucColor[1]);
     }
     else if (cm == molmil.colorEntry_Custom) { // custom
-      obj.rgba = setting; // convert to 32bit int
+      obj.rgba = setting;
     }
   }
   else if (obj instanceof molmil.polygonObject) {
@@ -7802,6 +7891,22 @@ molmil.createViewer = function (target, width, height, soupObject) {
   if (target.tagName.toLowerCase() == "canvas") canvas = target;
   else canvas = target.pushNode("canvas");
   width = width || canvas.width; height = height || canvas.height;
+  if (width == 300 && height == 150 && ! (canvas.style.width || canvas.style.height)) { // full-window sized canvas, with auto-resize
+    width = window.innerWidth || document.documentElement.clientWidth;
+    height = window.innerHeight || document.documentElement.clientHeight;
+    window.onresize = function() {
+      var dpr = devicePixelRatio || 1;
+      canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+      if (molmil.configBox.stereoMode != 3) {
+        canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+        canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+        canvas.renderer.resizeViewPort();
+      }
+      canvas.update = true;
+    };
+  }
+  
   canvas.width = width*dpr; canvas.height = height*dpr; canvas.defaultSize = [width, height];
 
   canvas.style.width = width+"px";
@@ -7832,7 +7937,6 @@ molmil.createViewer = function (target, width, height, soupObject) {
   molmil.cli_canvas = canvas; molmil.cli_soup = canvas.molmilViewer; // set some default stuff to make life easier
   
   if (! canvas.molmilViewer.renderer.initGL(canvas)) return canvas.molmilViewer.renderer.altCanvas;
-  canvas.style.backgroundColor = "rgb("+Math.round(molmil.configBox.BGCOLOR[0]*255)+", "+Math.round(molmil.configBox.BGCOLOR[1]*255)+", "+Math.round(molmil.configBox.BGCOLOR[2]*255)+")";
   
   canvas.molmilViewer.renderer.initRenderer();
   if (soupObject) {
@@ -7905,6 +8009,7 @@ molmil.loadPDBlite = function(pdbid, cb, async, soup) {
   requestA.OnError = function() {
     this.error = true;
     soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid), 1, cb || function(target, struc) {
+      struc.meta.pdbid = pdbid;
       delete target.pdbxData;
       molmil.displayEntry(struc, molmil.displayMode_Default);
       molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
@@ -7921,6 +8026,7 @@ molmil.loadPDBlite = function(pdbid, cb, async, soup) {
     var jso = JSON.parse(this.request.responseText);
     jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"];
     soup.loadStructureData(jso, "mmjson", pdbid+".json", cb || function(target, struc) { // later switch this to use the new lite mmjson files...
+      struc.meta.pdbid = pdbid;
       delete target.pdbxData;
       molmil.displayEntry(struc, molmil.displayMode_Default);
       molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
@@ -7932,7 +8038,8 @@ molmil.loadPDBlite = function(pdbid, cb, async, soup) {
 
 molmil.loadPDB = function(pdbid, cb, async, soup) {
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid), 1, cb || function(target, struc) {
+  soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid.toLowerCase()), 1, cb || function(target, struc) {
+    struc.meta.pdbid = pdbid;
     if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
@@ -7941,8 +8048,18 @@ molmil.loadPDB = function(pdbid, cb, async, soup) {
 
 molmil.loadCC = function(comp_id, cb, async, soup) {
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  soup.loadStructure(molmil.settings.comp_url.replace("__ID__", comp_id), 1, cb || function(target, struc) {
+  soup.loadStructure(molmil.settings.comp_url.replace("__ID__", comp_id.toUpperCase()), 1, cb || function(target, struc) {
+    struc.meta.comp_id = comp_id;
     molmil.displayEntry(struc, 1);
+    molmil.colorEntry(struc, 1, null, true, soup);
+  }, {async: async ? true : false});
+};
+
+molmil.loadPDBchain = function(pdbid, cb, async, soup) {
+  soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
+  soup.loadStructure(molmil.settings.pdb_chain_url.replace("__ID__", pdbid), 1, cb || function(target, struc) {
+    if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
+    else molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
   }, {async: async ? true : false});
 };
@@ -8218,7 +8335,7 @@ molmil.checkRebuild = function() {
 molmil.commandLines = {};
     
 molmil.commandLine = function(canvas) {
-  this.environment = {};
+  this.environment = {fileObjects: {}};
   this.commandBuffer = [];
   for (var e in window) this.environment[e] = undefined;
   
@@ -8382,19 +8499,14 @@ molmil.commandLine.prototype.buildGUI = function() {
   this.logBox.icon = this.icon = this.consoleBox.pushNode("span");
   this.icon.innerHTML = "<"; this.icon.title = "Display command line";
   this.icon.className = "molmil_UI_cl_icon";
-  this.icon.style.color = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
   
   this.icon.show = function(nofocus) {
     this.innerHTML = ">"; this.title = "Hide command line";
-    var invC = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
-    this.cli.logBox.style.border = "1px solid "+invC;
+    
     this.cli.logBox.style.borderBottom = "";
     this.cli.logBox.style.borderRadius = ".33em";
-    this.cli.consoleBox.style.color = invC;
-    this.cli.logBox.style.backgroundColor = "rgba("+molmil.configBox.BGCOLOR[0]*255+","+molmil.configBox.BGCOLOR[1]*255+","+molmil.configBox.BGCOLOR[2]*255+",.5)";
-    this.inp.style.backgroundColor = "rgb("+molmil.configBox.BGCOLOR[0]*255+","+molmil.configBox.BGCOLOR[1]*255+","+molmil.configBox.BGCOLOR[2]*255+")";
-    
-    this.inp.style.display = ""; this.cli.logBox.style.display = "";
+
+    this.inp.style.display = this.cli.logBox.style.display = "initial";
     this.cli.consoleBox.style.height = this.cli.consoleBox.style.maxHeight = "calc("+this.cli.canvas.clientHeight+"px - 6em)";
     this.cli.consoleBox.style.overflow = "";
     this.cli.logBox.style.overflow = "";
@@ -8403,26 +8515,22 @@ molmil.commandLine.prototype.buildGUI = function() {
   }
   this.icon.hide = function() {
     this.innerHTML = "<"; this.title = "Display command line";
-    this.inp.style.display = "none"; this.cli.logBox.style.display = "none";
+    this.inp.style.display = this.cli.logBox.style.display = "";
   }
   this.icon.onclick = function (mini) {
     if (mini == true) {
-      if (this.inp.style.display != "") {
-        this.cli.logBox.style.display = "";
+      if (this.inp.style.display == "") {
+        this.cli.logBox.style.display = "initial";
         this.cli.consoleBox.style.height = "8em";
         this.cli.logBox.style.pointerEvents = "none";
         this.cli.logBox.style.overflow = "hidden";
-        var invC = molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255));
-        this.cli.consoleBox.style.color = invC;
         this.logBox.scrollTop = this.logBox.scrollHeight;
       }
       return;
     }
-    if (this.inp.style.display == "") this.hide();
+    if (this.inp.style.display == "initial") this.hide();
     else this.show();
   };
-  this.logBox.onmouseover = function() {this.style.backgroundColor = "rgba("+molmil.configBox.BGCOLOR[0]*255+","+molmil.configBox.BGCOLOR[1]*255+","+molmil.configBox.BGCOLOR[2]*255+",.85)";};
-  this.logBox.onmouseout = function() {this.style.backgroundColor = "rgba("+molmil.configBox.BGCOLOR[0]*255+","+molmil.configBox.BGCOLOR[1]*255+","+molmil.configBox.BGCOLOR[2]*255+",.25)";};
   this.inp = this.icon.inp = this.consoleBox.pushNode("span");
   this.inp.className = "molmil_UI_cl_input"; this.inp.style.display = "none";
   this.inp.contentEditable = true;
@@ -8466,13 +8574,14 @@ molmil.xhr = function(url) {
 molmil.loadScript = function(url) {
   var cc = this.cli_canvas;
   var cli = cc.commandLine;
-
-  cc.molmilViewer.downloadInProgress = true;
+  
+  
+  cc.molmilViewer.downloadInProgress++;
 
   var request = molmil.xhr(url);
   request.ASYNC = true;
   request.OnDone = function() {
-    delete cc.molmilViewer.downloadInProgress;
+    cc.molmilViewer.downloadInProgress--;
     var pathconv = url.split("=");
     pathconv[pathconv.length-1] = pathconv[pathconv.length-1].substr(0, pathconv[pathconv.length-1].lastIndexOf('/'))
     if (pathconv[pathconv.length-1]) pathconv[pathconv.length-1] += "/";
@@ -9141,9 +9250,9 @@ molmil.guess_format = function(name) {
 molmil.loadFilePointer = function(fileObj, func, canvas) {
   fileObj.onload = function(e) {
     func(e.target.result, this.filename);
-    delete canvas.molmilViewer.downloadInProgress;
+    canvas.molmilViewer.downloadInProgress--;
   }
-  canvas.molmilViewer.downloadInProgress = true;
+  canvas.molmilViewer.downloadInProgress++;
   fileObj.readAsText(fileObj.fileHandle);
   return true;
 }
@@ -9233,8 +9342,14 @@ molmil.autoSetup = function(options, canvas) {
   
   if (! canvas) {
     for (var i=0; i<molmil.canvasList.length; i++) molmil.autoSetup(options, molmil.canvasList[i]);
-    return;
+    var viewers = document.getElementsByClassName("molmilViewer");
+    for (var i=0; i<viewers.length; i++) if (! viewers[i].molmilViewer) canvas = molmil.autoSetup(options, viewers[i]);
+    return canvas;
   }
+  
+  if (! canvas.molmilViewer) molmil.createViewer(canvas);
+  if (canvas.setupDone) return;
+  
   
   if (options.enable.includes("cli") && ! canvas.commandLine) {
     var cli = new molmil.commandLine(canvas);
@@ -9247,6 +9362,17 @@ molmil.autoSetup = function(options, canvas) {
       window.onhashchange = function() {
         var hash = window.location.hash ? window.location.hash.substr(1) : "";
         if (hash) {molmil.clear(canvas); cli.environment.console.runCommand(decodeURIComponent(hash));}
+      }
+    }
+    
+    if (window.onkeyup == null) {
+      var lastPress = 0;
+      window.onkeyup = function(ev) {
+        if (ev.keyCode == 27) {
+          var now = (new Date()).getTime();
+          if (now-lastPress < 250) cli.icon.onclick();
+          lastPress = now;
+        }
       }
     }
   }
@@ -9336,6 +9462,41 @@ molmil.promode_elastic = function(id, mode, type, soup) {
     });
   }
 }
+
+molmil.normalFromMat3 = function (a, out) {
+    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = 0,
+        a10 = a[3], a11 = a[4], a12 = a[5], a13 = 0,
+        a20 = a[6], a21 = a[7], a22 = a[8], a23 = 0,
+        a30 = 0, a31 = 0, a32 = 0, a33 = 1,
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32,
+        // Calculate the determinant
+        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    if (!det) { 
+        return null; 
+    }
+    det = 1.0 / det;
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    out[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    out[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    out[3] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    out[4] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    out[5] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    out[6] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    out[7] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    out[8] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    return out;
+};
 
 molmil.transformObject = function(obj, matrix) {
   var soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
@@ -9518,7 +9679,7 @@ molmil.orient = function(atoms, soup, xyzs) {
   var matrix = mat4.multiply(mat4.create(), stage2, stage1);
   if (! isNaN(sf)) mat4.getRotation(soup.renderer.camera.QView, matrix);
   
-  if (atoms && atoms.length) molmil.cli_soup.calculateCOG(atoms);
+  if (atoms && atoms.length) soup.calculateCOG(atoms);
 
   var mx = Math.sqrt(maxRadius)*2 + 5;
   
@@ -9535,13 +9696,52 @@ molmil.orient = function(atoms, soup, xyzs) {
   }
 }
 
-molmil.superpose = function(A, B, C, modelId) {
-  var data = molmil.calcRMSD(A, B, true);
-  if (! data) return;
-  
+molmil.superpose = function(A, B, C, modelId, iterate) {
+  if (! molmil.toBigEndian32) return molmil.loadPlugin(molmil.settings.src+"plugins/md-anal.js", this.superpose, this, [A, B, C, modelId, iterate]);
   modelId = modelId || 0;
   
-  var i, atom, xyz = vec3.create(), rotationMatrix = data[1];
+  var i, atom, atom2, xyz = vec3.create(), xyz2 = vec3.create(), rotationMatrix, Rs = new Array(A.length), old_selIdxs = A.map(function(x,i) {return i;});
+  
+  var Ap = A, Bp = B, selIdxs, initialRMSD = undefined;
+  while (true) {
+    var data = molmil.calcRMSD(Ap, Bp, true);
+    if (! data) return;
+    if (initialRMSD == undefined) initialRMSD = data[0];
+    rotationMatrix = data[1];
+    if (! iterate || modelId != 0) break;
+    
+    var iterate2 = iterate*iterate, Rs = [];
+    
+    selIdxs = [];
+    for (i=0; i<B.length; i++) {
+      atom = B[i];
+      atom2 = A[i];
+      
+      xyz[0] = atom.chain.modelsXYZ[modelId][atom.xyz] - data[3][0];
+      xyz[1] = atom.chain.modelsXYZ[modelId][atom.xyz+1] - data[3][1];
+      xyz[2] = atom.chain.modelsXYZ[modelId][atom.xyz+2] - data[3][2];
+      vec3.transformMat4(xyz, xyz, rotationMatrix);
+      xyz[0] += data[2][0];
+      xyz[1] += data[2][1];
+      xyz[2] += data[2][2];
+      
+      xyz2[0] = atom2.chain.modelsXYZ[modelId][atom2.xyz];
+      xyz2[1] = atom2.chain.modelsXYZ[modelId][atom2.xyz+1];
+      xyz2[2] = atom2.chain.modelsXYZ[modelId][atom2.xyz+2];
+      
+      Rs[i] = Math.pow(xyz[0]-xyz2[0], 2) + Math.pow(xyz[1]-xyz2[1], 2) + Math.pow(xyz[2]-xyz2[2], 2);
+    }
+    if (Math.min.apply(null, Rs) > iterate2) iterate2 = iterate2*4; // set the cutoff to double
+    for (i=0; i<B.length; i++) {
+      if (Rs[i] < iterate2) selIdxs.push(i);
+    }
+    
+    if (selIdxs.length < 3) break;
+    if (selIdxs.length == old_selIdxs.length && JSON.stringify(selIdxs) == JSON.stringify(old_selIdxs)) break;
+    Ap = selIdxs.map(function(i) {return A[i];});
+    Bp = selIdxs.map(function(i) {return B[i];});
+    old_selIdxs = selIdxs;
+  }
   
   for (i=0; i<C.length; i++) {
     atom = C[i];
@@ -9554,8 +9754,66 @@ molmil.superpose = function(A, B, C, modelId) {
     atom.chain.modelsXYZ[modelId][atom.xyz+2] = xyz[2] + data[2][2];
   }
 
-  return data[0];
+  return {initial_rmsd: initialRMSD, rmsd: data[0], aligned_indices: selIdxs};
 };
+
+molmil.alignInfo = {};
+
+molmil.align = function(A, B) {
+  // https://github.com/CDCgov/bioseq-js/blob/master/dist/bioseq.js
+  if (! window.bioseq) return molmil.loadPlugin("https://raw.githubusercontent.com/CDCgov/bioseq-js/master/dist/bioseq.js", molmil.align, molmil, [A, B]); 
+  
+  if (! bioseq.amino_acids) {
+    var blosum62 = {"*":{"*":1,"A":-4,"C":-4,"B":-4,"E":-4,"D":-4,"G":-4,"F":-4,"I":-4,"H":-4,"K":-4,"M":-4,"L":-4,"N":-4,"Q":-4,"P":-4,"S":-4,"R":-4,"T":-4,"W":-4,"V":-4,"Y":-4,"X":-4,"Z":-4},"A":{"*":-4,"A":4,"C":0,"B":-2,"E":-1,"D":-2,"G":0,"F":-2,"I":-1,"H":-2,"K":-1,"M":-1,"L":-1,"N":-2,"Q":-1,"P":-1,"S":1,"R":-1,"T":0,"W":-3,"V":0,"Y":-2,"X":0,"Z":-1},"C":{"*":-4,"A":0,"C":9,"B":-3,"E":-4,"D":-3,"G":-3,"F":-2,"I":-1,"H":-3,"K":-3,"M":-1,"L":-1,"N":-3,"Q":-3,"P":-3,"S":-1,"R":-3,"T":-1,"W":-2,"V":-1,"Y":-2,"X":-2,"Z":-3},"B":{"*":-4,"A":-2,"C":-3,"B":4,"E":1,"D":4,"G":-1,"F":-3,"I":-3,"H":0,"K":0,"M":-3,"L":-4,"N":3,"Q":0,"P":-2,"S":0,"R":-1,"T":-1,"W":-4,"V":-3,"Y":-3,"X":-1,"Z":1},"E":{"*":-4,"A":-1,"C":-4,"B":1,"E":5,"D":2,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":-2,"L":-3,"N":0,"Q":2,"P":-1,"S":0,"R":0,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":4},"D":{"*":-4,"A":-2,"C":-3,"B":4,"E":2,"D":6,"G":-1,"F":-3,"I":-3,"H":-1,"K":-1,"M":-3,"L":-4,"N":1,"Q":0,"P":-1,"S":0,"R":-2,"T":-1,"W":-4,"V":-3,"Y":-3,"X":-1,"Z":1},"G":{"*":-4,"A":0,"C":-3,"B":-1,"E":-2,"D":-1,"G":6,"F":-3,"I":-4,"H":-2,"K":-2,"M":-3,"L":-4,"N":0,"Q":-2,"P":-2,"S":0,"R":-2,"T":-2,"W":-2,"V":-3,"Y":-3,"X":-1,"Z":-2},"F":{"*":-4,"A":-2,"C":-2,"B":-3,"E":-3,"D":-3,"G":-3,"F":6,"I":0,"H":-1,"K":-3,"M":0,"L":0,"N":-3,"Q":-3,"P":-4,"S":-2,"R":-3,"T":-2,"W":1,"V":-1,"Y":3,"X":-1,"Z":-3},"I":{"*":-4,"A":-1,"C":-1,"B":-3,"E":-3,"D":-3,"G":-4,"F":0,"I":4,"H":-3,"K":-3,"M":1,"L":2,"N":-3,"Q":-3,"P":-3,"S":-2,"R":-3,"T":-1,"W":-3,"V":3,"Y":-1,"X":-1,"Z":-3},"H":{"*":-4,"A":-2,"C":-3,"B":0,"E":0,"D":-1,"G":-2,"F":-1,"I":-3,"H":8,"K":-1,"M":-2,"L":-3,"N":1,"Q":0,"P":-2,"S":-1,"R":0,"T":-2,"W":-2,"V":-3,"Y":2,"X":-1,"Z":0},"K":{"*":-4,"A":-1,"C":-3,"B":0,"E":1,"D":-1,"G":-2,"F":-3,"I":-3,"H":-1,"K":5,"M":-1,"L":-2,"N":0,"Q":1,"P":-1,"S":0,"R":2,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":1},"M":{"*":-4,"A":-1,"C":-1,"B":-3,"E":-2,"D":-3,"G":-3,"F":0,"I":1,"H":-2,"K":-1,"M":5,"L":2,"N":-2,"Q":0,"P":-2,"S":-1,"R":-1,"T":-1,"W":-1,"V":1,"Y":-1,"X":-1,"Z":-1},"L":{"*":-4,"A":-1,"C":-1,"B":-4,"E":-3,"D":-4,"G":-4,"F":0,"I":2,"H":-3,"K":-2,"M":2,"L":4,"N":-3,"Q":-2,"P":-3,"S":-2,"R":-2,"T":-1,"W":-2,"V":1,"Y":-1,"X":-1,"Z":-3},"N":{"*":-4,"A":-2,"C":-3,"B":3,"E":0,"D":1,"G":0,"F":-3,"I":-3,"H":1,"K":0,"M":-2,"L":-3,"N":6,"Q":0,"P":-2,"S":1,"R":0,"T":0,"W":-4,"V":-3,"Y":-2,"X":-1,"Z":0},"Q":{"*":-4,"A":-1,"C":-3,"B":0,"E":2,"D":0,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":0,"L":-2,"N":0,"Q":5,"P":-1,"S":0,"R":1,"T":-1,"W":-2,"V":-2,"Y":-1,"X":-1,"Z":3},"P":{"*":-4,"A":-1,"C":-3,"B":-2,"E":-1,"D":-1,"G":-2,"F":-4,"I":-3,"H":-2,"K":-1,"M":-2,"L":-3,"N":-2,"Q":-1,"P":7,"S":-1,"R":-2,"T":-1,"W":-4,"V":-2,"Y":-3,"X":-2,"Z":-1},"S":{"*":-4,"A":1,"C":-1,"B":0,"E":0,"D":0,"G":0,"F":-2,"I":-2,"H":-1,"K":0,"M":-1,"L":-2,"N":1,"Q":0,"P":-1,"S":4,"R":-1,"T":1,"W":-3,"V":-2,"Y":-2,"X":0,"Z":0},"R":{"*":-4,"A":-1,"C":-3,"B":-1,"E":0,"D":-2,"G":-2,"F":-3,"I":-3,"H":0,"K":2,"M":-1,"L":-2,"N":0,"Q":1,"P":-2,"S":-1,"R":5,"T":-1,"W":-3,"V":-3,"Y":-2,"X":-1,"Z":0},"T":{"*":-4,"A":0,"C":-1,"B":-1,"E":-1,"D":-1,"G":-2,"F":-2,"I":-1,"H":-2,"K":-1,"M":-1,"L":-1,"N":0,"Q":-1,"P":-1,"S":1,"R":-1,"T":5,"W":-2,"V":0,"Y":-2,"X":0,"Z":-1},"W":{"*":-4,"A":-3,"C":-2,"B":-4,"E":-3,"D":-4,"G":-2,"F":1,"I":-3,"H":-2,"K":-3,"M":-1,"L":-2,"N":-4,"Q":-2,"P":-4,"S":-3,"R":-3,"T":-2,"W":11,"V":-3,"Y":2,"X":-2,"Z":-3},"V":{"*":-4,"A":0,"C":-1,"B":-3,"E":-2,"D":-3,"G":-3,"F":-1,"I":3,"H":-3,"K":-2,"M":1,"L":1,"N":-3,"Q":-2,"P":-2,"S":-2,"R":-3,"T":0,"W":-3,"V":4,"Y":-1,"X":-1,"Z":-2},"Y":{"*":-4,"A":-2,"C":-2,"B":-3,"E":-2,"D":-3,"G":-3,"F":3,"I":-1,"H":2,"K":-2,"M":-1,"L":-1,"N":-2,"Q":-1,"P":-3,"S":-2,"R":-2,"T":-2,"W":2,"V":-1,"Y":7,"X":-1,"Z":-2},"X":{"*":-4,"A":0,"C":-2,"B":-1,"E":-1,"D":-1,"G":-1,"F":-1,"I":-1,"H":-1,"K":-1,"M":-1,"L":-1,"N":-1,"Q":-1,"P":-2,"S":0,"R":-1,"T":0,"W":-2,"V":-1,"Y":-1,"X":-1,"Z":-1},"Z":{"*":-4,"A":-1,"C":-3,"B":1,"E":4,"D":1,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":-1,"L":-3,"N":0,"Q":3,"P":-1,"S":0,"R":0,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":4}};
+    var alphabet = Object.keys(blosum62);
+    bioseq.amino_acids = bioseq.makeAlphabetMap(alphabet.join(""), alphabet.indexOf("*"));
+
+    var i,j, matrix = [];
+    for (i=0; i<alphabet.length; i++) {
+      matrix[i] = [];
+      for (j=0; j<alphabet.length; j++) matrix[i][j] = blosum62[alphabet[i]][alphabet[j]];
+    }
+    bioseq.blosum62 = matrix;
+  }
+  
+  var conv = {"ALA":"A","CYS":"C","ASP":"D","GLU":"E","PHE":"F","GLY":"G","HIS":"H","ILE":"I","LYS":"K","LEU":"L","MET":"M","ASN":"N","PRO":"P","GLN":"Q","ARG":"R","SER":"S","THR":"T","VAL":"V","TRP":"W","TYR":"Y"};
+  var Aseq = A.molecules.map(function(x) {return conv[x.name]||"*";}).join("");
+  var Bseq = B.molecules.map(function(x) {return conv[x.name]||"*";}).join("");
+
+  var rst = bioseq.align(Aseq, Bseq, true, bioseq.blosum62, [12, 1], null, bioseq.amino_acids);
+  var fmt = bioseq.cigar2gaps(Aseq, Bseq, rst.position, rst.CIGAR);
+  Aseq = fmt[0];
+  Bseq = fmt[1];
+  
+  var a = rst.position, b = (rst.CIGAR[0] & 0xf) == 4 ? (rst.CIGAR[0] >> 4) : 0, Aarr = [], Barr = [], align = [];
+  for (var i=0; i<Aseq.length; i++) {
+    if (Aseq[i] == "-") {b++; align.push(" "); continue;}
+    if (Bseq[i] == "-") {a++; align.push(" "); continue;}
+    Aarr.push(A.molecules[a].CA);
+    Barr.push(B.molecules[b].CA);
+    align.push("|");
+    a++; b++;
+  }
+
+  var Carr = Barr[0].chain.atoms;
+  
+  var data = molmil.superpose(Aarr, Barr, Carr, undefined, 2);
+  if (data === undefined) return console.error("An error occurred...");
+
+  var oASIdxs = align.map(function(x,i) {return i;}).filter(function(x){return align[x]=="|";}).filter(function(x,i){return data.aligned_indices.includes(i);})
+  data.optimized_alignment = align.map(function(x,i) {return oASIdxs.includes(i) ? "|" : " "}).join("");
+  data.alignment = align.join("");
+  data.seq1 = Aseq;
+  data.seq2 = Bseq;
+  data.chain1 = A;
+  data.chain2 = B;
+  
+  ID = A.CID+":"+B.CID;
+  
+  molmil.alignInfo[ID] = data;
+  
+  molmil.orient(Aarr, A.entry.soup);
+}
 
 if (typeof(requestAnimationFrame) != "undefined") molmil.animate_molmilViewers();
 

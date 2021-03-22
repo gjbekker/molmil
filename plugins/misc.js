@@ -1106,6 +1106,43 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
   sceneBU.no_identity = ! any_identity;
   
 
+
+  var tst = soup.pdbxData.pdbx_struct_assembly || {details: []};
+  var ref = ["octahedral", "tetrahedral", "dihedral", "circular", "point"];
+  var OK = false, OK_type = 0;
+  for (var i=0, j; i<tst.details.length; i++) {
+    for (j=0; j<ref.length; j++) {
+      if (tst.details[i].toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 1; break;}
+    }
+    if (OK) break;
+  }
+  
+  var ref = ["icosahedral", "helical"];
+  for (var i=0, j; i<tst.details.length; i++) {
+    for (j=0; j<ref.length; j++) {
+      if (tst.details[i].toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 2; break;}
+    }
+    if (OK) break;
+  }
+  
+  var sinfo = {}, norInfo = {};
+  if (soup.pdbxData.entity_poly && soup.pdbxData.entity_poly.entity_id) {
+    for (var i=0; i<soup.pdbxData.entity_poly.entity_id.length; i++) sinfo[soup.pdbxData.entity_poly.entity_id[i]] = soup.pdbxData.entity_poly.pdbx_seq_one_letter_code_can[i].replace(/\s/g, '').length;
+  }
+  for (var i=0; i<soup.pdbxData.struct_asym.id.length; i++) norInfo[soup.pdbxData.struct_asym.id[i]] = sinfo[soup.pdbxData.struct_asym.entity_id[i]] || 0;
+
+  var nor, sz = 0;
+  if (assembly_id != -1) {
+    for (var i=0,j; i<soup.BUassemblies[assembly_id].length; i++) {
+      nor = 0;
+      for (j=0; j<soup.BUassemblies[assembly_id][i][1].length; j++) nor += norInfo[soup.BUassemblies[assembly_id][i][1][j]] || 0;
+      sz += soup.BUassemblies[assembly_id][i][0].length * nor;
+    }
+  }
+  sceneBU.isBU = OK;
+  sceneBU.size = sz;
+  sceneBU.type = OK_type;
+
   var update = false;
   for (c=0; c<struct.chains.length; c++) { // add some functionality to check whether no changes to the AU were made, and if not --> don't update this stuff...
     if (toggleIdentity.hasOwnProperty(struct.chains[c].name)) {
@@ -1130,6 +1167,57 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
   return sceneBU;
   
 } 
+
+molmil.figureOutAssemblyId = function(pdbxData, BUassemblies) {
+  var assembly_id = null;
+      
+  if (pdbxData.pdbx_struct_assembly) {
+    var tst = pdbxData.pdbx_struct_assembly || {details: []};
+    for (var i=0; i<tst.details.length; i++) {
+      if (tst.details[i].substr(0, 19) == "author_and_software") {assembly_id = tst.id[i]; break;}
+    }
+    if (assembly_id == null) {
+      for (var i=0; i<tst.details.length; i++) {
+        if (tst.details[i].substr(0, 6) == "author") {assembly_id = tst.id[i]; break;}
+      }
+    }
+    if (assembly_id == null) {
+      for (var i=0; i<tst.details.length; i++) {
+        if (tst.details[i].substr(0, 8) == "software") {assembly_id = tst.id[i]; break;}
+      }
+    }
+  }
+
+  if (assembly_id == null) {
+    var sinfo = {}, norInfo = {};
+    if (pdbxData.entity_poly && pdbxData.entity_poly.entity_id) {
+      for (var i=0; i<pdbxData.entity_poly.entity_id.length; i++) sinfo[pdbxData.entity_poly.entity_id[i]] = pdbxData.entity_poly.pdbx_seq_one_letter_code_can[i].replace(/\s/g, '').length;
+    }
+    for (var i=0; i<pdbxData.struct_asym.id.length; i++) norInfo[pdbxData.struct_asym.id[i]] = sinfo[pdbxData.struct_asym.entity_id[i]] || 0;
+        
+    var largest = [null, 0];        
+        
+    for (var aid in BUassemblies) {
+      var nor, sz = 0;
+      if (isNaN(parseInt(aid, 10))) continue;
+      for (var i=0,j; i<BUassemblies[aid].length; i++) {
+        nor = 0;
+        for (j=0; j<BUassemblies[aid][i][1].length; j++) nor += norInfo[BUassemblies[aid][i][1][j]] || 0;
+        sz += BUassemblies[aid][i][0].length * nor;
+      }
+          
+      if (sz > largest[1]) {largest[0] = aid; largest[1] = sz;}
+    }
+        
+    if (largest[0] != null) assembly_id = largest[0];
+        
+  }
+      
+  if (assembly_id == null) assembly_id = -1;
+      
+  return assembly_id;
+}
+
 
 // separate display & color modes...
 // displayModes:

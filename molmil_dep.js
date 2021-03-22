@@ -319,6 +319,24 @@ molmil_dep.naturalSort=function(a, b) {
   return aa.length - bb.length;
 }
 
+molmil_dep.createINPUT = function(TYPE, NAME, VALUE) {
+  var input;
+  input = molmil_dep.dcE("INPUT"); input.type = TYPE;
+  input.name = (NAME ? NAME : ""); input.value = (VALUE ? VALUE : ""); 
+  return input;
+};
+
+molmil_dep.createTextBox = function(value, maxWidth) {
+  var tb = molmil_dep.dcE("INPUT");
+  tb.className = "textBox";
+  tb.setAttribute("type", "text");
+  if (maxWidth) {tb.style.maxWidth = maxWidth; tb.style.width = "";}
+  tb.getContent = function() {return this.value;};
+  tb.setContent = function(value) {this.value = value;};
+  if (value) tb.setAttribute("value", value);
+  return tb;
+}
+
 
 Element.prototype.setClass=function(className) {if (this.className.indexOf(className) == -1) this.className += " "+className;}
 Element.prototype.removeClass=function(className) {this.className = this.className.replace(new RegExp("\\b"+className+"\\b", "g"), "").trim();}
@@ -367,6 +385,11 @@ if (!Array.prototype.includes) {
   });
 }
 
+Array.prototype.Remove=function(s) {for (var i=0; i<this.length; i++) {if (s == this[i]) {this.splice(i, 1);}}};
+
 if(!Object.values) {Object.values = function(obj) {return Object.keys(obj).map(function(key) {return obj[key];});}}
+
+molmil_dep.isObject = function(item) {return (typeof item === "object" && !Array.isArray(item) && item !== null);}
+
 
 molmil_dep.init();
