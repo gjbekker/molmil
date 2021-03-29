@@ -1391,6 +1391,7 @@ molmil.commandLines.pyMol.bg_color = function(clr) {
   molmil.configBox.BGCOLOR[1] = rgba[1]/255;
   molmil.configBox.BGCOLOR[2] = rgba[2]/255;
   molmil.configBox.BGCOLOR[3] = rgba[3]/255;
+  molmil.updateBGcolor();
   
   this.cli_soup.canvas.update = true;
   

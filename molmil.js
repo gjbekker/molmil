@@ -430,11 +430,14 @@ molmil.initSettings = function () {
   
   molmil.configBox.keepBackgroundColor = molmil.localStorageGET("molmil.settings_keepBackgroundColor") == 1;
   
-  var fgcolor = molmil.hex2rgb(molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255)));
+  molmil.updateBGcolor();
+}
 
+molmil.updateBGcolor = function() {
+  var fgcolor = molmil.hex2rgb(molmil.invertColor(molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255)));
   let root = document.documentElement;
   root.style.setProperty("--BACKGROUND_COLOR", (molmil.configBox.BGCOLOR[0]*255).toFixed()+","+(molmil.configBox.BGCOLOR[1]*255).toFixed()+","+(molmil.configBox.BGCOLOR[2]*255).toFixed());
-  root.style.setProperty("--FOREGROUND_COLOR", (fgcolor[0]*255).toFixed()+","+(fgcolor[1]*255).toFixed()+","+(fgcolor[2]*255).toFixed());
+  root.style.setProperty("--FOREGROUND_COLOR", (fgcolor[0]*255).toFixed()+","+(fgcolor[1]*255).toFixed()+","+(fgcolor[2]*255).toFixed());  
 }
 
 // display modes

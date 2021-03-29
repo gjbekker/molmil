@@ -560,7 +560,7 @@
 }
 
 canvas {
-  /*background-color: rgba(var(--BACKGROUND_COLOR), var(--BACKGROUND_ALPHA));*/
+  background-color: rgb(var(--BACKGROUND_COLOR));
 }
 
 #styleif form {
