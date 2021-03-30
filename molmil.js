@@ -23,21 +23,17 @@ molmil.ignoreBlackList = false;
 molmil.vrDisplay = null;
 molmil.vrPose = [0, 0, 0];
 molmil.vrOrient = [0, 0, 0, 0];
+molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://data."+window.location.host+"/" : "https://data.pdbj.org/";
+
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
   src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
-  pdb_url: "http://192.168.39.64:8082/pdbjplus/data/pdb/mmjson/__ID__.json",
-  pdb_chain_url: "http://192.168.39.64:8082/pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
-  comp_url: "http://192.168.39.64:8082/pdbjplus/data/cc/mmjson/__ID__.json",
-  data_url: "http://192.168.39.64:8082/",
-  newweb_rest: "http://192.168.39.64/rest/newweb/",
-  
-  /* deprecate the below */
-  promodeE_check_url: "https://pdbj.org/rest/quick_search?fields=5&query=__ID__",
-  promodeE_base_structure_url: "https://pdbj.org/rest/displayPromodeEfile?format=min&id=__ID__",
-  promodeE_mode_vectors_url: "https://pdbj.org/rest/displayPromodeEfile?format=vec&id=__ID_____MODE__",
-  promodeE_animation_url: "https://pdbj.org/rest/displayPromodeEfile?format=anm&id=__ID_____MODE__",
+  pdb_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson/__ID__.json",
+  pdb_chain_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
+  comp_url: molmil.pdbj_data+"pdbjplus/data/cc/mmjson/__ID__.json",
+  data_url: molmil.pdbj_data,
+  newweb_rest: molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://"+window.location.host+"/rest/newweb/" : "https://pdbj.org/rest/newweb/",
   
   /* change the implementation to force usage of molmil-app */
   molmil_video_url: "http://127.0.0.1:8080/app/",
@@ -1208,6 +1204,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
     delete chain.molecules[0].C;
     return;
   }
+  
   var m1, m2, xyz1, xyz2, rC, newChains, struc = chain.entry, dx, dy, dz, r, tmpArray;
   var xyzRef = chain.modelsXYZ[0];
   chain.bonds = [];

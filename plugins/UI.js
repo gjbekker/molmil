@@ -411,11 +411,6 @@ molmil.UI.prototype.showLM=function(icon) {
     e = this.menu.sub.pushNode("div", "PDB chem_comp (PDBj)", "molmil_UI_ME");
     e.UI = this.UI;
     e.onclick = function() {this.UI.openID(2);};
-    
-    e = this.menu.sub.pushNode("div", "Promode Elastic (PDBj)", "molmil_UI_ME");
-    e.UI = this.UI;
-    e.onclick = function() {this.UI.openPMEID();};
-    
   };
 
   e = menu.appendChild(document.createElement("div")); e.menu = menu; e.UI = this;
@@ -1140,91 +1135,6 @@ molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
   
   return popup;
   
-};
-
-molmil.UI.prototype.openPMEID=function() {
-  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
-  
-  var UI = this;
-  var popup = molmil_dep.dcE("div");
-  popup.setClass("molmil_menu_popup");
-  
-  popup.pushNode("div", "Promode Elastic");
-  popup.pushNode("hr");
-  
-  popup.pushNode("span", "Display: ");
-  popup.dpm1 = popup.pushNode("label");
-  popup.dpm1.inp = popup.dpm1.pushNode("input");
-  popup.dpm1.inp.type = "radio";
-  popup.dpm1.inp.name = "displayMode";
-  popup.dpm1.pushNode("span", "Displacement vectors");
-  popup.dpm1.inp.checked = true;
-  
-  popup.pushNode("br");
-  
-  popup.dpm2 = popup.pushNode("label");
-  popup.dpm2.inp = popup.dpm2.pushNode("input");
-  popup.dpm2.inp.type = "radio";
-  popup.dpm2.inp.name = "displayMode";
-  popup.dpm2.pushNode("span", "Animation");
-  
-  popup.pushNode("br");
-  
-  popup.pushNode("span", "Mode:").style.paddingRight = "1.125em";
-  popup.mode = popup.pushNode("select");
-  popup.mode.style.width = "10em";
-  for (var i=0; i<10; i++) popup.mode.pushNode("option", i+1);
-  
-  popup.pushNode("br");
-  
-  popup.pushNode("span", "PDB ID: ");
-  popup.inp = popup.pushNode("input");
-  popup.inp.type = "text";
-  popup.inp.style.width = "10em";
-  popup.inp.onkeyup = function(ev) {
-    if (ev.keyCode == 13) this.load.onclick();
-    else if (ev.keyCode == 27) this.cancel.onclick();
-  };
-  
-  popup.pushNode("br");
-  
-  popup.pushNode("span", "Variant:").style.paddingRight = ".25em";
-  popup.sel = popup.pushNode("select");
-  popup.sel.style.width = "10em";
-  
-  popup.pushNode("br");
-  
-  popup.inp.load = popup.load = popup.pushNode("button", "Load");
-  popup.load.canvas = this.canvas;
-  popup.load.inpBuf = null;
-  popup.load.doLoad = function(id) {
-    id = id || popup.sel.childNodes[popup.sel.selectedIndex].innerHTML;
-    var mode = popup.mode.childNodes[popup.mode.selectedIndex].innerHTML;
-    
-    molmil.promode_elastic(id, mode, popup.dpm1.inp.checked ? 1 : 2, this.canvas.molmilViewer);
-    popup.cancel.onclick();
-  };
-  popup.load.onclick = function() {
-    if (popup.inp.value != this.inpBuf) {
-      this.inpBuf = popup.inp.value;
-      var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true; 
-      request.OnDone = function() {
-        molmil_dep.Clear(popup.sel);
-        var jso = JSON.parse(this.request.responseText);
-        if (jso.length == 1) {return popup.load.doLoad(jso[0][2]);};
-        for (var i=0; i<jso.length; i++) popup.sel.pushNode("option", jso[i][2]);
-      };
-      request.Send(molmil.settings.promodeE_check_url.replace("__ID__", this.inpBuf));
-    }
-    else if (popup.sel.length) popup.load.doLoad();
-  };
-  popup.inp.cancel = popup.cancel = popup.pushNode("button", "Cancel");
-  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup);};
-  popup.cancel.popup = popup;
-  
-  this.LM.parentNode.pushNode(popup);
-  
-  popup.inp.focus();
 };
 
 molmil.UI.prototype.openID=function(dbid) {

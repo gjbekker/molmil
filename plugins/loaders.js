@@ -1101,8 +1101,10 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
             currentChain.water = true;
           }
         }
-        else if (currentChain.molecules.length && currentChain.molecules[currentChain.molecules.length-1].water) struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
-        currentChain.CID = this.CID++;
+        else if (currentChain.molecules.length && currentChain.molecules[currentChain.molecules.length-1].water) {
+          struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
+          currentChain.CID = this.CID++;
+        }
         currentMol.chain = currentChain;
         currentChain.molecules.push(currentMol);
         currentMol.MID = this.MID++;
@@ -1142,10 +1144,10 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       if (data[i].length >= 66) atom.Bfactor = parseFloat(data[i].substring(60, 66).trim());
 
       if (atom.atomName == "N") {currentMol.N = atom; currentMol.ligand = false;}
-      else if (atom.atomName == "CA" || atom.atomName == "CH3") {currentMol.CA = atom; currentMol.ligand = false;}
+      else if (atom.atomName == "CA" || atom.atomName == "CH3") {currentChain.isHet = false; currentMol.CA = atom; currentMol.ligand = false;}
       else if (atom.atomName == "C") {currentChain.isHet = false; currentMol.C = atom; currentMol.ligand = false;}
       else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = false;}
-      else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom;}
+      else if (atom.atomName == "P") {currentChain.isHet = false; currentMol.P = atom; currentMol.N = atom;}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
       else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
 
