@@ -2802,7 +2802,10 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
     var sigma1 = parseFloat(form.sigma1.value) || 1;
     var sigma2 = parseFloat(form.sigma2.value) || 2;
     
-    if (! form.atom) return;
+    if (! form.atom) {
+      alert("Please select an atom...");
+      return false;
+    }
     var XYZ = [[form.atom.chain.modelsXYZ[0][form.atom.xyz], form.atom.chain.modelsXYZ[0][form.atom.xyz+1], form.atom.chain.modelsXYZ[0][form.atom.xyz+2]]];
     
     var doRequest = function(mode, filename, red, green, blue, sigma) {
@@ -2861,12 +2864,6 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
   };
   
   edmap2_downloads();
-  
-  
-  // FOR TESTING
-  form.atom = molmil.quickSelect("resi 68 and name ND1", UI.soup)[0];
-  item.onclick();
-  
 };
 
 molmil.UI.prototype.styleif_sites = function(contentBox) {

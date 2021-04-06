@@ -249,7 +249,7 @@ molmil.configBox = {
   OES_element_index_uint: null,
   EXT_frag_depth: null,
   imposterSpheres: false,
-  BGCOLOR: [0.0, 0.0, 0.0, 1.0],
+  BGCOLOR: [1.0, 1.0, 1.0, 1.0],
   
   backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1, "CN": 1, "CM": 1, "CH3": 1},
   projectionMode: 1, // 1: perspective, 2: orthographic
