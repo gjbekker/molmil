@@ -900,12 +900,20 @@ molmil.commandLines.pyMol.styleif = function(cmds) {
   this.cli_soup.UI.styleif(cmds[0], cmds.slice(1));
 }
 
-molmil.commandLines.pyMol.align = function(obj1, obj2) {
-  if (! (obj1 in this.fileObjects)) return this.console.log("Unknown object", obj1);
-  if (! (obj2 in this.fileObjects)) return this.console.log("Unknown object", obj2);
+molmil.commandLines.pyMol.align = function(name1, name2) {
+  name1 = name1.split(":"); name2 = name2.split(":");
+  var obj1, obj2;
+  if (name1 in this.fileObjects) obj1 = this.fileObjects[name1[0]];
+  if (name2 in this.fileObjects) obj2 = this.fileObjects[name2[0]];
   
+  if (!obj1) obj1 = this.cli_soup.structures.filter(x=>x.meta.id == name1[0])[0];
+  if (!obj2) obj2 = this.cli_soup.structures.filter(x=>x.meta.id == name2[0])[0];
+
+  if (! obj1) return this.console.log("Unknown object", name1);
+  if (! obj2) return this.console.log("Unknown object", name2);
+
   // maybe later implement something smart so that specific chains can be extracted, e.g. obj1:A, obj2:B
-  molmil.align(this.fileObjects[obj1].chains[0], this.fileObjects[obj2].chains[0]);
+  molmil.align(obj1.chains[0], obj2.chains[0]);
   return true;
 }
 
@@ -917,6 +925,9 @@ molmil.commandLines.pyMol.alter = function(atoms, options) {
 
   if (options.b) {
     for (var a=0; a<atoms.length; a++) atoms[a].Bfactor = parseFloat(options.b); // maybe in the future change this so that this'll actually execute something...
+  }
+  if (options.chain) {
+    for (var a=0; a<atoms.length; a++) atoms[a].chain.authName = atoms[a].chain.labelName = options.chain;
   }
   
   return true;

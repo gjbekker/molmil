@@ -169,6 +169,7 @@
   -o-user-select: text !important;
   user-select: text !important;
   
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   
   border: 1px solid rgb(var(--FOREGROUND_COLOR));
@@ -192,6 +193,7 @@
   width: 4em;
   height: 4em;
   display: inline-block;
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   color: rgb(var(--FOREGROUND_COLOR));
 }
@@ -210,6 +212,7 @@
   border-right: 0px;
   padding: .33em .5em 1em .5em;
   display: inline-block;
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
@@ -440,12 +443,14 @@
 }
 
 #styleif > div {
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   pointer-events: auto;
 }
 
 #styleif:hover > div {
   background-color: rgba(var(--BACKGROUND_COLOR), .67);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
 

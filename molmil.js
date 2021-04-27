@@ -23,7 +23,7 @@ molmil.ignoreBlackList = false;
 molmil.vrDisplay = null;
 molmil.vrPose = [0, 0, 0];
 molmil.vrOrient = [0, 0, 0, 0];
-molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://data."+window.location.host+"/" : "https://data.pdbj.org/";
+molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://data."+window.location.host+"/" : "https://data.pdbjbk1.pdbj.org/";
 
 
 // switch PDBj URLs to newweb file service
@@ -9795,7 +9795,8 @@ molmil.align = function(A, B) {
     a++; b++;
   }
 
-  var Carr = Barr[0].chain.atoms;
+  var Carr = [];
+  for (var c=0; c<B.entry.chains.length; c++) Carr = Carr.concat(B.entry.chains[c].atoms);
   
   var data = molmil.superpose(Aarr, Barr, Carr, undefined, 2);
   if (data === undefined) return console.error("An error occurred...");
@@ -9813,6 +9814,8 @@ molmil.align = function(A, B) {
   molmil.alignInfo[ID] = data;
   
   molmil.orient(Aarr, A.entry.soup);
+  A.entry.soup.renderer.rebuildRequired = true;
+  molmil.geometry.reInitChains = true;
 }
 
 if (typeof(requestAnimationFrame) != "undefined") molmil.animate_molmilViewers();
