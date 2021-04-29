@@ -2249,8 +2249,8 @@ molmil.viewer.prototype.showCell=function() {
 // geometry functions
 
 // ** generates a PLY file **
-molmil.exportPLY = function(soup) {
-  return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", this.exportPLY, this, [soup]);
+molmil.exportPLY = function(soup, file) {
+  return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", this.exportPLY, this, [soup, file]);
 };
 
 molmil.exportMPBF = function(soup) {

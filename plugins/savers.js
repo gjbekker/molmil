@@ -65,8 +65,9 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
 }
 
 // ** generates a PLY file **
-molmil.exportPLY = function(soup) {
-  if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", this.exportPLY, this, [soup]); 
+molmil.exportPLY = function(soup, file) {
+  if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", this.exportPLY, this, [soup, file]);
+  file = file || "molmil.ply";
   
   soup = soup || molmil.cli_soup;
   
@@ -78,8 +79,9 @@ molmil.exportPLY = function(soup) {
   molmil.geometry.generate(soup.structures, soup.renderer);
   
   // regenerate 
-  var meshes = [];
+  var meshes = [], edges = [];
   if (molmil.geometry.buffer1) meshes.push(molmil.geometry.buffer1);
+  if (molmil.geometry.buffer2) edges.push(molmil.geometry.buffer2);
   if (molmil.geometry.buffer3) meshes.push(molmil.geometry.buffer3);
   if (molmil.geometry.buffer4) meshes.push(molmil.geometry.buffer4);
   for (var i=0; i<soup.structures.length; i++) {
@@ -94,53 +96,106 @@ molmil.exportPLY = function(soup) {
   }
   // output
   
-  var m, nov=0, nof=0, vs;
+  var m, nov=0, nof=0, vs, edgeMode = false;
         
   for (m=0; m<meshes.length; m++) {
     vs = meshes[m].vertexSize || 8;
     nov += meshes[m].vertexBuffer.length / vs;
     nof += meshes[m].indexBuffer.length / 3;
   }
+  
+  if (nov == 0) { // skip to edge mode
+    edgeMode = true;
+    for (m=0; m<edges.length; m++) {
+      vs = edges[m].vertexSize || 5;
+      nov += edges[m].vertexBuffer.length / vs;
+      nof += edges[m].indexBuffer.length / 2; // not actually faces
+    }
+    
+    var header = "ply\nformat binary_little_endian 1.0\nelement vertex "+nov+"\nproperty float x\nproperty float y\nproperty float z\nproperty uint8 red\nproperty uint8 green\nproperty uint8 blue\nproperty uint8 alpha\nelement edge "+nof+"\nproperty int vertex1\nproperty int vertex2\nend_header\n";
+
+    var vout = new Float32Array(nov*4);
+    var vout8 = new Uint8Array(vout.buffer);
+    var iout = new Int32Array(nof*2);
+          
+    var v, v8, vo=0, vo8=0, io=0, vB, vB8, voffset = 0;
         
-  var header = "ply\nformat binary_little_endian 1.0\nelement vertex "+nov+"\nproperty float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\nproperty uint8 red\nproperty uint8 green\nproperty uint8 blue\nproperty uint8 alpha\nelement face "+nof+"\nproperty list int32 int32 vertex_indices\nend_header\n";
-        
-  var vout = new Float32Array(nov*7);
-  var vout8 = new Uint8Array(vout.buffer);
-  var iout = new Int32Array(nof*4);
-        
-  var v, v8, vo=0, vo8=0, io=0, vB, vB8, voffset = 0;
+    for (m=0; m<edges.length; m++) {
+      vs = edges[m].vertexSize || 5;
       
-  for (m=0; m<meshes.length; m++) {
-    vs = meshes[m].vertexSize || 8;
-          
-    vB = meshes[m].vertexBuffer;
-    vB8 = new Uint8Array(vB.buffer, meshes[m].vertices_offset);
-    for (v=0, v8=0; v<vB.length; v+=vs, v8+=(vs*4), vo8+=28) {
-      vout[vo++] = vB[v];   // x
-      vout[vo++] = vB[v+1]; // y
-      vout[vo++] = vB[v+2]; // z
-      vout[vo++] = vB[v+3]; // nx
-      vout[vo++] = vB[v+4]; // ny
-      vout[vo++] = vB[v+5]; // nz
-      vout8[vo8+24] = vB8[v8+24]; vout8[vo8+25] = vB8[v8+25]; vout8[vo8+26] = vB8[v8+26]; vout8[vo8+27] = vB8[v8+27]; vo++; // rgba
+      vB = edges[m].vertexBuffer;
+      vB8 = new Uint8Array(vB.buffer, edges[m].vertices_offset);
+      for (v=0, v8=0; v<vB.length; v+=vs, v8+=(vs*4), vo8+=16) {
+        vout[vo++] = vB[v];   // x
+        vout[vo++] = vB[v+1]; // y
+        vout[vo++] = vB[v+2]; // z
+        vout8[vo8+12] = vB8[v8+12]; vout8[vo8+13] = vB8[v8+13]; vout8[vo8+14] = vB8[v8+14]; vout8[vo8+15] = vB8[v8+15]; vo++; // rgba
+      }
+      
+      vB = edges[m].indexBuffer;
+      for (v=0; v<vB.length; v+=2) {
+        iout[io++] = voffset+vB[v];
+        iout[io++] = voffset+vB[v+1];
+      }
+      
+      voffset += edges[m].vertexBuffer.length/vs;
     }
-          
-    vB = meshes[m].indexBuffer;
-    for (v=0; v<vB.length; v+=3) {
-      iout[io++] = 3;
-      iout[io++] = voffset+vB[v];
-      iout[io++] = voffset+vB[v+1];
-      iout[io++] = voffset+vB[v+2];
-    }
-          
-    voffset += meshes[m].vertexBuffer.length/vs;
   }
-        
+  else {
+    var header = "ply\nformat binary_little_endian 1.0\nelement vertex "+nov+"\nproperty float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\nproperty uint8 red\nproperty uint8 green\nproperty uint8 blue\nproperty uint8 alpha\nelement face "+nof+"\nproperty list int32 int32 vertex_indices\nend_header\n";
+    
+    var vout = new Float32Array(nov*7);
+    var vout8 = new Uint8Array(vout.buffer);
+    var iout = new Int32Array(nof*4);
+    
+    var v, v8, vo=0, vo8=0, io=0, vB, vB8, voffset = 0;
+    
+    for (m=0; m<meshes.length; m++) {
+      vs = meshes[m].vertexSize || 8;
+      
+      vB = meshes[m].vertexBuffer;
+      vB8 = new Uint8Array(vB.buffer, meshes[m].vertices_offset);
+      for (v=0, v8=0; v<vB.length; v+=vs, v8+=(vs*4), vo8+=28) {
+        vout[vo++] = vB[v];   // x
+        vout[vo++] = vB[v+1]; // y
+        vout[vo++] = vB[v+2]; // z
+        vout[vo++] = vB[v+3]; // nx
+        vout[vo++] = vB[v+4]; // ny
+        vout[vo++] = vB[v+5]; // nz
+        vout8[vo8+24] = vB8[v8+24]; vout8[vo8+25] = vB8[v8+25]; vout8[vo8+26] = vB8[v8+26]; vout8[vo8+27] = vB8[v8+27]; vo++; // rgba
+      }
+      
+      vB = meshes[m].indexBuffer;
+      for (v=0; v<vB.length; v+=3) {
+        iout[io++] = 3;
+        iout[io++] = voffset+vB[v];
+        iout[io++] = voffset+vB[v+1];
+        iout[io++] = voffset+vB[v+2];
+      }
+      
+      voffset += meshes[m].vertexBuffer.length/vs;
+    }
+  }
+
   var blob = new Blob([header, vout, iout], {type: "application/octet-binary"});
-  saveAs(blob, "molmil.ply");
+  //saveAs(blob, "molmil.ply");
+  
+ 
+  if (molmil.configBox.customSaveFunction) blobToBase64(blob).then(function(content) {molmil.configBox.customSaveFunction(file, content, "base64-bin");});
+  else saveAs(blob, file);
   
   // de-init
   molmil.geometry.skipClearBuffer = false;
+};
+
+function blobToBase64(blob) {
+  const reader = new FileReader();
+  reader.readAsDataURL(blob);
+  return new Promise(resolve => {
+    reader.onloadend = () => {
+      resolve(reader.result);
+    };
+  });
 };
 
 molmil.exportMPBF = function(soup) {

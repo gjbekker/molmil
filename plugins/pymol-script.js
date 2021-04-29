@@ -827,7 +827,7 @@ molmil.commandLines.pyMol.png = function(filename) {
   if (! filename && ! navigator.clipboard) filename = "image.png";
   
   if (filename && ! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", arguments.callee, this, [filename]);
-  console.log(molmil.configBox.keepBackgroundColor);
+
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) {
     var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
   }
@@ -842,7 +842,7 @@ molmil.commandLines.pyMol.png = function(filename) {
       console.log("Image pasted to clipboard.");
     });
   }
-  else if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(filename, canvas.toDataURL(), "base64-png");
+  else if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(filename, canvas.toDataURL(), "base64-bin");
   else canvas.toBlob(function(blob) {saveAs(blob, filename);});
   canvas.renderer.selectDefaultContext();
   if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
@@ -999,6 +999,7 @@ molmil.commandLines.pyMol.save = function(file, command) {
   else selection = molmil.commandLines.pyMol.select.apply(this, [selection]);
 
   if (format == "pdb") molmil.savePDB(soup, selection, state, file);
+  else if (format == "ply") molmil.exportPLY(soup, file);
   
   soup.renderer.modelId = prevState;
 }
