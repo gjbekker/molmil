@@ -3141,7 +3141,7 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
       c1pos += Array.from(alignment.seq1.substring(pos, fpos)).filter(x=>x!="-").length;
       tr.pushNode("td", alignment.chain1.molecules[c1pos-1].RSID);
       
-      var tmp = alignment.optimized_alignment.substring(pos.fpos);
+      var tmp = alignment.optimized_alignment.substring(pos, fpos);
       var tmp2 = Array.from(alignment.alignment.substring(pos, fpos)).map(function(x, i) {return tmp[i] == "|" ? "<b>|</b>" : x;}).join("");
       tr = alignTable.pushNode("tr");
       tr.pushNode("td", "");
