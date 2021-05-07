@@ -2807,7 +2807,6 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
       return false;
     }
     var XYZ = [[form.atom.chain.modelsXYZ[0][form.atom.xyz], form.atom.chain.modelsXYZ[0][form.atom.xyz+1], form.atom.chain.modelsXYZ[0][form.atom.xyz+2]]];
-    
     var doRequest = function(mode, filename, red, green, blue, sigma) {
       var request = new molmil_dep.CallRemote("POST");
       request.AddParameter("xyz", JSON.stringify(XYZ));
@@ -2829,8 +2828,7 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
         struct.meta.meshes.push(mesh);
         edmap2_downloads();
       };
-      //request.Send(newweb_rest+"edmap2");
-      request.Send("https://pdbj.org/rest/edmap2"); // THIS STILL NEEDS TO BE DONE>...
+      request.Send(molmil.settings.newweb_rest+"edmap");
     };
     
     if (form.modeSel[1].checked) doRequest("2fo-fc", "edmap_2fo-fc_"+struct.meta.fileCounter+".ccp4", 0, 255, 255, sigma1);
@@ -2839,6 +2837,8 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
       doRequest("2fo-fc", "edmap_2fo-fc_"+struct.meta.fileCounter+".ccp4", 0, 255, 255, sigma1);
       doRequest("fo-fc", "edmap_fo-fc_"+struct.meta.fileCounter+".ccp4", 255, 0, 255, sigma2);
     }
+    else return false;
+    struct.meta.fileCounter++;
 
     return false;
   };
@@ -3121,22 +3121,25 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
   var show = function(aid) {
     molmil_dep.Clear(alignmentInfo);
     
-    var alignment = alignments[aid]
+    var alignment = alignments[aid];
 
+    var name1 = alignment.chain1.entry.meta.id.indexOf("_") == -1 ? alignment.chain1.entry.meta.pdbid + alignment.chain1.name : alignment.chain1.entry.meta.id;
+    var name2 = alignment.chain2.entry.meta.id.indexOf("_") == -1 ? alignment.chain2.entry.meta.pdbid + alignment.chain2.name : alignment.chain2.entry.meta.id;
+    alignmentInfo.pushNode("div", "Alignment of <b style='color: cyan;'>"+name1+"</b> vs <b style='color: magenta;'>"+name2+"</b>");
     alignmentInfo.pushNode("div", "Initial RMSD: " + alignment.initial_rmsd.toFixed(2) + " \u212B (over all matched residues)");
     alignmentInfo.pushNode("div", "Optimized RMSD: " + alignment.rmsd.toFixed(2) + " \u212B (over all green matched residues)");
 
     var alignTable = alignmentInfo.pushNode("table"), tr;
-    
-    var pos = 0;
+    var pos = 0, c1pos = 0, c2pos = 0;
     while (true) {
       fpos = pos + nlen;
       if (fpos >= alignment.alignment.length) fpos = alignment.alignment.length-1;
       
       tr = alignTable.pushNode("tr");
-      tr.pushNode("td", alignment.chain1.molecules[pos].RSID);
+      tr.pushNode("td", alignment.chain1.molecules[c1pos].RSID);
       tr.pushNode("td", alignment.seq1.substring(pos, fpos));
-      tr.pushNode("td", alignment.chain1.molecules[fpos-1].RSID);
+      c1pos += Array.from(alignment.seq1.substring(pos, fpos)).filter(x=>x!="-").length;
+      tr.pushNode("td", alignment.chain1.molecules[c1pos-1].RSID);
       
       var tmp = alignment.optimized_alignment.substring(pos.fpos);
       var tmp2 = Array.from(alignment.alignment.substring(pos, fpos)).map(function(x, i) {return tmp[i] == "|" ? "<b>|</b>" : x;}).join("");
@@ -3146,19 +3149,17 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
       tr.pushNode("td", "");
 
       tr = alignTable.pushNode("tr");
-      tr.pushNode("td", alignment.chain2.molecules[pos].RSID);
+      tr.pushNode("td", alignment.chain2.molecules[c2pos].RSID);
       tr.pushNode("td", alignment.seq2.substring(pos, fpos));
-      tr.pushNode("td", alignment.chain2.molecules[fpos-1].RSID);
+      c2pos += Array.from(alignment.seq2.substring(pos, fpos)).filter(x=>x!="-").length;
+      tr.pushNode("td", alignment.chain2.molecules[c2pos-1].RSID);
       
       pos += nlen;
       if (pos >= alignment.alignment.length) break;
     }
-    
   };
-  
-  
+
   show(0);
-  
 };
 
 molmil.UI.prototype.styleif_misc = function(contentBox) {};
@@ -3176,12 +3177,13 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
         struct.meta.styleif = Object.values(jso)[0];
       };
       request.Send(molmil.settings.newweb_rest+"fetch/rdb?entryId="+pdbid+"&schemaName=pdbj&tables=__files,struct_site_pdbmlplus,struct_site_gen_pdbmlplus"+("entity_poly" in struct.meta.pdbxData ? "" : ",entity_poly,struct_site,struct_site_gen"));
-    }    
+    }
   };
   
   for (var i=0; i<UI.soup.structures.length; i++) initStruct(UI.soup.structures[i]);
   
   var nwif = document.getElementById("styleif");
+
   if (! nwif) {
     nwif = this.canvas.parentNode.pushNode("div");
     nwif.id = "styleif";
@@ -3247,6 +3249,8 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
       nwif.options.classList.toggle("visible");
     }
   }
+  
+  if (showOption == "bu" && UI.soup.AisB) showOption = "structure";
   
   for (var i=0; i<nwif.options.childNodes.length; i++) {
     var opt = nwif.options.childNodes[i];

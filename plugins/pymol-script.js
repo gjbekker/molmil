@@ -896,7 +896,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
 
 molmil.commandLines.pyMol.styleif = function(cmds) {
   if (! this.cli_soup.canvas.setupDone) return molmil_dep.asyncStart(molmil.commandLines.pyMol.styleif, [cmds], this, 100);
-  cmds = cmds.split(",").map(function(x){return x.trim()})
+  cmds = cmds.split(",").map(function(x){return x.trim()});
   this.cli_soup.UI.styleif(cmds[0], cmds.slice(1));
 }
 

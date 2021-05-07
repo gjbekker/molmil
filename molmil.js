@@ -25,7 +25,6 @@ molmil.vrPose = [0, 0, 0];
 molmil.vrOrient = [0, 0, 0, 0];
 molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://data."+window.location.host+"/" : "https://data.pdbjbk1.pdbj.org/";
 
-
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
   src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
@@ -33,8 +32,9 @@ molmil.settings_default = {
   pdb_chain_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
   comp_url: molmil.pdbj_data+"pdbjplus/data/cc/mmjson/__ID__.json",
   data_url: molmil.pdbj_data,
-  newweb_rest: molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://"+window.location.host+"/rest/newweb/" : "https://pdbj.org/rest/newweb/",
-  
+  newweb_rest: molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://"+window.location.host+(window.location.pathname.startsWith("/molmil_dev/") ? "/dev" : "")+"/rest/newweb/" : "https://pdbj.org"+(window.location.pathname.startsWith("/molmil_dev/") ? "/dev" : "")+"/rest/newweb/",
+ 
+ 
   /* change the implementation to force usage of molmil-app */
   molmil_video_url: "http://127.0.0.1:8080/app/",
   dependencies: ["lib/gl-matrix-min.js"],
@@ -9782,10 +9782,11 @@ molmil.align = function(A, B) {
 
   var rst = bioseq.align(Aseq, Bseq, true, bioseq.blosum62, [12, 1], null, bioseq.amino_acids);
   var fmt = bioseq.cigar2gaps(Aseq, Bseq, rst.position, rst.CIGAR);
-  Aseq = fmt[0];
-  Bseq = fmt[1];
-  
   var a = rst.position, b = (rst.CIGAR[0] & 0xf) == 4 ? (rst.CIGAR[0] >> 4) : 0, Aarr = [], Barr = [], align = [];
+  
+  Aseq = "-".repeat(b) + fmt[0];
+  Bseq = Bseq.substr(0,b) + fmt[1];
+  b = 0;
   for (var i=0; i<Aseq.length; i++) {
     if (Aseq[i] == "-") {b++; align.push(" "); continue;}
     if (Bseq[i] == "-") {a++; align.push(" "); continue;}
