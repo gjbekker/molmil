@@ -8,6 +8,8 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     set_color: molmil.commandLines.pyMol.setColorCommand, 
     show: molmil.commandLines.pyMol.showCommand,
     hide: molmil.commandLines.pyMol.hideCommand,
+    enable: molmil.commandLines.pyMol.enableCommand,
+    disable: molmil.commandLines.pyMol.disableCommand,
     turn: molmil.commandLines.pyMol.turnCommand,
     move: molmil.commandLines.pyMol.moveCommand,
     fetch: molmil.commandLines.pyMol.fetchCommand,
@@ -274,6 +276,20 @@ molmil.commandLines.pyMol.hideCommand = function(env, command) {
     try {molmil.commandLines.pyMol.hide.apply(env, [cmd[1], cmd[2]]);}
     catch (e) {console.error(e); return false;}
   }
+  return true;
+}
+
+molmil.commandLines.pyMol.enableCommand = function(env, command) {
+  cmd = command.match(/enable[\s]+[\s]*(.*)/);
+  try {molmil.commandLines.pyMol.enable.apply(env, [cmd[1]]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
+molmil.commandLines.pyMol.disableCommand = function(env, command) {
+  cmd = command.match(/disable[\s]+[\s]*(.*)/);
+  try {molmil.commandLines.pyMol.disable.apply(env, [cmd[1]]);}
+  catch (e) {console.error(e); return false;}
   return true;
 }
 
@@ -1246,6 +1262,34 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
   this.cli_soup.renderer.rebuildRequired = true;
   
   return true;
+}
+
+molmil.commandLines.pyMol.enable = function(atoms) {
+  if (typeof atoms != "object") {
+    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
+    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+  }
+  
+  for (var i=0; i<atoms.length; i++) atoms[i].chain.entry.display = true;
+
+  var entries = document.getElementsByClassName("UI_entryItem");
+  for (var i=0; i<entries.length; i++) if (entries[i].payload[0].display) entries[i].style.color = "";
+  
+  this.cli_soup.renderer.rebuildRequired = true;
+}
+
+molmil.commandLines.pyMol.disable = function(atoms) {
+  if (typeof atoms != "object") {
+    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
+    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+  }
+  
+  for (var i=0; i<atoms.length; i++) atoms[i].chain.entry.display = false;
+  
+  var entries = document.getElementsByClassName("UI_entryItem");
+  for (var i=0; i<entries.length; i++) if (! entries[i].payload[0].display) entries[i].style.color = "lightgrey";
+  
+  this.cli_soup.renderer.rebuildRequired = true;
 }
 
 molmil.commandLines.pyMol.turn = function(axis, degrees) {

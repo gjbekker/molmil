@@ -168,6 +168,7 @@ molmil.UI.prototype.showRM=function(icon, reset) {
     file = files[i];
     if (file instanceof molmil.entryObject) {
       item = menu.pushNode("div");
+      item.className = "UI_entryItem";
       item.plus = item.pushNode("a", "+");
       item.plus.className = "optCat_p";
       item.name = item.pushNode("a", file.meta.id + " ("+file.meta.idnr+")");
@@ -2852,10 +2853,10 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
       form.modeSel[2].checked = true;
       form.modeSel[2].onchange();
     }
-    else {
-      form.modeSel[0].checked = true;
-      form.modeSel[0].onchange();
-    }
+  }
+  if (! form.modeSel[1].checked && ! form.modeSel[2].checked) {
+    form.modeSel[0].checked = true;
+    form.modeSel[0].onchange();
   }
   
   

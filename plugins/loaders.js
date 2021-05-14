@@ -780,7 +780,33 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     
     Xpos = currentChain.modelsXYZ[0].length;
     currentChain.modelsXYZ[0].push(x, y, z);
-    currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType.split(".")[0], currentMol, currentChain));
+    
+    if (atomType.indexOf(".") == -1) {
+      if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
+        for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
+        if (atomName.length > 1 && ! molmil_dep.isNumber(atomName[1]) && atomName[1] == atomName[1].toLowerCase()) atomType = atomName.substring(offset, offset+2);
+        else atomType = atomName.substring(offset, offset+1);
+      }
+      else {
+        atomType = "";
+        for (offset=0; offset<atomName.length; offset++) {
+          if (molmil_dep.isNumber(atomName[offset])) {
+            if (atomType.length) break;
+            else continue;
+          }
+          atomType += atomName[offset];
+        }
+        if (atomType.length == 2) {
+          atomType = atomType[0].toUpperCase() + atomType[1].toLowerCase();
+          if (! molmil.configBox.vdwR.hasOwnProperty(atomType)) atomType = atomType[0];
+          if (["C", "N", "O", "H", "S"].includes(atomType.substr(0,1)) && ["a", "b", "g", "d", "e", "z"].includes(atomType.substr(1,1))) atomType = atomType.substr(0,1);
+        }
+        else atomType = atomType[0].toUpperCase();
+      }
+    }
+    else atomType = atomType.split(".")[0];
+    
+    currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType, currentMol, currentChain));
     currentChain.atoms.push(atom);
     if (atom.element == "H") atom.display = this.showHydrogens;
     else atom.display = true;

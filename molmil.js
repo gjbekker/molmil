@@ -53,6 +53,7 @@ molmil.configBox = {
   liteMode: false,
   cullFace: true,
   loadModelsSeparately: false,
+  wheelZoomRequiresCtrl: false,
   
   // Co, Mo, D, Ru, W, Q, YB, gd, ir, os, Y, sm, pr, tb, re, eu, ta, rh, lu, ho
   
@@ -6582,6 +6583,7 @@ molmil.handle_molmilViewer_mouseMove = function (event) {
 }
 
 molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing in vr mode...
+  if (molmil.configBox.wheelZoomRequiresCtrl && ! event.ctrlKey) return;
   event.target.renderer.TransZ -= (event.wheelDelta || -event.detail*40 || event.deltaY*40 || event.deltaX*40);
   if (molmil_dep.dBT.MSIE) event.target.renderer.TransZ /= 50;
   event.target.update = true;
