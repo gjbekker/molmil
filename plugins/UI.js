@@ -357,7 +357,13 @@ molmil.UI.prototype.showResidues=function(target, payload) {
 //molmil.UI.prototype.
 
 molmil.UI.prototype.showLM=function(icon) {
-  try {if (icon.parentNode.childNodes.length > 1) {icon.parentNode.removeChild(icon.nextSibling); icon.parentNode.removeChild(icon.nextSibling); return;}}
+  try {
+    if (icon.parentNode.childNodes.length > 1) {
+      icon.parentNode.removeChild(icon.nextSibling); icon.parentNode.removeChild(icon.nextSibling); 
+      if (this.onLMhide) this.onLMhide();
+      return;
+    }
+  }
   catch (e) {}
   
   var menu = document.createElement("div"), e;
@@ -527,6 +533,8 @@ molmil.UI.prototype.showLM=function(icon) {
   menu.sub = icon.parentNode.appendChild(document.createElement("div"));
   menu.sub.className = "molmil_UI_LM";
   menu.sub.style.display = "none";
+  
+  if (this.onLMshow) this.onLMshow();
 };
 
 molmil.UI.prototype.view=function(sub) {
@@ -554,6 +562,7 @@ molmil.UI.prototype.view=function(sub) {
 
 molmil.UI.prototype.configureBU = function(target) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
 
   var assembly = this.soup.infoBag.BU_assembly || -1; // make this configurable...
   var rm = this.soup.infoBag.BU_rm || [3, 2]; // make this configurable...
@@ -640,7 +649,11 @@ molmil.UI.prototype.configureBU = function(target) {
   
   var closeButton = popup.pushNode("button", "Close");
   closeButton.style.marginLeft = "1em";
-  closeButton.onclick = function() {popup.parentNode.removeChild(popup);};
+  var UI = this;
+  closeButton.onclick = function() {
+    popup.parentNode.removeChild(popup);
+    if (UI.onLMhide) UI.onLMhide();
+  };
   
   if (target) target.pushNode(popup);
   else this.LM.parentNode.pushNode(popup);
@@ -648,6 +661,9 @@ molmil.UI.prototype.configureBU = function(target) {
 
 molmil.UI.prototype.configureSlab=function(target) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
+  
+  var canvas = this.soup.canvas;
   
   var popup = molmil_dep.dcE("div");
   popup.setClass("molmil_menu_popup");
@@ -707,7 +723,8 @@ molmil.UI.prototype.configureSlab=function(target) {
   
   var closeButton = popup.pushNode("button", "Close");
   closeButton.style.marginLeft = "1em";
-  closeButton.onclick = function() {popup.parentNode.removeChild(popup);};
+  var UI = this;
+  closeButton.onclick = function() {popup.parentNode.removeChild(popup); if (UI.onLMhide) UI.onLMhide();};
   
   if (target) target.pushNode(popup);
   else this.LM.parentNode.pushNode(popup);
@@ -715,7 +732,7 @@ molmil.UI.prototype.configureSlab=function(target) {
 }
 
 molmil.UI.prototype.settings=function() { // also make these inputs more dynamic -> make stuff update immediately (also, if possible without rebuilding anything)
-  
+  if (this.onLMshow) this.onLMshow();
   var popup = molmil_dep.dcE("div");
   popup.setClass("molmil_menu_popup");
   
@@ -828,13 +845,15 @@ molmil.UI.prototype.settings=function() { // also make these inputs more dynamic
     
     // close
     this.popup.parentNode.removeChild(this.popup);
+    if (this.onLMhide) this.onLMhide();
   };
   
   popup.pushNode(saveButton);
   
   var cancelButton = popup.pushNode("button", "Cancel");
   cancelButton.style.marginLeft = "1em";
-  cancelButton.onclick = function() {popup.parentNode.removeChild(popup);};
+  var UI = this;
+  cancelButton.onclick = function() {popup.parentNode.removeChild(popup); if (UI.onLMhide) UI.onLMhide();};
   
   this.LM.parentNode.pushNode(popup);
   
@@ -1088,6 +1107,7 @@ molmil.UI.prototype.ccp4_input_popup=function(fp, fn, cb) {
 
 molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
   
   var soup = this.soup;
   var UI = this;
@@ -1129,7 +1149,8 @@ molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
   };
   popup.cancel = popup.pushNode("button", "Cancel");
 
-  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup); if (oncancel) oncancel();};
+  var UI = this;
+  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup); if (UI.onLMhide) UI.onLMhide(); if (oncancel) oncancel();};
   popup.cancel.popup = popup;
 
   if (this.LM) this.LM.parentNode.pushNode(popup);
@@ -1140,6 +1161,7 @@ molmil.UI.prototype.open=function(name, format, ondone, oncancel, binary) {
 
 molmil.UI.prototype.openID=function(dbid) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
   
   var text, url;
   
@@ -1178,7 +1200,8 @@ molmil.UI.prototype.openID=function(dbid) {
     popup.cancel.onclick();
   };
   popup.inp.cancel = popup.cancel = popup.pushNode("button", "Cancel");
-  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup);};
+  var UI = this;
+  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup); if (UI.onLMhide) UI.onLMhide();};
   popup.cancel.popup = popup;
   
   this.LM.parentNode.pushNode(popup);
@@ -1188,6 +1211,7 @@ molmil.UI.prototype.openID=function(dbid) {
 
 molmil.UI.prototype.savePNG=function() {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
   
   var popup = molmil_dep.dcE("div");
   popup.setClass("molmil_menu_popup");
@@ -1235,7 +1259,8 @@ molmil.UI.prototype.savePNG=function() {
     popup.cancel.onclick();
   };
   popup.cancel = popup.pushNode("button", "Cancel");
-  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup);};
+  var UI = this;
+  popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup); if (UI.onLMhide) UI.onLMhide();};
   popup.cancel.popup = popup;
   
   popup.range.onmousemove();
