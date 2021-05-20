@@ -483,6 +483,19 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
   return true;
 }
 
+molmil.quickSelect = molmil.commandLines.pyMol.selectModel = function(expr, soup) {
+  expr = expr.trim();
+  var soupObject = this.soupObject || molmil.cli_soup || soup || this.cli_soup;
+  if (expr.startsWith("#")) {
+    for (var i=0; i<soupObject.structures.length; i++) if (soupObject.structures[i].meta.idnr == expr) return [soupObject.structures[i]];
+  }
+  else {
+    expr = expr.toLowerCase();
+    for (var i=0; i<soupObject.structures.length; i++) if (soupObject.structures[i].meta.id.toLowerCase() == expr) return [soupObject.structures[i]];
+  }
+  return [];
+}
+
 molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMol.pymolSelectEngine = function(expr, soup) {
   if (! molmil.isBalancedStatement(expr)) throw "Incorrect statement"; // safety check
   
@@ -1128,62 +1141,82 @@ molmil.commandLines.pyMol.cartoon_color = function(clr, atoms, quiet) {
 
     
 molmil.commandLines.pyMol.color = function(clr, atoms) {
+  var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    //else atoms = molmil.commandLines.pyMol.select(atoms);
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
   
-  if (clr == "default") {
-    var mols = [];
-    for (var i=0; i<atoms.length; i++) mols.push(atoms[i].molecule);
-     molmil.colorEntry(mols, 1, null, true);
-   }
-   else if (clr == "structure") {
-     var mols = [];
-     for (var i=0; i<atoms.length; i++) mols.push(atoms[i].molecule);
-     molmil.colorEntry(mols, 2, null, true);
-   }
-   else if (clr == "cpk") {
-     molmil.colorEntry(atoms, 3, null, true);
-   }
-   else if (clr == "group") {
-     var chains = {};
-     for (var i=0; i<atoms.length; i++) chains[atoms[i].chain.CID] = atoms[i].chain;
-     molmil.colorEntry(Object.values(chains), 4, null, true);
-   }
-   else if (clr == "chain") {
-     var entries = {};
-     for (var i=0; i<atoms.length; i++) entries[JSON.stringify(atoms[i].chain.entry.meta)] = atoms[i].chain.entry;
-     molmil.colorEntry(Object.values(entries), molmil.colorEntry_Chain, null, true);
-  }
-   else if (clr == "chainAlt") {
-     var entries = {};
-     for (var i=0; i<atoms.length; i++) entries[JSON.stringify(atoms[i].chain.entry.meta)] = atoms[i].chain.entry;
-     molmil.colorEntry(Object.values(entries), molmil.colorEntry_ChainAlt, null, true);
-  }
-  else if (clr == "bfactor") {
-    var values = []
-    for (var i=0; i<atoms.length; i++) values.push(atoms[i].Bfactor);
-    if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
-    else var min = Math.min.apply(null, values);
-    if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
-    else var max = Math.max.apply(null, values); 
-    var diffInv = 1./(max-min), tmp;
-    for (var i=0; i<atoms.length; i++) {
-      tmp = 1-((values[i]-min)*diffInv); ///TODO
-      atoms[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); atoms[i].rgba[0] *= 255; atoms[i].rgba[1] *= 255; atoms[i].rgba[2] *= 255; atoms[i].rgba.push(255);
-      if (atoms[i].molecule.CA == atoms[i]) atoms[i].molecule.rgba = atoms[i].rgba;
+  // for (var i=0; i<atoms.length; i++) if (atoms[i] instanceof molmil.polygonObject) atoms[i].programs[0].settings.rgba = rgba;
+  
+  if (selMode == 1) {
+    if (clr == "default") {
+      var mols = [];
+      for (var i=0; i<selection.length; i++) mols.push(selection[i].molecule);
+       molmil.colorEntry(mols, 1, null, true);
+     }
+     else if (clr == "structure") {
+       var mols = [];
+       for (var i=0; i<selection.length; i++) mols.push(selection[i].molecule);
+       molmil.colorEntry(mols, 2, null, true);
+     }
+     else if (clr == "cpk") {
+       molmil.colorEntry(selection, 3, null, true);
+     }
+     else if (clr == "group") {
+       var chains = {};
+       for (var i=0; i<selection.length; i++) chains[selection[i].chain.CID] = selection[i].chain;
+       molmil.colorEntry(Object.values(chains), 4, null, true);
+     }
+     else if (clr == "chain") {
+       var entries = {};
+       for (var i=0; i<selection.length; i++) entries[JSON.stringify(selection[i].chain.entry.meta)] = selection[i].chain.entry;
+       molmil.colorEntry(Object.values(entries), molmil.colorEntry_Chain, null, true);
     }
-    this.cli_soup.renderer.rebuildRequired = true;
-  }
-  else if (clr == "snfg") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].molecule.rgba = atoms[i].rgba = (molmil.SNFG[atoms[i].molecule.name] || molmil.SNFG.__UNKNOWN__).rgba.slice();
+     else if (clr == "chainAlt") {
+       var entries = {};
+       for (var i=0; i<selection.length; i++) entries[JSON.stringify(selection[i].chain.entry.meta)] = selection[i].chain.entry;
+       molmil.colorEntry(Object.values(entries), molmil.colorEntry_ChainAlt, null, true);
     }
-    this.cli_soup.renderer.rebuildRequired = true;
+    else if (clr == "bfactor") {
+      var values = []
+      for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
+      if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
+      else var min = Math.min.apply(null, values);
+      if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
+      else var max = Math.max.apply(null, values); 
+      var diffInv = 1./(max-min), tmp;
+      for (var i=0; i<selection.length; i++) {
+        tmp = 1-((values[i]-min)*diffInv); ///TODO
+        selection[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); selection[i].rgba[0] *= 255; selection[i].rgba[1] *= 255; selection[i].rgba[2] *= 255; selection[i].rgba.push(255);
+        if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
+      }
+      this.cli_soup.renderer.rebuildRequired = true;
+    }
+    else if (clr == "snfg") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].molecule.rgba = selection[i].rgba = (molmil.SNFG[selection[i].molecule.name] || molmil.SNFG.__UNKNOWN__).rgba.slice();
+      }
+      this.cli_soup.renderer.rebuildRequired = true;
+    }
+    else {
+      if (typeof clr == "string") {
+        var rgba = molmil.color2rgba(clr);
+        if (rgba == clr && this.colors.hasOwnProperty(clr)) rgba = this.colors[clr];
+        if (rgba == clr) {
+          rgba = JSON.parse(clr);
+          if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3] || rgba[3] == 0 ? rgba[3] : 255];
+        }
+      }
+      else var rgba = clr;
+
+      for (var i=0; i<selection.length; i++) selection[i].rgba = rgba;
+
+      this.cli_soup.renderer.rebuildRequired = true;
+    }
   }
-  else {
+  else if (selMode == 2) {
     if (typeof clr == "string") {
       var rgba = molmil.color2rgba(clr);
       if (rgba == clr && this.colors.hasOwnProperty(clr)) rgba = this.colors[clr];
@@ -1194,9 +1227,8 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
     }
     else var rgba = clr;
 
-    for (var i=0; i<atoms.length; i++) atoms[i].rgba = rgba;
-
-    // in the future upgrade all this so that this is executed after the command buffer is empty...
+    for (var i=0; i<selection.length; i++) selection[i].programs[0].settings.rgba = rgba;
+    
     this.cli_soup.renderer.rebuildRequired = true;
   }
   
@@ -1216,6 +1248,7 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
     //else atoms = molmil.commandLines.pyMol.select(atoms);
     else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
   }
+  
   if (repr == "hydro" || repr == "h.") {
     this.cli_soup.hydrogenToggle(false);
   }
@@ -1265,12 +1298,22 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
 }
 
 molmil.commandLines.pyMol.enable = function(atoms) {
+  var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    if (this.hasOwnProperty(atoms)) selection = this[atoms];
+    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
   
-  for (var i=0; i<atoms.length; i++) atoms[i].chain.entry.display = true;
+  if (selMode == 1) {
+    for (var i=0; i<selection.length; i++) selection[i].chain.entry.display = true;
+  }
+  else if (selMode == 2) {
+    for (var i=0; i<selection.length; i++) {
+      selection[i].display = false;
+      for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = true;
+    }
+  }
 
   var entries = document.getElementsByClassName("UI_entryItem");
   for (var i=0; i<entries.length; i++) if (entries[i].payload[0].display) entries[i].style.color = "";
@@ -1279,12 +1322,22 @@ molmil.commandLines.pyMol.enable = function(atoms) {
 }
 
 molmil.commandLines.pyMol.disable = function(atoms) {
+  var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    if (this.hasOwnProperty(atoms)) selection = this[atoms];
+    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
-  
-  for (var i=0; i<atoms.length; i++) atoms[i].chain.entry.display = false;
+
+  if (selMode == 1) {
+    for (var i=0; i<selection.length; i++) selection[i].chain.entry.display = false;
+  }
+  else if (selMode == 2) {
+    for (var i=0; i<selection.length; i++) {
+      selection[i].display = false;
+      for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = false;
+    }
+  }
   
   var entries = document.getElementsByClassName("UI_entryItem");
   for (var i=0; i<entries.length; i++) if (! entries[i].payload[0].display) entries[i].style.color = "lightgrey";
@@ -1312,17 +1365,18 @@ molmil.commandLines.pyMol.move = function(axis, degrees) {
 }
 
 molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
+  var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    //else atoms = molmil.commandLines.pyMol.select(atoms);
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    if (this.hasOwnProperty(atoms)) selection = this[atoms];
+    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
   
   var i;
   if (key == "stick_radius") {
     value = parseFloat(value);
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].stickRadius = value;
+    for (var i=0; i<selection.length; i++) {
+      selection[i].stickRadius = value;
     }
   }
   else if (key == "depth_cue") {
@@ -1416,6 +1470,14 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     }
     this.mesh_color = rgba;
   }
+  else if (selMode == 2 && key == "surface_color") {
+    var rgba = molmil.color2rgba(value);
+    if (rgba == value) {
+      rgba = JSON.parse(value);
+      if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
+    }
+    for (var i=0; i<selection.length; i++) selection[i].programs[0].settings.rgba = rgba;
+  }
   else if (key == "cif_use_auth") {
     if (value == "on") this.cif_use_auth = true;
     else this.cif_use_auth = false;
@@ -1473,186 +1535,202 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   // atoms => all
   var backboneAtoms = molmil.configBox.backboneAtoms4Display;
 
+
   var soup = molmil.cli_soup;
+  var selection = atoms, selMode = 1;
   if (atoms === undefined) atoms = Object.values(soup.atomRef);
   else if (typeof atoms != "object") {
     atoms = atoms.replace(/,/, '').trim();
-    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    //else atoms = molmil.commandLines.pyMol.select(atoms);
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+    if (this.hasOwnProperty(atoms)) selection = this[atoms];
+    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
 
-  if (repr == "spheres") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 1;
-      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
-      else atoms[i].display = true;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.showSC = true;
-        atoms[i].molecule.chain.twoDcache = null;
-      }
-      else if (atoms[i].molecule.ligand) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.display = true;
-        atoms[i].chain.display = true;
-      }
-    }
-  }
-  else if (repr == "ball_stick") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 2;
-      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
-      else atoms[i].display = true;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.showSC = true;
-        atoms[i].molecule.chain.twoDcache = null;
-      }
-      else if (atoms[i].molecule.ligand) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.display = true;
-        atoms[i].chain.display = true;
+  if (selMode == 1) {
+    if (repr == "spheres") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 1;
+        if (selection[i].element == "H") selection[i].display = soup.showHydrogens;
+        else selection[i].display = true;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.showSC = true;
+          selection[i].molecule.chain.twoDcache = null;
+        }
+        else if (selection[i].molecule.ligand) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.display = true;
+          selection[i].chain.display = true;
+        }
       }
     }
-  }
-  else if (repr == "sticks") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 3;
-      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
-      else atoms[i].display = true;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.display = true;
-        atoms[i].molecule.showSC = true;
-        atoms[i].molecule.chain.twoDcache = null;
-      }
-      else if (atoms[i].molecule.ligand) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.display = true;
-        atoms[i].chain.display = true;
-      }
-    }
-  }
-  else if (repr == "lines") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 4;
-      if (atoms[i].element == "H") atoms[i].display = soup.showHydrogens;
-      else atoms[i].display = true;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 0;
-        atoms[i].molecule.showSC = true;
-        atoms[i].molecule.chain.twoDcache = null;
+    else if (repr == "ball_stick") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 2;
+        if (selection[i].element == "H") selection[i].display = soup.showHydrogens;
+        else selection[i].display = true;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.showSC = true;
+          selection[i].molecule.chain.twoDcache = null;
+        }
+        else if (selection[i].molecule.ligand) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.display = true;
+          selection[i].chain.display = true;
+        }
       }
     }
-  }
-  else if (repr == "cartoon") {
-    var resshow = {};
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 0;
-      atoms[i].chain.display = atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i] || atoms[i].molecule.SNFG) {
-        atoms[i].molecule.displayMode = 3;
-        atoms[i].molecule.showSC = false;
-        atoms[i].molecule.chain.displayMode = 3;
-      }
-      if (atoms[i].molecule.SNFG && atoms[i].molecule.res_con) resshow[atoms[i].molecule.res_con.MID] = atoms[i].molecule.res_con;
-    }
-    for (var i in resshow) {
-      resshow[i].showSC = true;
-      for (var a=0; a<resshow[i].atoms.length; a++) {
-        if (! backboneAtoms.hasOwnProperty(resshow[i].atoms[a].atomName)) resshow[i].atoms[a].displayMode = 0;
-      }
-    }
-    molmil.geometry.reInitChains = true;
-  }
-  else if (repr == "rocket") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 0;
-      atoms[i].chain.display = atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 31;
-        atoms[i].molecule.showSC = false;
-        atoms[i].molecule.chain.displayMode = 4;
-      }
-      else if (atoms[i].molecule.SNFG) {
-        atoms[i].molecule.displayMode = 31;
-        atoms[i].molecule.chain.displayMode = 4;
-        atoms[i].displayMode = 3;
+    else if (repr == "sticks") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 3;
+        if (selection[i].element == "H") selection[i].display = soup.showHydrogens;
+        else selection[i].display = true;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.display = true;
+          selection[i].molecule.showSC = true;
+          selection[i].molecule.chain.twoDcache = null;
+        }
+        else if (selection[i].molecule.ligand) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.display = true;
+          selection[i].chain.display = true;
+        }
       }
     }
-    molmil.geometry.reInitChains = true;
-  }
-  else if (repr == "snfg-icon") {
-    var resshow = {};
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 0;
-      atoms[i].chain.display = atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.SNFG) {
-        atoms[i].molecule.displayMode = 31;
-        atoms[i].molecule.chain.displayMode = 4;
-        atoms[i].displayMode = 3;
-        if (atoms[i].molecule.res_con) resshow[atoms[i].molecule.res_con.MID] = atoms[i].molecule.res_con;
+    else if (repr == "lines") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 4;
+        if (selection[i].element == "H") selection[i].display = soup.showHydrogens;
+        else selection[i].display = true;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 0;
+          selection[i].molecule.showSC = true;
+          selection[i].molecule.chain.twoDcache = null;
+        }
       }
     }
-    for (var i in resshow) {
-      resshow[i].showSC = true;
-      for (var a=0; a<resshow[i].atoms.length; a++) {
-        if (! backboneAtoms.hasOwnProperty(resshow[i].atoms[a].atomName)) resshow[i].atoms[a].displayMode = resshow[i].atoms[a].displayMode || 3;
+    else if (repr == "cartoon") {
+      var resshow = {};
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 0;
+        selection[i].chain.display = selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i] || selection[i].molecule.SNFG) {
+          selection[i].molecule.displayMode = 3;
+          selection[i].molecule.showSC = false;
+          selection[i].molecule.chain.displayMode = 3;
+        }
+        if (selection[i].molecule.SNFG && selection[i].molecule.res_con) resshow[selection[i].molecule.res_con.MID] = selection[i].molecule.res_con;
+      }
+      for (var i in resshow) {
+        resshow[i].showSC = true;
+        for (var a=0; a<resshow[i].selection.length; a++) {
+          if (! backboneAtoms.hasOwnProperty(resshow[i].selection[a].atomName)) resshow[i].selection[a].displayMode = 0;
+        }
+      }
+      molmil.geometry.reInitChains = true;
+    }
+    else if (repr == "rocket") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 0;
+        selection[i].chain.display = selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 31;
+          selection[i].molecule.showSC = false;
+          selection[i].molecule.chain.displayMode = 4;
+        }
+        else if (selection[i].molecule.SNFG) {
+          selection[i].molecule.displayMode = 31;
+          selection[i].molecule.chain.displayMode = 4;
+          selection[i].displayMode = 3;
+        }
+      }
+      molmil.geometry.reInitChains = true;
+    }
+    else if (repr == "snfg-icon") {
+      var resshow = {};
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 0;
+        selection[i].chain.display = selection[i].chain.entry.display = true;
+        if (selection[i].molecule.SNFG) {
+          selection[i].molecule.displayMode = 31;
+          selection[i].molecule.chain.displayMode = 4;
+          selection[i].displayMode = 3;
+          if (selection[i].molecule.res_con) resshow[selection[i].molecule.res_con.MID] = selection[i].molecule.res_con;
+        }
+      }
+      for (var i in resshow) {
+        resshow[i].showSC = true;
+        for (var a=0; a<resshow[i].selection.length; a++) {
+          if (! backboneAtoms.hasOwnProperty(resshow[i].selection[a].atomName)) resshow[i].selection[a].displayMode = resshow[i].selection[a].displayMode || 3;
+        }
       }
     }
-  }
-  else if (repr == "coarse-surface") {
-    //for (var i=0; i<atoms.length; i++) atoms[i].molecule.displayMode = atoms[i].chain.displayMode = 0;
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].chain.entry.display = true;
-      atoms[i].chain.displayMode = molmil.displayMode_ChainSurfaceCG;
-      atoms[i].chain.displayMode = molmil.displayMode_ChainSurfaceCG;
-    }
-  }
-  else if (repr == "tube") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 0;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 2;
-        atoms[i].molecule.showSC = false;
-        atoms[i].molecule.chain.displayMode = 2;
+    else if (repr == "coarse-surface") {
+      //for (var i=0; i<selection.length; i++) selection[i].molecule.displayMode = selection[i].chain.displayMode = 0;
+      for (var i=0; i<selection.length; i++) {
+        selection[i].chain.entry.display = true;
+        selection[i].chain.displayMode = molmil.displayMode_ChainSurfaceCG;
+        selection[i].chain.displayMode = molmil.displayMode_ChainSurfaceCG;
       }
     }
-  }
-  else if (repr == "ca-trace") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].displayMode = 0;
-      atoms[i].chain.entry.display = true;
-      if (atoms[i].molecule.CA == atoms[i]) {
-        atoms[i].molecule.displayMode = 1;
-        atoms[i].molecule.showSC = false;
-        atoms[i].molecule.chain.displayMode = 1;
+    else if (repr == "tube") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 0;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 2;
+          selection[i].molecule.showSC = false;
+          selection[i].molecule.chain.displayMode = 2;
+        }
       }
     }
-  }
-  else if (repr == "hydro" || repr == "h.") {
-    this.cli_soup.hydrogenToggle(true);
-  }
-  else if (repr == "solvent") {
-    this.cli_soup.waterToggle(true);
-  }
-  else if (repr == "visible") {
-    for (var i=0; i<atoms.length; i++) {
-      atoms[i].chain.entry.display = true;
-      atoms[i].display = true;
+    else if (repr == "ca-trace") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].displayMode = 0;
+        selection[i].chain.entry.display = true;
+        if (selection[i].molecule.CA == selection[i]) {
+          selection[i].molecule.displayMode = 1;
+          selection[i].molecule.showSC = false;
+          selection[i].molecule.chain.displayMode = 1;
+        }
+      }
+    }
+    else if (repr == "hydro" || repr == "h.") {
+      this.cli_soup.hydrogenToggle(true);
+    }
+    else if (repr == "solvent") {
+      this.cli_soup.waterToggle(true);
+    }
+    else if (repr == "visible") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].chain.entry.display = true;
+        selection[i].display = true;
+      }
+    }
+    else if (repr == "cell") {
+      soup.showCell();
+    }
+    else {
+      console.error(repr+" is unknown...");
     }
   }
-  else if (repr == "cell") {
-    soup.showCell();
-  }
-  else {
-    console.error(repr+" is unknown...");
+  else if (selMode == 2) {
+    if (repr == "lines") {
+      for (var i=0; i<selection.length; i++) {
+        if (selection[i].programs[0].settings.solid) selection[i].programs[0].toggleWF();
+      }
+    }
+    else if (repr == "solid") {
+      for (var i=0; i<selection.length; i++) {
+        if (! selection[i].programs[0].settings.solid) selection[i].programs[0].toggleWF();
+      }
+    }
   }
   
   this.cli_soup.renderer.rebuildRequired = true;

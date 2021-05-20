@@ -2392,6 +2392,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   else {
     var program = {}; program.settings = settings;
   }
+  
   program.renderer = renderer;
   
   //settings.solid = false;
@@ -2452,7 +2453,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
   
   program.point_shader = renderer.shaders.points;
   if (program.point_shader) program.point_attributes = program.point_shader.attributes;
-  
+
   if (settings.uniform_color || settings.rgba) {
     if (settings.alphaSet) {
       program.pre_shader = renderer.shaders.alpha_dummy;
@@ -2463,12 +2464,12 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     program.point_shader = renderer.shaders.points_uniform_color;
   }
   else {
-    if (settings.alphaMode) program.standard_shader = renderer.shaders.standard_alpha;
-    else if (settings.alphaSet) {
+    if ("alphaMode" in settings) program.standard_shader = renderer.shaders.standard_alpha;
+    else if ("alphaSet" in settings) {
       program.pre_shader = renderer.shaders.alpha_dummy;
       program.standard_shader = renderer.shaders.standard_alphaSet;
     }
-    else if (settings.slab) {
+    else if ("slab" in settings) {
       if (settings.slabColor) program.standard_shader = renderer.shaders.standard_slabColor;
       else program.standard_shader = renderer.shaders.standard_slab;
     }

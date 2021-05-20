@@ -222,14 +222,13 @@ molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
 
 molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   if (! settings) settings = {solid: true};
-  var rgba = settings.rgba || [255, 255, 255, 255];
+  var rgba = settings.rgba = settings.rgba || [255, 255, 255, 255];
   
   data = data.split("\n");
   var tmp, i;
   var pos = [], norm = [], idx = [], n, hihi = [0, 0, 0, 0];
   
   var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
-  
   for (i=0; i<data.length; i++) {
     if (data[i].substr(0,2) == "vn") {
       tmp = data[i].split(/\s+/);
@@ -260,7 +259,7 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
       idx.push([parseInt(tmp[1].split("//")[0])-1, parseInt(tmp[2].split("//")[0])-1, parseInt(tmp[3].split("//")[0])-1]);
     }
   }
-  
+
   if (norm.length == 0) {
     // make faces list
     
@@ -287,9 +286,7 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
       norm.push(normal);
     }
     molmil.taubinSmoothing(norm, idx, .5, -.53, 5);
-    
   }
-  
 
   var vertices = new Float32Array(pos.length*7); // x, y, z, nx, ny, nz, rgba
   var indices = new Int32Array(idx.length*3);
@@ -306,10 +303,10 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
     vertices[p++] = norm[i][1];
     vertices[p++] = norm[i][2];
     
-    vertices8[p8+24] = rgba[0];
-    vertices8[p8+25] = rgba[1];
-    vertices8[p8+26] = rgba[2];
-    vertices8[p8+27] = rgba[3];
+    vertices8[p8+24] = 255;
+    vertices8[p8+25] = 255;
+    vertices8[p8+26] = 255;
+    vertices8[p8+27] = 255;
     p++;
   }
   
@@ -336,35 +333,22 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   }
   
   
-  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); canvas.molmilViewer.structures.push(struct);
+  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); this.structures.push(struct);
   struct.options = [];
   struct.meta.geomRanges = geomRanges;
-  
-  var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
-  canvas.renderer.addProgram(program);
+
+  var program = molmil.geometry.build_simple_render_program(vertices, indices, this.canvas.renderer, settings);
+  this.canvas.renderer.addProgram(program);
   struct.programs.push(program);
   
   program.settings.meshData8 = vertices8;
   
-  program.recolor = function(rgba) {
-    for (var i=0; i<this.settings.meshData8.length; i+=28) {
-      this.settings.meshData8[i+24] = rgba[0];
-      this.settings.meshData8[i+25] = rgba[1];
-      this.settings.meshData8[i+26] = rgba[2];
-      this.settings.meshData8[i+27] = rgba[3];
-    }
-    var vbuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vbuffer);
-    this.gl.bufferData(this.gl.ARRAY_BUFFER, this.settings.meshData8.buffer, this.gl.STATIC_DRAW);
-    this.vertexBuffer = vbuffer;
-  };
+  this.calculateCOG();
   
-  canvas.molmilViewer.calculateCOG();
-  
-  canvas.renderer.initBuffers();
-  canvas.update = true;
+  this.renderer.initBuffers();
+  this.canvas.update = true;
           
-  molmil.safeStartViewer(canvas);
+  molmil.safeStartViewer(this.canvas);
   
   return struct;
   

@@ -1884,8 +1884,19 @@ molmil.animationObj.prototype.backwardRenderer = function() {
 
 
 
+molmil.UI.prototype.meshOptionsFunction = function(payload, lv, mode) {
+  if (! (payload instanceof Array)) payload = [payload];
+  var mesh = payload[0], UI = this;
+  
+  UI.styleif_mesh(mesh, {clientX: window.innerWidth*.25, clientY: window.innerHeight*.25}, {ondelete: function() {
+    UI.deleteMeshFunction(payload);
+  }});
+  
+  this.resetRM();
+};
+
 molmil.UI.prototype.deleteMeshFunction = function(payload, lv, mode) {
-  if (! (payload instanceof Array)) payload = [payload]
+  if (! (payload instanceof Array)) payload = [payload];
   
   var files = this.soup.structures;
   
@@ -2185,9 +2196,8 @@ molmil.UI.prototype.initMenus = function() {
       if (payload[0].display) {structure[3][2] = molmil.displayMode_None; return "Hide";}
       else {structure[3][2] = molmil.displayMode_Visible; return "Show";}
     }, this.displayFunction, this, [null, 0, 0]],
-    ["Color", this.colorFunction, this, [null, 0, 0]],
-    ["Isosurface cutoff", this.displayFunction, this, [null, 0, 0]],
-    ["Delete", this.deleteMeshFunction, this, [null, 0, 0]],
+    ["Options", this.meshOptionsFunction, this, [null, 0, 0]],
+    ["Delete", this.deleteMeshFunction, this, [null, 0, 0]]
   ];
   
   this.contextMenuStructuresEntry = [
@@ -2625,6 +2635,7 @@ molmil.UI.prototype.styleif_mesh = function(mesh, ev, options) {
   if (settings.solid) solid_mode.checked = true;
   item.onclick = function() {
     if (settings.solid) return;
+    if (! ("alphaSet" in settings)) settings.alphaSet = 1.0;
     mesh.programs[0].toggleWF();
     UI.soup.renderer.canvas.update = true;
     transp.disabled = false;
