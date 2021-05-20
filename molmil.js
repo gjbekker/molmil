@@ -2464,7 +2464,10 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     program.point_shader = renderer.shaders.points_uniform_color;
   }
   else {
-    if ("alphaMode" in settings) program.standard_shader = renderer.shaders.standard_alpha;
+    if ("alphaMode" in settings) {
+      program.pre_shader = renderer.shaders.alpha_dummy;
+      program.standard_shader = renderer.shaders.standard_alpha;
+    }
     else if ("alphaSet" in settings) {
       program.pre_shader = renderer.shaders.alpha_dummy;
       program.standard_shader = renderer.shaders.standard_alphaSet;

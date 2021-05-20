@@ -401,7 +401,7 @@ molmil.viewer.prototype.load_wrl = function(data, filename, settings) {
   this.renderer.initBuffers();
   this.canvas.update = true;
   
-  molmil.safeStartViewer(canvas);
+  molmil.safeStartViewer(this.canvas);
   
   return struct;
 }
