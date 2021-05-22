@@ -1172,7 +1172,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
     for (m=0; m<struc.chains[c].molecules.length; m++) {
       mol = struc.chains[c].molecules[m];
       if (mol.xna) {
-        if ((! mol.P || ! mol.CA || ! mol.C)) {
+        if ((! mol.P || ! mol.CA || ! mol.C) && ! (mol.name in molmil.AATypes)) {
           mol.ligand = true;
           delete mol.P; delete mol.CA; delete mol.C;
           mol.xna = false;
