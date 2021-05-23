@@ -1076,7 +1076,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   var sheetData = [];
   var newModels = [];
   
-  var struc = null, Xpos, cmnum, strucs = [];
+  var struc = null, Xpos, cmnum, strucs = [], CAonly = true, Ponly = true;
   
   for (i=0; i<data.length; i++) {
     if ((data[i].substring(0,5) == "MODEL" && currentChain) || ! struc) {
@@ -1086,10 +1086,10 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       ccid = cmid = null;
     }
     if (data[i].substring(0, 4) == "ATOM" || data[i].substring(0, 6) == "HETATM") {
-      chainName = data[i].substring(21, 22).trim();
+      chainName = data[i].substring(20, 22).trim();
       molID = data[i].substring(22, 28).trim();
       atomName = data[i].substring(11, 16).trim();
-      molName = data[i].substring(17, 21).trim();
+      molName = data[i].substring(17, 20).trim();
       
       x = parseFloat(data[i].substring(30, 38).trim());
       y = parseFloat(data[i].substring(38, 46).trim());
@@ -1160,6 +1160,8 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       else if (atom.atomName == "P") {currentChain.isHet = false; currentMol.P = atom; currentMol.N = atom;}
       else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
       else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
+      if (CAonly && currentMol.CA != atom) CAonly = false;
+      if (Ponly && currentMol.P != atom) Ponly = false;
 
       currentChain.atoms.push(atom);
       atom.AID = this.AID++;
@@ -1168,19 +1170,33 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
   }
   
   var c, m, mol;
-  for (c=0; c<struc.chains.length; c++) {
-    for (m=0; m<struc.chains[c].molecules.length; m++) {
-      mol = struc.chains[c].molecules[m];
-      if (mol.xna) {
-        if ((! mol.P || ! mol.CA || ! mol.C) && ! (mol.name in molmil.AATypes)) {
+  
+  if (! CAonly && ! Ponly) {
+    for (c=0; c<struc.chains.length; c++) {
+      for (m=0; m<struc.chains[c].molecules.length; m++) {
+        mol = struc.chains[c].molecules[m];
+        if (mol.xna) {
+          if ((! mol.P || ! mol.CA || ! mol.C) && ! (mol.name in molmil.AATypes)) {
+            mol.ligand = true;
+            delete mol.P; delete mol.CA; delete mol.C;
+            mol.xna = false;
+          }
+        }
+        else if ((! mol.CA || ! mol.N || ! mol.O) && ! molmil.AATypes.hasOwnProperty(mol.name)) {
           mol.ligand = true;
-          delete mol.P; delete mol.CA; delete mol.C;
-          mol.xna = false;
+          delete mol.CA; delete mol.N; delete mol.O;
         }
       }
-      else if ((! mol.CA || ! mol.N || ! mol.O) && ! molmil.AATypes.hasOwnProperty(mol.name)) {
-        mol.ligand = true;
-        delete mol.CA; delete mol.N; delete mol.O;
+    }
+  }
+  else if (Ponly) {
+    for (c=0; c<struc.chains.length; c++) {
+      for (m=0; m<struc.chains[c].molecules.length; m++) {
+        mol = struc.chains[c].molecules[m];
+        mol.CA = mol.P;
+        mol.xna = true;
+        delete mol.P;
+        delete mol.N;
       }
     }
   }

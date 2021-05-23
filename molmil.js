@@ -1212,7 +1212,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
   for (m1=0; m1<chain.molecules.length; m1++) {
     rC = 17;
     if (chain.molecules[m1].xna) {
-      rC = 50; tmpArray = [];
+      rC = 100; tmpArray = [];
       for (m2=0; m2<chain.molecules[m1].atoms.length; m2++) tmpArray.push(chain.molecules[m1].atoms[m2].atomName);
       if (! chain.molecules[m1].CA && tmpArray.indexOf("O5'") != -1) chain.molecules[m1].CA = chain.molecules[m1].atoms[[tmpArray.indexOf("O5'")]];
       if (tmpArray.indexOf("O2") != -1) {
@@ -1256,7 +1256,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
           }
         }
       }
-      else if (chain.molecules[m1].CA && chain.molecules[m2].CA) {
+      else if (chain.molecules[m1].CA && chain.molecules[m2].CA && m2 == m1+1) { // only allow sequential
         xyz1 = chain.molecules[m1].CA.xyz;
         xyz2 = chain.molecules[m2].CA.xyz;
         dx = xyzRef[xyz1]-xyzRef[xyz2]; dx *= dx;
