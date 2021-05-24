@@ -1195,6 +1195,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         mol = struc.chains[c].molecules[m];
         mol.CA = mol.P;
         mol.xna = true;
+        mol.ligand = false;
         delete mol.P;
         delete mol.N;
       }
