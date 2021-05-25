@@ -483,7 +483,7 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
   return true;
 }
 
-molmil.quickSelect = molmil.commandLines.pyMol.selectModel = function(expr, soup) {
+molmil.commandLines.pyMol.selectModel = function(expr, soup) {
   expr = expr.trim();
   var soupObject = this.soupObject || molmil.cli_soup || soup || this.cli_soup;
   if (expr.startsWith("#")) {
@@ -491,7 +491,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.selectModel = function(expr, soup
   }
   else {
     expr = expr.toLowerCase();
-    for (var i=0; i<soupObject.structures.length; i++) if (soupObject.structures[i].meta.id.toLowerCase() == expr) return [soupObject.structures[i]];
+    for (var i=0; i<soupObject.structures.length; i++) if ((soupObject.structures[i].meta.id || soupObject.structures[i].meta.filename).toLowerCase() == expr) return [soupObject.structures[i]];
   }
   return [];
 }
@@ -593,7 +593,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "model") {
         // two modes, by name & by number (1-...)
         if (expr[i+1] == "#") key = "this.soupObject.atomRef[a].chain.entry.meta.idnr == '%s'";
-        else {key = "this.soupObject.atomRef[a].chain.entry.meta.id.toLowerCase() == '%s'"; toLower_ = true;}
+        else {key = "(this.soupObject.atomRef[a].chain.entry.meta.id || this.soupObject.atomRef[a].chain.entry.meta.filename).toLowerCase() == '%s'"; toLower_ = true;}
       }
       else if (word == "around") {
         var atomList = []

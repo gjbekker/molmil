@@ -892,6 +892,10 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   this.downloadInProgress++;
   
   settings = settings || {};
+  if (settings.bakadl) {
+    delete settings.bakadl;
+    this.downloadInProgress--;
+  }
   var gz = loc.substr(-3).toLowerCase() == ".gz" && ! settings.no_pako_gz;
   if (settings.gzipped) gz = true;
   if (gz && ! window.hasOwnProperty("pako")) {
@@ -922,6 +926,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     };
   }
   else if (format == 2 || (format+"").toLowerCase() == "mmcif") {
+    settings.bakadl = true;
     if (! window.CIFparser) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructure, this, [loc, format, ondone, settings]); 
     preloadLoadersJS = [];
     request.parse = function() {
@@ -929,6 +934,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     };
   }
   else if (format == 3 || (format+"").toLowerCase() == "pdbml") {
+    settings.bakadl = true;
     if (! window.loadPDBML) return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", this.loadStructure, this, [loc, format, ondone, settings]); 
     preloadLoadersJS = [];
     request.parse = function() {
@@ -941,6 +947,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     };
   }
   else if ((format+"").toLowerCase() == "mmtf") {
+    settings.bakadl = true;
     if (! window.MMTF) return molmil.loadPlugin(molmil.settings.src+"lib/mmtf.js", this.loadStructure, this, [loc, format, ondone, settings]); 
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
@@ -1083,7 +1090,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   request.ondone = ondone;
   request.OnDone = function() {
     this.target.downloadInProgress--;
-    
+
     var structures = this.parse();
     if (! structures) return;
     if (! (structures instanceof Array)) structures = [structures];
