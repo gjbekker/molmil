@@ -3168,6 +3168,7 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
 
     var alignTable = alignmentInfo.pushNode("table"), tr;
     var pos = 0, c1pos = 0, c2pos = 0;
+
     while (true) {
       fpos = pos + nlen;
       if (fpos >= alignment.alignment.length) fpos = alignment.alignment.length-1;
@@ -3176,7 +3177,7 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
       tr.pushNode("td", alignment.chain1.molecules[c1pos].RSID);
       tr.pushNode("td", alignment.seq1.substring(pos, fpos));
       c1pos += Array.from(alignment.seq1.substring(pos, fpos)).filter(x=>x!="-").length;
-      tr.pushNode("td", alignment.chain1.molecules[c1pos-1].RSID);
+      tr.pushNode("td", c1pos ? alignment.chain1.molecules[c1pos-1].RSID : alignment.chain1.molecules[c1pos].RSID);
       
       var tmp = alignment.optimized_alignment.substring(pos, fpos);
       var tmp2 = Array.from(alignment.alignment.substring(pos, fpos)).map(function(x, i) {return tmp[i] == "|" ? "<b>|</b>" : x;}).join("");
