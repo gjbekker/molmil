@@ -369,8 +369,8 @@ molmil.SNFG.NEU = {"type": "diamond", "rgba": [161, 122, 77, 255], "name": "Neu"
 molmil.SNFG.GMH = {"type": "flat-hex", "rgba": [0, 166, 81, 255], "name": "LDmanHep"};
 
 molmil.initSettings = function () {
-  cifDicLocJSON = "https://pdbj.org/molmil-data/mmcif_pdbx_v50_summary.json";
-  cifDicLoc = "https://pdbj.org/molmil-data/mmcif_pdbx_v50.dic";
+  cifDicLocJSON = "https://pdbj.org/molmil2/mmcif_pdbx_v50_summary.json";
+  cifDicLoc = "https://data.pdbj.org/pdbjplus/dictionaries/mmcif_pdbx.dic";
   
   var colors = {
     DUMMY: [255, 20, 147],
