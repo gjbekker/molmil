@@ -1887,6 +1887,7 @@ molmil.animationObj.prototype.backwardRenderer = function() {
 molmil.UI.prototype.meshOptionsFunction = function(payload, lv, mode) {
   if (! (payload instanceof Array)) payload = [payload];
   var mesh = payload[0], UI = this;
+  if (! (mesh instanceof molmil.polygonObject)) mesh = mesh.structures[0];
   
   UI.styleif_mesh(mesh, {clientX: window.innerWidth*.25, clientY: window.innerHeight*.25}, {ondelete: function() {
     UI.deleteMeshFunction(payload);
