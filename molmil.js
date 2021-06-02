@@ -899,6 +899,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   var gz = loc.substr(-3).toLowerCase() == ".gz" && ! settings.no_pako_gz;
   if (settings.gzipped) gz = true;
   if (gz && ! window.hasOwnProperty("pako")) {
+    settings.bakadl = true;
     var head = document.getElementsByTagName("head")[0];
     var obj = molmil_dep.dcE("script"); obj.src = molmil.settings.src+"lib/pako.js"; 
     obj.soup = this; obj.argList = [loc, format, ondone, settings]; obj.onload = function() {molmil_dep.asyncStart(this.soup.loadStructure, this.argList, this.soup, 0);};
