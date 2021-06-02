@@ -200,20 +200,20 @@ molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
     indices[offset+2] = parseInt(line[5])-1;
   }
   
-  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); canvas.molmilViewer.structures.push(struct);
+  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); this.canvas.molmilViewer.structures.push(struct);
   struct.options = [];
   struct.meta.geomRanges = geomRanges;
   
-  var program = molmil.geometry.build_simple_render_program(vertices, indices, canvas.renderer, settings);
-  canvas.renderer.addProgram(program);
+  var program = molmil.geometry.build_simple_render_program(vertices, indices, this.canvas.renderer, settings);
+  this.canvas.renderer.addProgram(program);
   struct.programs.push(program);
   
-  canvas.molmilViewer.calculateCOG();
+  this.calculateCOG();
   
-  canvas.renderer.initBuffers();
-  canvas.update = true;
+  this.canvas.renderer.initBuffers();
+  this.canvas.update = true;
           
-  molmil.safeStartViewer(canvas);
+  molmil.safeStartViewer(this.canvas);
   
   return struct;
   
