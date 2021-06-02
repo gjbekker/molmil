@@ -897,7 +897,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     this.downloadInProgress--;
   }
   var gz = loc.substr(-3).toLowerCase() == ".gz" && ! settings.no_pako_gz;
-  if (settings.gzipped) gz = true;
+  if (settings.gzipped == true || settings.gzipped == 1) gz = true;
   if (gz && ! window.hasOwnProperty("pako")) {
     settings.bakadl = true;
     var head = document.getElementsByTagName("head")[0];
