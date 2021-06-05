@@ -245,7 +245,7 @@ molmil.UI.prototype.showChains=function(target, payload) {
     item.plus = item.pushNode("a", "+");
     item.plus.className = "optCat_p";
     var saa = chain.name ? chain.name : i+1;
-    if (chain.authName != saa) saa += " ("+chain.authName+")";
+    if (chain.authName && chain.authName != saa) saa += " ("+chain.authName+")";
     item.name = item.pushNode("a", saa);
     item.name.title = "Left click to expand\nRight click to show the context menu for display & color options";
     item.name.className = "optCat_n";
@@ -357,6 +357,9 @@ molmil.UI.prototype.showResidues=function(target, payload) {
 //molmil.UI.prototype.
 
 molmil.UI.prototype.showLM=function(icon) {
+  var UI = this;
+  if (! molmil.VRstatus) return molmil.initVR(null, function() {UI.showLM(icon);});
+  
   try {
     if (icon.parentNode.childNodes.length > 1) {
       icon.parentNode.removeChild(icon.nextSibling); icon.parentNode.removeChild(icon.nextSibling); 

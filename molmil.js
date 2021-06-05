@@ -1641,11 +1641,15 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
 
     var branch_ids = {};
     if (pdb.pdbx_entity_branch) {for (var i=0; i<pdb.pdbx_entity_branch.entity_id.length; i++) branch_ids[pdb.pdbx_entity_branch.entity_id[i]] = true;}
-
-    for (var a=0; a<Cartn_x.length; a++) {
-      if (Cartn_x[a] == null || (Cartn_x[a] == 0 && Cartn_y[a] == 0 && Cartn_z[a] == 0 && Cartn_x.length > 1)) continue;
-      // split this up in structure loading (1st model) & coordinate only loading (2+ models)
     
+    var baka = 0;
+    for (var a=0; a<Cartn_x.length; a++) {
+      if (Cartn_x[a] == null) continue;
+      if (Cartn_x[a] == 0 && Cartn_y[a] == 0 && Cartn_z[a] == 0) {
+        baka++;
+        if (baka > 1) continue;
+      }
+
       if (label_alt_id[a]) {
         if (alt_loc_handler == null) alt_loc_handler = label_alt_id[a];
         else if (label_alt_id[a] != alt_loc_handler) continue; // deal with junk
@@ -9852,7 +9856,7 @@ if (! window.molmil_dep) {
 }
 
 molmil.VRstatus = false;
-molmil.initVR = function(soup) {
+molmil.initVR = function(soup, callback) {
   var initFakeVR = function() {
     var dep = document.createElement("script")
     dep.src = molmil.settings.src+"lib/webvr-polyfill.min.js";
@@ -9864,22 +9868,21 @@ molmil.initVR = function(soup) {
       }
       var polyfill = new WebVRPolyfill(config);
       navigator.getVRDisplays().then(function(displays) {molmil.vrDisplays = displays; molmil.VRstatus = true; 
-      molmil.initVR(soup);
+      molmil.initVR(soup, callback);
     });};
     var head = document.getElementsByTagName("head")[0];
     head.appendChild(dep);
   }
   if (! molmil.VRstatus) {
     if (navigator.getVRDisplays) {
-      navigator.getVRDisplays().then(function(displays) {if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup);} else initFakeVR();}).catch(function(){initFakeVR();});
+      navigator.getVRDisplays().then(function(displays) {if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup, callback);} else initFakeVR();}).catch(function(){initFakeVR();});
     }
     else initFakeVR();
-    return;
   }
-  if (! soup) return;
-  
-  molmil.startWebVR(soup);
+  else {
+    if (soup) molmil.startWebVR(soup);
+    if (callback) callback();
+  }
 }
 
-molmil.initVR();
 molmil.initSettings();
