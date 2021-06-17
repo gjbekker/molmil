@@ -1,5 +1,8 @@
 # Molmil manual
 
+## Cite molmil
+If you use Molmil, please <a href="https://jcheminf.biomedcentral.com/articles/10.1186/s13321-016-0155-1#citeas" target="_blank">cite our Molmil paper</a>.
+
 ## UI
 
 #### 3D operations
