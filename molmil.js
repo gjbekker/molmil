@@ -252,7 +252,7 @@ molmil.configBox = {
   imposterSpheres: false,
   BGCOLOR: [1.0, 1.0, 1.0, 1.0],
   
-  backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1, "CN": 1, "CM": 1, "CH3": 1},
+  backboneAtoms4Display: {"N": 1, "C": 1, "O": 1, "H": 1, "OXT": 1, "OC1": 1, "OC2": 1, "H1": 1, "H2": 1, "H3": 1, "HA": 1, "HA2": 1, "HA3": 1, "CN": 1, "CM": 1, "CH3": 1},
   projectionMode: 1, // 1: perspective, 2: orthographic
   colorMode: 1, // 1: rasmol, 2: jmol
   
@@ -1072,15 +1072,16 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else {
     var fakeObj = {filename: loc, readAsText: function() {}, readAsArrayBuffer: function() {}};
     for (var j=0; j<this.canvas.inputFunctions.length; j++) {
-      if (this.canvas.inputFunctions[j](canvas, fakeObj)) {
+      if (this.canvas.inputFunctions[j](this.canvas, fakeObj)) {
         request.inputFunction = this.canvas.inputFunctions[j];
+        request.canvas = this.canvas;
         request.parse = function() {
           var fakeObj = {
             filename: loc, 
             readAsText: function() {fakeObj.onload({target: {result: request.request.responseText}});},
             readAsArrayBuffer: function() {fakeObj.onload({target: {result: request.request.response}});}
           };
-          this.inputFunction(canvas, fakeObj);
+          this.inputFunction(this.canvas, fakeObj);
         };
         break;
       }
@@ -9363,7 +9364,8 @@ molmil.autoSetup = function(options, canvas) {
   if (! canvas) {
     for (var i=0; i<molmil.canvasList.length; i++) molmil.autoSetup(options, molmil.canvasList[i]);
     var viewers = document.getElementsByClassName("molmilViewer");
-    for (var i=0; i<viewers.length; i++) if (! viewers[i].molmilViewer) canvas = molmil.autoSetup(options, viewers[i]);
+    if (viewers.length == 0) viewers = [document.getElementById("molmilViewer")];
+    for (var i=0; i<viewers.length; i++) if (viewers[i] && ! viewers[i].molmilViewer) canvas = molmil.autoSetup(options, viewers[i]);
     return canvas;
   }
   
@@ -9412,8 +9414,9 @@ molmil.autoSetup = function(options, canvas) {
   try {var commandBuffer = window.sessionStorage.commandBuffer ? JSON.parse(window.sessionStorage.commandBuffer) : [];}
   catch (e) {var commandBuffer = [];}
   for (var i=0; i<commandBuffer.length; i++) processExternalCommand(commandBuffer[i]);  
-  
+
   canvas.setupDone = true;
+  if (options.callback) options.callback();
 };
 
 window.addEventListener("message", function(e) {
