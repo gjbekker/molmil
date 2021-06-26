@@ -23,7 +23,7 @@ molmil.ignoreBlackList = false;
 molmil.vrDisplay = null;
 molmil.vrPose = [0, 0, 0];
 molmil.vrOrient = [0, 0, 0, 0];
-molmil.pdbj_data = window.location.host.endsWith(".pdbj.org") ? "https://data."+window.location.host+"/" : "https://data.pdbj.org/";
+molmil.pdbj_data = "https://data.pdbj.org/";
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
