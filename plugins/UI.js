@@ -2662,9 +2662,10 @@ molmil.UI.prototype.styleif_mesh = function(mesh, ev, options) {
   var transp = cont.pushNode("input")
   transp.type = "range"; transp.min = 0; transp.max = 255;
   if (! settings.solid) transp.disabled = true;
-  transp.value = settings.alphaSet*255;
+  transp.value = (settings.alphaSet === undefined ? 1 : settings.alphaSet)*255;
   transp.oninput = function() {
     settings.alphaSet = parseFloat(this.value)/255;
+    if (mesh.programs[0].settings.alphaSet != 1 && mesh.programs[0].pre_shader != UI.soup.renderer.shaders.alpha_dummy) mesh.programs[0].rebuild();
     UI.soup.renderer.canvas.update = true;
   };
   cont.pushNode("br");

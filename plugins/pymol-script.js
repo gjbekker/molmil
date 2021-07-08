@@ -218,8 +218,11 @@ molmil.commandLines.pyMol.cartoon_colorCommand = function(env, command) {
     
 molmil.commandLines.pyMol.colorCommand = function(env, command) {
   tmp = command.match(/color[\s]+([a-zA-Z0-9_]+)[\s]*,[\s]*(.*)/);
-  if (! tmp) command = command.match(/color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
-  else command = tmp;
+  if (! tmp) {
+    tmp = command.match(/color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
+    if (! tmp) tmp = command.match(/color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
+  }
+  command = tmp;
   try {molmil.commandLines.pyMol.color.apply(env, [command[1], command[2]]);}
   catch (e) {console.error(e); return false;}
   return true;
@@ -934,15 +937,17 @@ molmil.commandLines.pyMol.align = function(name1, name2) {
   var obj1, obj2;
   if (name1 in this.fileObjects) obj1 = this.fileObjects[name1[0]];
   if (name2 in this.fileObjects) obj2 = this.fileObjects[name2[0]];
-  
-  if (!obj1) obj1 = this.cli_soup.structures.filter(x=>x.meta.id == name1[0])[0];
-  if (!obj2) obj2 = this.cli_soup.structures.filter(x=>x.meta.id == name2[0])[0];
+
+  if (!obj1) obj1 = this.cli_soup.structures.find(function(x) {return x.meta.id == name1[0]});
+  if (!obj2) obj2 = this.cli_soup.structures.find(function(x) {return x.meta.id == name2[0]});
 
   if (! obj1) return this.console.log("Unknown object", name1);
   if (! obj2) return this.console.log("Unknown object", name2);
-
-  // maybe later implement something smart so that specific chains can be extracted, e.g. obj1:A, obj2:B
-  molmil.align(obj1.chains[0], obj2.chains[0]);
+  
+  obj1 = obj1.chains.find(function(x) {return x.name == name1[1]}) || obj1.chains[0];
+  obj2 = obj2.chains.find(function(x) {return x.name == name2[1]}) || obj2.chains[0];
+  
+  molmil.align(obj1, obj2);
   return true;
 }
 
@@ -981,7 +986,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
   
   var sigma = this.edmap_sigma || 1.0;
   var solid = false;
-  var rgba = this.mesh_color || mode == "fo-fc" ? [255, 0, 255, 255] : [0, 255, 255, 255];
+  var rgba = this.mesh_color || (mode == "fo-fc" ? [255, 0, 255, 255] : [0, 255, 255, 255]);
 
   var request = new molmil_dep.CallRemote("POST");
   request.AddParameter("xyz", JSON.stringify(XYZ));
@@ -1007,7 +1012,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
   };
   soup.downloadInProgress++;
   request.OnError = function() {this.console.error("Unable to retrieve map...");};
-  request.Send("https://pdbj.org/rest/edmap2");
+  request.Send(molmil.settings.newweb_rest+"edmap");
 }
 
 molmil.commandLines.pyMol.save = function(file, command) {
@@ -1227,7 +1232,11 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
     }
     else var rgba = clr;
 
-    for (var i=0; i<selection.length; i++) selection[i].programs[0].settings.rgba = rgba;
+    for (var i=0; i<selection.length; i++) {
+      selection[i].programs[0].settings.rgba = rgba;
+      selection[i].programs[0].settings.alphaSet = (rgba[3] === undefined ? 255 : rgba[3])/255;
+      if (selection[i].programs[0].settings.alphaSet != 1 && selection[i].programs[0].pre_shader != this.cli_soup.renderer.shaders.alpha_dummy) selection[i].programs[0].rebuild();
+    }
     
     this.cli_soup.renderer.rebuildRequired = true;
   }
