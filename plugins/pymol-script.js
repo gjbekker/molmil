@@ -1232,10 +1232,15 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
     }
     else var rgba = clr;
 
+    var pita = function(x) {
+      x.programs[0].settings.rgba = rgba;
+      x.programs[0].settings.alphaSet = (rgba[3] === undefined ? 255 : rgba[3])/255;
+      if (x.programs[0].settings.alphaSet != 1 && x.programs[0].pre_shader != cli_soup.renderer.shaders.alpha_dummy) x.programs[0].rebuild();
+    }, cli_soup = this.cli_soup;
+
     for (var i=0; i<selection.length; i++) {
-      selection[i].programs[0].settings.rgba = rgba;
-      selection[i].programs[0].settings.alphaSet = (rgba[3] === undefined ? 255 : rgba[3])/255;
-      if (selection[i].programs[0].settings.alphaSet != 1 && selection[i].programs[0].pre_shader != this.cli_soup.renderer.shaders.alpha_dummy) selection[i].programs[0].rebuild();
+      if (selection[i].structures) selection[i].structures.forEach(function(x) {pita(x);});
+      else pita(selection[i]);
     }
     
     this.cli_soup.renderer.rebuildRequired = true;
