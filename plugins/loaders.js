@@ -222,7 +222,9 @@ molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
 
 molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   if (! settings) settings = {solid: true};
-  var rgba = settings.rgba = settings.rgba || [255, 255, 255, 255];
+  var rgba = [255, 255, 255, 255];
+  settings.rgba = settings.rgba || rgba;
+  if (settings.rgba[3] != 255) settings.alphaSet = settings.rgba[3]/255;
   
   data = data.split("\n");
   var tmp, i;
