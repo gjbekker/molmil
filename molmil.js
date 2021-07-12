@@ -976,7 +976,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else if (format == 8 || (format+"").toLowerCase() == "mpbf") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
-      return this.target.load_MPBF(this.request.response, this.filename, settings);
+      return this.target.load_MPBF(this.gz ? pako.inflate(new Uint8Array(this.request.response)).buffer : this.request.response, this.filename, settings);
     };
   }
   else if ((format+"").toLowerCase() == "ccp4") {
