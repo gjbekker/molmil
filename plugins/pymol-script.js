@@ -1325,7 +1325,8 @@ molmil.commandLines.pyMol.enable = function(atoms) {
   else if (selMode == 2) {
     for (var i=0; i<selection.length; i++) {
       selection[i].display = false;
-      for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = true;
+      if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) x.programs[m].status = true;});
+      else {for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = true;}
     }
   }
 
@@ -1349,7 +1350,8 @@ molmil.commandLines.pyMol.disable = function(atoms) {
   else if (selMode == 2) {
     for (var i=0; i<selection.length; i++) {
       selection[i].display = false;
-      for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = false;
+      if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) x.programs[m].status = false;});
+      else {for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].status = false;}
     }
   }
   
