@@ -1492,7 +1492,11 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
       rgba = JSON.parse(value);
       if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
     }
-    for (var i=0; i<selection.length; i++) selection[i].programs[0].settings.rgba = rgba;
+    
+    for (var i=0; i<selection.length; i++) {
+      if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) x.programs[m].settings.rgba = rgba;});
+      else {for (var m=0; m<selection[i].programs.length; m++) selection[i].programs[m].settings.rgba = rgba;}
+    }
   }
   else if (key == "cif_use_auth") {
     if (value == "on") this.cif_use_auth = true;
@@ -1739,12 +1743,16 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
   else if (selMode == 2) {
     if (repr == "lines") {
       for (var i=0; i<selection.length; i++) {
-        if (selection[i].programs[0].settings.solid) selection[i].programs[0].toggleWF();
+        selection[i].display = false;
+        if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) if (x.programs[m].settings.solid) x.programs[m].toggleWF();});
+        else {for (var m=0; m<selection[i].programs.length; m++) if (selection[i].programs[m].settings.solid) selection[i].programs[m].toggleWF();}
       }
     }
     else if (repr == "solid") {
       for (var i=0; i<selection.length; i++) {
-        if (! selection[i].programs[0].settings.solid) selection[i].programs[0].toggleWF();
+        selection[i].display = false;
+        if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) if (! x.programs[m].settings.solid) x.programs[m].toggleWF();});
+        else {for (var m=0; m<selection[i].programs.length; m++) if (! selection[i].programs[m].settings.solid) selection[i].programs[m].toggleWF();}
       }
     }
   }
