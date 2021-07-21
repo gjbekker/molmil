@@ -12,6 +12,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     disable: molmil.commandLines.pyMol.disableCommand,
     turn: molmil.commandLines.pyMol.turnCommand,
     move: molmil.commandLines.pyMol.moveCommand,
+    translate: molmil.commandLines.pyMol.translateCommand,
     fetch: molmil.commandLines.pyMol.fetchCommand,
     "fetch-cc": molmil.commandLines.pyMol.fetchCCCommand,
     "fetch-chain": molmil.commandLines.pyMol.fetchChainCommand,
@@ -316,6 +317,22 @@ molmil.commandLines.pyMol.moveCommand = function(env, command) {
   return true;
 }
 
+// [x, y, z], selection
+
+
+
+
+
+
+molmil.commandLines.pyMol.translateCommand = function(env, command) {
+  var cmd = command.match(/translate[\s]+\[[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*,[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*,[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*\][\s]*,[\s]*(.*)/);
+  if (cmd != null) {
+    try {molmil.commandLines.pyMol.translate.apply(env, [[parseFloat(cmd[1]), parseFloat(cmd[2]), parseFloat(cmd[3])], cmd[4]]);}
+    catch (e) {console.error(e); return false;}
+  }
+  else return false;
+  return true;
+}
 
 molmil.commandLines.pyMol.fetchCommand = function(env, command) {
   var cmd = command.match(/fetch[\s]+([a-zA-Z0-9]{4})/);
@@ -1380,6 +1397,32 @@ molmil.commandLines.pyMol.move = function(axis, degrees) {
   this.cli_soup.renderer.canvas.update = true;  
 }
 
+molmil.commandLines.pyMol.translate = function(xyz, selection) {
+  var soup = molmil.cli_soup;
+  if (typeof selection != "object") {
+    selection = selection.replace(/,/, '').trim();
+    if (this.hasOwnProperty(selection)) selection = this[selection];
+    else selection = molmil.commandLines.pyMol.select.apply(this, [selection]) || [];
+  }
+  
+  // rotate in camera space
+  var mat = mat3.fromMat4(mat3.create(), soup.renderer.camera.generateMatrix()); mat3.invert(mat, mat);
+  vec3.transformMat3(xyz, xyz, mat);
+  
+  var mdl = soup.renderer.modelId, xyzpos;
+  for (var i=0; i<selection.length; i++) {
+    xyzpos = selection[i].xyz;
+    selection[i].chain.modelsXYZ[mdl][xyzpos+0] += xyz[0];
+    selection[i].chain.modelsXYZ[mdl][xyzpos+1] += xyz[1];
+    selection[i].chain.modelsXYZ[mdl][xyzpos+2] += xyz[2];
+  }
+  
+  molmil.geometry.reInitChains = true;
+  molmil.geometry.generate(soup.structures, soup.renderer, 0);
+  for (var i=0; i<soup.texturedBillBoards.length; i++) soup.texturedBillBoards[i].dynamicsUpdate();
+  soup.renderer.initBD = true;
+}
+
 molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
@@ -1513,6 +1556,20 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   }
   else if (key == "connect_cutoff") {
     molmil.configBox.connect_cutoff = parseFloat(value);
+  }
+  
+  else if (key == "backface_cull") {
+    var gl = this.cli_soup.renderer.gl;
+    if (value == 1) {
+      molmil.configBox.cullFace = true;
+      gl.enable(gl.CULL_FACE);
+      gl.cullFace(gl.BACK);
+    }
+    else {
+      molmil.configBox.cullFace = false;
+      gl.disable(gl.CULL_FACE);
+    }
+    
   }
   
   return true;

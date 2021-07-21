@@ -2233,13 +2233,14 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
   
   var rotationMatrix = mat4.create();
   var vertex = [0, 0, 0, 0], normal = [0, 0, 0, 0], VEC = [0, 0, 0], NORMAL = [0, 0, 0], BINORMAL = [0, 0, 0];
-  var r = 4.0, rgba, v=0, vP8=0, vP=0, p=0, iP = 0, v, dx, dy, dz, dij, angle;
+  var r = 4.0, r2 = 4.0, rgba, v=0, vP8=0, vP=0, p=0, iP = 0, v, dx, dy, dz, dij, angle;
   
   var cylNverts;
   var genCylinder = function() {
     tmpObj = object.lowQuality ? cylinderLQ : cylinder;
     // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
     r = object.radius;
+    r2 = object.radius2;
     dx = object.coords[1][0]-object.coords[0][0];
     dy = object.coords[1][1]-object.coords[0][1];
     dz = object.coords[1][2]-object.coords[0][2];
@@ -2252,7 +2253,8 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p; // a2
 
     for (v=0; v<tmpObj.vertices.length; v+=3, vP8+=28) {
-      vec3.transformMat4(vertex, [tmpObj.vertices[v]*r, tmpObj.vertices[v+1]*r, tmpObj.vertices[v+2]*dij*2], rotationMatrix);
+      if (v%2 == 0) vec3.transformMat4(vertex, [tmpObj.vertices[v]*r, tmpObj.vertices[v+1]*r, tmpObj.vertices[v+2]*dij*2], rotationMatrix);
+      else vec3.transformMat4(vertex, [tmpObj.vertices[v]*r2, tmpObj.vertices[v+1]*r2, tmpObj.vertices[v+2]*dij*2], rotationMatrix);
       vec3.transformMat4(normal, [tmpObj.normals[v], tmpObj.normals[v+1], tmpObj.normals[v+2]], rotationMatrix);
 
       vBuffer[vP++] = vertex[0]+object.coords[1][0];

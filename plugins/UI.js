@@ -1282,11 +1282,11 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
     if (! videoID) return;
     if (pixels == null) pixels = new Uint8Array(this.canvas.width * this.canvas.width * 4);
     
-    if (window.addFrame) addFrame(canvas.toDataURL());
+    if (window.addFrame) addFrame(this.canvas.toDataURL());
     else {
       var req = new molmil_dep.CallRemote("POST");
       req.AddParameter("id", videoID);
-      req.AddParameter("data", canvas.toDataURL());
+      req.AddParameter("data", this.canvas.toDataURL());
       req.Send(molmil.settings.molmil_video_url+"addFrame");
     }
           

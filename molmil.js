@@ -2099,6 +2099,15 @@ molmil.viewer.prototype.calculateCOG = function(atomList) {
         n += struct.meta.COR[3];
         if (struct.meta.hasOwnProperty("geomRanges")) ALTs.push(struct.meta.geomRanges, struct.meta.COR[3]);
       }
+      else if (struct.structures) {
+        for (var i=0; i<struct.structures.length; i++) {
+          this.avgX += struct.structures[i].meta.COR[0];
+          this.avgY += struct.structures[i].meta.COR[1];
+          this.avgZ += struct.structures[i].meta.COR[2];
+          n += struct.structures[i].meta.COR[3];
+          if (struct.structures[i].meta.hasOwnProperty("geomRanges")) ALTs.push(struct.structures[i].meta.geomRanges, struct.structures[i].meta.COR[3]);
+        }
+      }
     }
   }
   
