@@ -12,6 +12,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     disable: molmil.commandLines.pyMol.disableCommand,
     turn: molmil.commandLines.pyMol.turnCommand,
     move: molmil.commandLines.pyMol.moveCommand,
+    "stop-anim": molmil.commandLines.pyMol.stopAnimCommand,
     translate: molmil.commandLines.pyMol.translateCommand,
     fetch: molmil.commandLines.pyMol.fetchCommand,
     "fetch-cc": molmil.commandLines.pyMol.fetchCCCommand,
@@ -298,9 +299,9 @@ molmil.commandLines.pyMol.disableCommand = function(env, command) {
 }
 
 molmil.commandLines.pyMol.turnCommand = function(env, command) {
-  var cmd = command.match(/turn[\s]+([xyz]),[\s]+([-+]?[0-9]*\.?[0-9]+)/);
+  var cmd = command.match(/turn[\s]+([xyz]),[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*(,[\s]*([-+]?[0-9]*\.?[0-9]+))?/);
   if (cmd != null) {
-    try {molmil.commandLines.pyMol.turn.apply(env, [cmd[1], cmd[2]]);}
+    try {molmil.commandLines.pyMol.turn.apply(env, [cmd[1], cmd[2], cmd[4]]);}
     catch (e) {console.error(e); return false;}
   }
   else return false;
@@ -308,21 +309,24 @@ molmil.commandLines.pyMol.turnCommand = function(env, command) {
 }
 
 molmil.commandLines.pyMol.moveCommand = function(env, command) {
-  var cmd = command.match(/move[\s]+([xyz]),[\s]+([-+]?[0-9]*\.?[0-9]+)/);
+  var cmd = command.match(/move[\s]+([xyz]),[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*(,[\s]*([-+]?[0-9]*\.?[0-9]+))?/);
   if (cmd != null) {
-    try {molmil.commandLines.pyMol.move.apply(env, [cmd[1], cmd[2]]);}
+    try {molmil.commandLines.pyMol.move.apply(env, [cmd[1], cmd[2], cmd[4]]);}
     catch (e) {console.error(e); return false;}
   }
   else return false;
   return true;
 }
 
-// [x, y, z], selection
-
-
-
-
-
+molmil.commandLines.pyMol.stopAnimCommand = function(env, command) {
+  var cmd = command.match(/stop-anim[\s]*/);
+  if (cmd != null) {
+    try {molmil.commandLines.pyMol.stopAnim.apply(env, []);}
+    catch (e) {console.error(e); return false;}
+  }
+  else return false;
+  return true;
+}
 
 molmil.commandLines.pyMol.translateCommand = function(env, command) {
   var cmd = command.match(/translate[\s]+\[[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*,[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*,[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*\][\s]*,[\s]*(.*)/);
@@ -1378,24 +1382,55 @@ molmil.commandLines.pyMol.disable = function(atoms) {
   this.cli_soup.renderer.rebuildRequired = true;
 }
 
-molmil.commandLines.pyMol.turn = function(axis, degrees) {
-  if (axis == "x") this.cli_soup.renderer.camera.pitchAngle += parseFloat(degrees) || 0;
-  else if (axis == "y") this.cli_soup.renderer.camera.headingAngle += parseFloat(degrees) || 0;
-  else if (axis == "z") this.cli_soup.renderer.camera.rollAngle += parseFloat(degrees) || 0;
+molmil.commandLines.pyMol.turn = function(axis, degrees, interval) {
+  interval = parseFloat(interval);
+  if (isNaN(interval)) interval = 0;
   
-  this.cli_soup.renderer.camera.positionCamera();
-  this.cli_soup.renderer.canvas.update = true;  
+  var camera = this.cli_soup.renderer.camera, canvas = this.cli_canvas, obj = [0];
+  this.animObjects = this.animObjects || [];
+  this.animObjects.push(obj);
+  
+  var update = function() {
+    if (axis == "x") camera.pitchAngle += parseFloat(degrees) || 0;
+    else if (axis == "y") camera.headingAngle += parseFloat(degrees) || 0;
+    else if (axis == "z") camera.rollAngle += parseFloat(degrees) || 0;
+    
+    camera.positionCamera();
+    canvas.update = true;
+    if (interval > 0) obj[0] = setTimeout(update, interval);
+  };
+  update();
   
   return true;
 }
 
-molmil.commandLines.pyMol.move = function(axis, degrees) {
-  if (axis == "x") this.cli_soup.renderer.camera.x += parseFloat(degrees) || 0;
-  if (axis == "y") this.cli_soup.renderer.camera.y += parseFloat(degrees) || 0;
-  if (axis == "z") this.cli_soup.renderer.camera.z += parseFloat(degrees) || 0;
+molmil.commandLines.pyMol.move = function(axis, amount, interval) {
+  interval = parseFloat(interval);
+  if (isNaN(interval)) interval = 0;
   
-  this.cli_soup.renderer.canvas.update = true;  
+  var camera = this.cli_soup.renderer.camera, canvas = this.cli_canvas, obj = [0];
+  this.animObjects = this.animObjects || [];
+  this.animObjects.push(obj);
+  
+  var update = function() {
+    if (axis == "x") camera.x += parseFloat(amount) || 0;
+    else if (axis == "y") camera.y += parseFloat(amount) || 0;
+    else if (axis == "z") camera.z += parseFloat(amount) || 0;
+    
+    canvas.update = true;
+    if (interval > 0) obj[0] = setTimeout(update, interval);
+  };
+  update();
+  
+  return true;
 }
+
+molmil.commandLines.pyMol.stopAnim = function() {
+  this.animObjects.forEach(function (x) {clearTimeout(x);});
+  return;
+}
+
+
 
 molmil.commandLines.pyMol.translate = function(xyz, selection) {
   var soup = molmil.cli_soup;
@@ -1557,7 +1592,7 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   else if (key == "connect_cutoff") {
     molmil.configBox.connect_cutoff = parseFloat(value);
   }
-  
+
   else if (key == "backface_cull") {
     var gl = this.cli_soup.renderer.gl;
     if (value == 1) {
