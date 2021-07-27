@@ -4634,7 +4634,7 @@ molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentB
         vBuffer8[vP8+24] = cartoon_highlight_color[0];
         vBuffer8[vP8+25] = cartoon_highlight_color[1];
         vBuffer8[vP8+26] = cartoon_highlight_color[2];
-        vBuffer8[vP8+27] = cartoon_highlight_color[3];
+        vBuffer8[vP8+27] = rgba_[3];
       }
       else {
         vBuffer8[vP8+24] = rgba_[0];
@@ -4747,7 +4747,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
       vBuffer8[vP8+24] = cartoon_highlight_color[0];
       vBuffer8[vP8+25] = cartoon_highlight_color[1];
       vBuffer8[vP8+26] = cartoon_highlight_color[2];
-      vBuffer8[vP8+27] = cartoon_highlight_color[3];
+      vBuffer8[vP8+27] = rgba_[3];
     }
     else {
       vBuffer8[vP8+24] = rgba_[0];
@@ -4788,7 +4788,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
         vBuffer8[vP8+24] = cartoon_highlight_color[0];
         vBuffer8[vP8+25] = cartoon_highlight_color[1];
         vBuffer8[vP8+26] = cartoon_highlight_color[2];
-        vBuffer8[vP8+27] = cartoon_highlight_color[3];
+        vBuffer8[vP8+27] = rgba_[3];
       }
       else {
         vBuffer8[vP8+24] = rgba_[0];
@@ -4817,7 +4817,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
         vBuffer8[vP8+24] = cartoon_highlight_color[0];
         vBuffer8[vP8+25] = cartoon_highlight_color[1];
         vBuffer8[vP8+26] = cartoon_highlight_color[2];
-        vBuffer8[vP8+27] = cartoon_highlight_color[3];
+        vBuffer8[vP8+27] = rgba_[3];
       }
       else {
         vBuffer8[vP8+24] = rgba_[0];
@@ -4863,7 +4863,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
         vBuffer8[vP8+24] = cartoon_highlight_color[0];
         vBuffer8[vP8+25] = cartoon_highlight_color[1];
         vBuffer8[vP8+26] = cartoon_highlight_color[2];
-        vBuffer8[vP8+27] = cartoon_highlight_color[3];
+        vBuffer8[vP8+27] = rgba_[3];
       }
       else {
         vBuffer8[vP8+24] = rgba_[0];
@@ -4894,7 +4894,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
         vBuffer8[vP8+24] = cartoon_highlight_color[0];
         vBuffer8[vP8+25] = cartoon_highlight_color[1];
         vBuffer8[vP8+26] = cartoon_highlight_color[2];
-        vBuffer8[vP8+27] = cartoon_highlight_color[3];
+        vBuffer8[vP8+27] = rgba_[3];
       }
       else {
         vBuffer8[vP8+24] = rgba_[0];

@@ -211,8 +211,11 @@ molmil.commandLines.pyMol.saveCommand = function(env, command) {
     
 molmil.commandLines.pyMol.cartoon_colorCommand = function(env, command) {
   tmp = command.match(/cartoon_color[\s]+([a-zA-Z0-9_]+)[\s]*,[\s]*(.*)/);
-  if (! tmp) command = command.match(/cartoon_color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
-  else command = tmp;
+  if (! tmp) {
+    tmp = command.match(/cartoon_color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
+    if (! tmp) tmp = command.match(/cartoon_color[\s]+(\[[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*,[\s]*[0-9]+[\s]*\])[\s]*,[\s]*(.*)/);
+  }
+  command = tmp;
   try {molmil.commandLines.pyMol.cartoon_color.apply(env, [command[1], command[2]]);}
   catch (e) {console.error(e); return false;}
   return true;

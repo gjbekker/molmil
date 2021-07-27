@@ -2240,7 +2240,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     tmpObj = object.lowQuality ? cylinderLQ : cylinder;
     // create a cylinder with radius object.radius on object.coords[0] & object.coords[1]
     r = object.radius;
-    r2 = object.radius2;
+    r2 = object.radius2 || r;
     dx = object.coords[1][0]-object.coords[0][0];
     dy = object.coords[1][1]-object.coords[0][1];
     dz = object.coords[1][2]-object.coords[0][2];

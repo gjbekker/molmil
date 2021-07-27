@@ -33,22 +33,16 @@ attribute vec3 in_Normal;
 #ifdef UNIFORM_COLOR
 #ifdef ALPHA_MODE
 uniform vec4 uniform_color;
-varying vec4 ex_Colour;
 #else
 uniform vec3 uniform_color;
-varying vec3 ex_Colour;
 #endif
 
 #else
-#ifdef ALPHA_MODE
 attribute vec4 in_Colour;
-varying vec4 ex_Colour;
-#else
-attribute vec3 in_Colour;
-varying vec3 ex_Colour;
-#endif
 
 #endif
+
+varying vec4 ex_Colour;
 
 
 varying vec3 ex_Normal;
@@ -67,7 +61,11 @@ void main() {
   gl_Position = projectionMatrix * gl_Position;
 
 #ifdef UNIFORM_COLOR
+#ifdef ALPHA_MODE
   ex_Colour = uniform_color;
+#else
+  ex_Colour = vec4(uniform_color, 1.0);
+#endif
 #else
   ex_Colour = in_Colour;
 #endif
@@ -93,11 +91,7 @@ precision highp int;
 varying vec3 ex_Normal;
 varying vec3 vertPos;
 
-#ifdef ALPHA_MODE
 varying vec4 ex_Colour;
-#else
-varying vec3 ex_Colour;
-#endif
 
 #ifdef ALPHA_SET
 uniform float alpha;
@@ -142,9 +136,10 @@ void main() {
 #ifdef ALPHA_MODE
   vec4 color = vec4(vec3(max(lambertian*ex_Colour.a, 0.2)), 1.0)*ex_Colour + vec4(specular, specular, specular, 0.0);
 #elif defined(ALPHA_SET)
-  vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0)*alpha;
+  vec4 color = vec4(max(lambertian, 0.2)*ex_Colour.rgb + specular, 1.0)*alpha;
 #else
-  vec4 color = vec4(max(lambertian, 0.2)*ex_Colour + specular, 1.0);
+  if (ex_Colour.a == 0.0) discard;
+  vec4 color = vec4(max(lambertian, 0.2)*ex_Colour.rgb + specular, 1.0);
 #endif
 
 #ifdef ENABLE_FOG
