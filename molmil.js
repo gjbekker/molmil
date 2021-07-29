@@ -9858,6 +9858,26 @@ molmil.align = function(A, B) {
   molmil.geometry.reInitChains = true;
 }
 
+molmil.record = function(canvas, video_path, video_framerate) {
+  // make sure that both the width & height are divisible by 2 (ffmpeg issue)
+  var w = canvas.width, h = canvas.height;
+  if (w%2 == 1) w--;
+  if (h%2 == 1) h--;
+  if (w != canvas.width || h != canvas.height) {canvas.width = w; canvas.height = h; canvas.renderer.resizeViewPort();}
+  initVideo(video_path, canvas.width, canvas.height, video_framerate);
+  
+  canvas.renderer.onRenderFinish = function() {
+    var pixels = new Uint8Array(canvas.width * canvas.width * 4);
+    addFrame(canvas.toDataURL());
+    canvas.renderer.gl.readPixels(0, 0, canvas.width, canvas.height, canvas.renderer.gl.RGBA, canvas.renderer.gl.UNSIGNED_BYTE, pixels);
+  };
+}
+
+molmil.end_record = function(canvas) {
+  finalizeVideo();
+  canvas.renderer.onRenderFinish = undefined;
+}
+
 if (typeof(requestAnimationFrame) != "undefined") molmil.animate_molmilViewers();
 
 if (! window.molmil_dep) {
