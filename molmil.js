@@ -7303,6 +7303,7 @@ molmil.quickModelColor = function(type, options, soup) {
   var carbonOnly = options.hasOwnProperty("carbonOnly") ? options.carbonOnly : true;
   
   var applyColor = function(model, color) {
+    if (color.length == 3) color = [color[0], color[1], color[2], 255];
     for (c=0; c<model.chains.length; c++) {
       chain = model.chains[c];
       chain.rgba = color;
