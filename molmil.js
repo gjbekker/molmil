@@ -1534,6 +1534,10 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
   return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", molmil.savePDB, null, [soup, atomSelection, modelId, file]);
 };
 
+molmil.saveBU = function(assembly_id, options, struct, soup) {
+  return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", molmil.saveBU, null, [assembly_id, options, struct, soup]);
+};
+
 // ** calculates the optimal zoom amount **
 molmil.viewer.prototype.calcZ = function(geomRanges) {
   var test = geomRanges;
@@ -9830,9 +9834,11 @@ molmil.align = function(A, B) {
   for (var i=0; i<Aseq.length; i++) {
     if (Aseq[i] == "-") {b++; align.push(" "); continue;}
     if (Bseq[i] == "-") {a++; align.push(" "); continue;}
-    Aarr.push(A.molecules[a].CA);
-    Barr.push(B.molecules[b].CA);
-    align.push("|");
+    if (A.molecules[a].CA && B.molecules[a].CA) {
+      Aarr.push(A.molecules[a].CA);
+      Barr.push(B.molecules[b].CA);
+      align.push("|");
+    }
     a++; b++;
   }
 
