@@ -9834,7 +9834,7 @@ molmil.align = function(A, B) {
   for (var i=0; i<Aseq.length; i++) {
     if (Aseq[i] == "-") {b++; align.push(" "); continue;}
     if (Bseq[i] == "-") {a++; align.push(" "); continue;}
-    if (A.molecules[a].CA && B.molecules[a].CA) {
+    if (A.molecules[a].CA && B.molecules[b].CA) {
       Aarr.push(A.molecules[a].CA);
       Barr.push(B.molecules[b].CA);
       align.push("|");
