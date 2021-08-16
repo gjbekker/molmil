@@ -3172,12 +3172,14 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
         obj.center = chain.branches[m][0].SNFG_obj.center;
         // what to do if it's connected to a protein? -> get the Calpha instead...
         if (chain.branches[m][0].CA) {
+          if (! chain.branches[m][1].SNFG_obj) assignSNFG_obj(chain.branches[m][1]);
           xyzRef = chain.branches[m][0].chain.modelsXYZ[modelId || 0];
           Xpos = chain.branches[m][0].CA.xyz;
           xyz[0] = xyzRef[Xpos]; xyz[1] = xyzRef[Xpos+1]; xyz[2] = xyzRef[Xpos+2];
           obj.backvec = [xyz[0]-chain.branches[m][1].SNFG_obj.center[0], xyz[1]-chain.branches[m][1].SNFG_obj.center[1], xyz-chain.branches[m][1].SNFG_obj.center[2]]; 
         }
         else if (chain.branches[m][1].CA) {
+          if (! chain.branches[m][0].SNFG_obj) assignSNFG_obj(chain.branches[m][0]);
           xyzRef = chain.branches[m][1].chain.modelsXYZ[modelId || 0];
           Xpos = chain.branches[m][1].CA.xyz;
           xyz[0] = xyzRef[Xpos]; xyz[1] = xyzRef[Xpos+1]; xyz[2] = xyzRef[Xpos+2];
