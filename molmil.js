@@ -1206,7 +1206,9 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
 // ** connects amino bonds within a chain object **
 molmil.viewer.prototype.buildAminoChain = function(chain) {
   if (chain.isHet || (chain.molecules.length && (chain.molecules[0].water))) return;
-  if (chain.molecules[0].SNFG) return this.buildSNFG(chain);
+  var snfg = true;
+  for (var m1=0; m1<chain.molecules.length; m1++) if (! chain.molecules[m1].SNFG) snfg = false;
+  if (snfg) return this.buildSNFG(chain);
   if (chain.molecules.length == 1 && chain.molecules[0].xna) {
     chain.molecules[0].ligand = chain.isHet = true; chain.molecules[0].xna = false;
     delete chain.molecules[0].N;
@@ -1335,8 +1337,11 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   chain.bondsOK = true;
   
   if (chain.struct_conn && chain.struct_conn.length) {
-    var a1, a2;
-    for (m1=0; m1<chain.molecules.length; m1++) molmil.buildBondsList4Molecule(chain.bonds, chain.molecules[m1], xyzRef);
+    var a1, a2, snfg = true;
+    for (m1=0; m1<chain.molecules.length; m1++) {
+      if (! chain.molecules[m1].SNFG) snfg = false;
+      molmil.buildBondsList4Molecule(chain.bonds, chain.molecules[m1], xyzRef);
+    }
     for (m1=0; m1<chain.struct_conn.length; m1++) {
       
       chain.bonds.push(chain.struct_conn[m1]);
@@ -1350,11 +1355,13 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
         if (chain.struct_conn[m1][1].molecule.CA) chain.showBBatoms.push(chain.struct_conn[m1][1].molecule.CA);
       }
     }
-    if (chain.molecules.length && chain.molecules[0].SNFG) this.buildSNFG(chain);
+    if (snfg) this.buildSNFG(chain);
     return;
   }
 
+  var snfg = true;
   for (m1=0; m1<chain.molecules.length; m1++) {
+    if (! chain.molecules[m1].SNFG) snfg = false;
     SG1 = chain.bonds.length;
     molmil.buildBondsList4Molecule(chain.bonds, chain.molecules[m1], xyzRef);
 
@@ -1436,7 +1443,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
     }
   }
   
-  if (chain.molecules.length && chain.molecules[0].SNFG) this.buildSNFG(chain);
+  if (snfg) this.buildSNFG(chain);
 };
 
 molmil.viewer.prototype.getChain = function(struc, cid) {
