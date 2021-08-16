@@ -1303,7 +1303,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
 molmil.viewer.prototype.buildSNFG = function(chain) {
   chain.SNFG = true;
   chain.branches = [];
-  if (chain.bonds.length == 0) return this.buildBondList(chain);
+  if (chain.bonds.length == 0 && chain.atoms.length > 1) return this.buildBondList(chain);
   
   for (var i=0; i<chain.bonds.length; i++) {
     if (chain.bonds[i][0].molecule != chain.bonds[i][1].molecule) {
