@@ -2564,6 +2564,23 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
     molmil.toggleBU(this.soup.infoBag.BU_assembly, this.soup.infoBag.BU_rm[0], this.soup.infoBag.BU_rm[1], null, this.soup);
   }
   
+  tr = table.pushNode("tr");
+  
+  td = tr.pushNode("td", "Save BU as:");
+  td = tr.pushNode("td");
+  
+  var save = td.pushNode("button");
+  save.innerHTML = "mmJSON";
+  save.onclick = function() {molmil.saveBU(soup.sceneBU.assembly_id, {format: "mmjson"}, null, soup);};
+  
+  save = td.pushNode("button");
+  save.innerHTML = "mmCIF";
+  save.onclick = function() {molmil.saveBU(soup.sceneBU.assembly_id, {format: "mmcif"}, null, soup);};
+  
+  save = td.pushNode("button");
+  save.innerHTML = "PDB";
+  save.onclick = function() {molmil.saveBU(soup.sceneBU.assembly_id, {format: "pdb"}, null, soup);};
+  
 };
 
 
