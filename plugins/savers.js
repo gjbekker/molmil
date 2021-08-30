@@ -64,6 +64,59 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
   }
 }
 
+molmil.saveBU = function(assembly_id, options, struct, soup) {
+  if (! molmil.BU2JSO) return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", molmil.saveBU, molmil, [assembly_id, options, struct, soup]);
+  if (! molmil.configBox.customSaveFunction && ! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.saveBU, molmil, [assembly_id, options, struct, soup]);
+  if (! window.CIFparser && options.format == "mmcif") return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", molmil.saveBU, molmil, [assembly_id, options, struct, soup]);
+  soup = soup || molmil.cli_soup;
+  if (! struct) {for (var i=0; i<soup.structures.length; i++) if (soup.structures[i] instanceof molmil.entryObject) {struct = soup.structures[i]; break;}}
+  var pdbid = (struct.meta.pdbid || "").toUpperCase();
+  
+  options = options || {};
+  options.format = options.format || "mmjson";
+  if (options.format == "pdb") options.modelMode = true;
+  var jso = molmil.BU2JSO(assembly_id, options, struct, soup);
+  var out = "";
+  
+  if (options.format == "mmjson") {
+    if (! options.filename) options.filename = "BU"+(pdbid ? "_"+pdbid : "")+".json";
+    var jso_out = {}; jso_out["data"+(pdbid ? "_"+pdbid : "")+"_BU"] = jso;
+    out = JSON.stringify(jso_out);
+  }
+  else if (options.format == "mmcif") {
+    if (! options.filename) options.filename = "BU"+(pdbid ? "_"+pdbid : "")+".cif";
+    var jso_out = {}; jso_out["data"+(pdbid ? "_"+pdbid : "")+"_BU"] = jso;
+    out = dumpCIF(jso_out);
+  }
+  else if (options.format == "pdb") {
+    if (! options.filename) options.filename = "BU"+(pdbid ? "_"+pdbid : "")+".pdb";
+    var aname, cname, rid, prevMdl;
+    for (var aid=0; aid<jso.atom_site.Cartn_x.length; aid++) {
+      if (prevMdl != jso.atom_site.pdbx_PDB_model_num[aid]) {
+        if (aid != 0) out += "ENDMDL\n";
+        out += "MODEL "+jso.atom_site.pdbx_PDB_model_num[aid]+"\n";
+        prevMdl = jso.atom_site.pdbx_PDB_model_num[aid];
+      }
+      aname = jso.atom_site.label_atom_id[aid].substr(0,4);
+      if (! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
+      cname = (jso.atom_site.auth_asym_id[aid] || jso.atom_site.label_asym_id[aid] || "").substr(0,2);
+      rid = (jso.atom_site.label_seq_id[aid]||"").substr(0,4);
+
+      out += jso.atom_site.group_PDB[aid].padEnd(6) + ((aid+1)+'').padStart(5) + " " + aname.padEnd(4) + " " + jso.atom_site.label_comp_id[aid].padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + jso.atom_site.Cartn_x[aid].toFixed(3).padStart(8) + jso.atom_site.Cartn_y[aid].toFixed(3).padStart(8) + jso.atom_site.Cartn_z[aid].toFixed(3).padStart(8) + "\n";
+    }
+  }
+  else {
+    return console.error("Unsupported format", options.format);
+  }
+  
+  if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(options.filename, out, "utf8");
+  else {
+    var blob = new Blob([out], {type: "text/plain;charset=utf-8"});
+    saveAs(blob, options.filename);
+  }
+  
+}
+
 // ** generates a PLY file **
 molmil.exportPLY = function(soup, file) {
   if (! window.saveAs) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", this.exportPLY, this, [soup, file]);

@@ -1848,12 +1848,74 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
     }
     molmil.orient(null, soup, xyzs);
   }
- 
+
   soup.canvas.update = true;
+}
+
+molmil.BU2JSO = function(assembly_id, options, struct, soup) {
+  options = options || {};
+  soup = soup || molmil.cli_soup;
+  if (! struct) {for (var i=0; i<soup.structures.length; i++) if (soup.structures[i] instanceof molmil.entryObject) {struct = soup.structures[i]; break;}}
   
+  var atom_site = {group_PDB: [], type_symbol: [], label_atom_id: [], label_alt_id: [], label_comp_id: [], label_asym_id: [], label_entity_id: [], label_seq_id: [], Cartn_x: [], Cartn_y: [], Cartn_z: [], auth_asym_id: [], id: []};
+  if (options.modelMode) atom_site.pdbx_PDB_model_num = [];
   
-  //console.log(! canvas.molmilViewer.sceneBU.no_identity , canvas.molmilViewer.sceneBU.NOC > 1);
+  if (assembly_id == -1) var BU = [[[null], undefined]];
+  else var BU = soup.BUassemblies[assembly_id];
   
+  var p=0, i, c, asym_ids, id = 1;
+  var m, matrix, buid;
+  var oldChain, oldResidue, oldAtom;
+  var xyzin = vec3.create(), xyzout = vec3.create(), cp, bucounter = 1;
+  
+  for (p=0; p<BU.length; p++) {
+    asym_ids = BU[p][1] ? new Set(BU[p][1]) : BU[p][1];
+    
+    for (cp=0; cp<BU[p][0].length; cp++) {
+      m = BU[p][0][cp] == null ? ["identity operation", mat4.create()] : soup.BUmatrices[BU[p][0][cp]];
+      if (options.modelMode) {
+        buid = "";
+      }
+      if (m[0] == "identity operation") buid = "";
+      else {buid = "_"+bucounter; bucounter++;}
+      matrix = m[1];
+
+      for (c=0; c<struct.chains.length; c++) {
+        oldChain = struct.chains[c];
+        if (asym_ids !== undefined && ! asym_ids.has(oldChain.name)) continue;
+
+        for (m=0; m<oldChain.molecules.length; m++) {
+          oldResidue = oldChain.molecules[m];
+        
+          for (a=0; a<oldResidue.atoms.length; a++) {
+            oldAtom = oldResidue.atoms[a];
+            
+            xyzin[0] = oldChain.modelsXYZ[0][oldAtom.xyz];
+            xyzin[1] = oldChain.modelsXYZ[0][oldAtom.xyz+1];
+            xyzin[2] = oldChain.modelsXYZ[0][oldAtom.xyz+2];
+            vec3.transformMat4(xyzout, xyzin, matrix);
+            
+            atom_site.group_PDB.push(oldResidue.ligand ? "HETATM" : "ATOM");
+            atom_site.Cartn_x.push(xyzout[0]);
+            atom_site.Cartn_y.push(xyzout[1]);
+            atom_site.Cartn_z.push(xyzout[2]);
+            atom_site.auth_asym_id.push(oldChain.authName);
+            atom_site.label_asym_id.push(oldChain.name+buid);
+            atom_site.label_alt_id.push(oldAtom.label_alt_id);
+            atom_site.label_atom_id.push(oldAtom.atomName);
+            atom_site.label_comp_id.push(oldResidue.name);
+            atom_site.label_entity_id.push(oldChain.entity_id);
+            atom_site.label_seq_id.push(oldResidue.RSID);
+            atom_site.type_symbol.push(oldAtom.element);
+            atom_site.id.push(id++);
+            
+            if (options.modelMode) atom_site.pdbx_PDB_model_num.push(bucounter);
+          }
+        }
+      }
+    }
+  }
+  return {atom_site: atom_site};
 }
 
 // the goal of this function is to simply duplicate the BU (i.e. instead of doing on the GPU, create explicit in-memory copies of the structure and transform its location...)
@@ -1869,38 +1931,24 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
   var models = soup.models;
   
   var BU = soup.BUassemblies[assembly_id];
-
-  var selectionAtoms, chain;
-  var selectionAtoms = JSON.parse(JSON.stringify(molmil.configBox.backboneAtoms4Display)); selectionAtoms.CA = 1;
   
-  var lines2draw, atoms2draw, rgba, vertices, vertices8, indices, refy, vbuffer, ibuffer;
-  var p=0, j, i, c, b, asym_ids, asym_ids_list = [], COM, COM_avg = [0, 0, 0, 0], COM_tmp = [0, 0, 0], atom;
-
-  var matSz = 0;
-  var toggleIdentity = {}, noe;
+  var p=0, i, c, asym_ids;
   
   var m, matrix, cpID = 1;
-
-  var xMin = 1e99, xMax = -1e99, yMin = 1e99, yMax = -1e99, zMin = 1e99, zMax = -1e99, A = [0, 0, 0], B = [0, 0, 0];
-  
-  var chainInfo = {}, any_identity = false, NOC = 0, rangeInfo;
   
   var newStruc, newChain, newResidue, newAtom;
   var oldChain, oldResidue, oldAtom;
   
-  var xyzin = vec3.create(), xyzout = vec3.create(), clearInfo = [], cp;
+  var xyzin = vec3.create(), xyzout = vec3.create(), cp;
   
-  for (p=0, j=0; p<BU.length; p++) {    
+  for (p=0; p<BU.length; p++) {    
     asym_ids = BU[p][1];
     
     for (cp=0; cp<BU[p][0].length; cp++) {
       m = soup.BUmatrices[BU[p][0][cp]];
       matrix = m[1];
       
-      if (m[0] == "identity operation") {
-        clearInfo = asym_ids;
-        continue;
-      }
+      if (m[0] == "identity operation") continue;
       
       newStruc = new molmil.entryObject({id: "bu_"+cpID, "idnr": struct.meta.idnr+"."+cpID});
       newStruc.soup = soup;
@@ -1972,18 +2020,12 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
     }
   }
   
-  options.cleanup = true;
-  if (options.cleanup) {
-    //console.log(clearInfo); // <-- these chains should be kept...
-  }
-  
   if (! options.skipInit) {
     soup.calculateCOG();
     soup.renderer.initBuffers();
     soup.canvas.update = true;
   }
-  
-  
+
   return newStrucs;
 }
 
