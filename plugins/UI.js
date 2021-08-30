@@ -3013,7 +3013,7 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
       for (i=0; i<buffer.id.length; i++) {
         fgroup = {
           name: "", 
-          sequence: "",
+          sequence: [],
           description: buffer.details[i],
           source: buffer.info_subtype[i] ? buffer.info_subtype[i]+" : "+buffer.id[i] : undefined,
           residueList: [] // list of molObject/s 
@@ -3033,11 +3033,11 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
 
             chains = UI.soup.getChainAuth(struct, chainid);
             
-            if (fgroup.sequence.length) fgroup.sequence += ", ";
             for (c=residx; c<=residx2; c++) {
               mol = UI.soup.getMolObject4ChainAlt(chains, c);
               if (! mol) continue;
-              fgroup.sequence += aaCode[mol.name] || ""; fgroup.residueList.push(mol);
+              fgroup.sequence.push(aaCode[mol.name] || mol.name);
+              fgroup.residueList.push(mol);
             }
 
             tmp.push([chainid+": "+residues[r].beg_auth_seq_id+(residues[r].beg_auth_seq_id != residues[r].end_auth_seq_id ? "-"+residues[r].end_auth_seq_id : "")]);
@@ -3064,11 +3064,10 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
 
             chains = UI.soup.getChainAuth(struct, chainid);
 
-            if (fgroup.sequence.length) fgroup.sequence += ", ";
             for (c=residx; c<=residx2; c++) {
               mol = UI.soup.getMolObject4ChainAlt(chains, c);
               if (! mol) continue;
-              fgroup.sequence += aaCode[mol.name] || "";
+              fgroup.sequence.push(aaCode[mol.name] || mol.name);
               fgroup.residueList.push(mol);
             }
 
@@ -3122,7 +3121,7 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
       if (fgroups[i].sequence) {
         tr = tbl.pushNode("tr");
         tr.pushNode("td", "Sequence:");
-        tr.pushNode("td", fgroups[i].sequence);
+        tr.pushNode("td", fgroups[i].sequence.join(", "));
       }
       
       if (fgroups[i].description) {
