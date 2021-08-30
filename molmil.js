@@ -6556,6 +6556,7 @@ molmil.getOffset = function (evt) {
 molmil.handle_molmilViewer_mouseUp = function (event) {
   var activeCanvas = molmil.activeCanvas;
   if (! molmil.mouseMoved && activeCanvas) {
+    if (event.srcElement != activeCanvas) return;
     if (event.ctrlKey != activeCanvas.atomCORset) {
       if (event.ctrlKey) activeCanvas.molmilViewer.setCOR();
       else activeCanvas.molmilViewer.resetCOR();
