@@ -28,6 +28,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     save: molmil.commandLines.pyMol.saveCommand,
     viewport: molmil.commandLines.pyMol.viewportCommand,
     view: molmil.commandLines.pyMol.viewCommand,
+    reset: molmil.commandLines.pyMol.resetCommand,
     findseq: molmil.commandLines.pyMol.findseqCommand,
     delete: molmil.commandLines.pyMol.deleteCommand,
     edmap: molmil.commandLines.pyMol.edmapCommand,
@@ -85,6 +86,13 @@ molmil.commandLines.pyMol.viewportCommand = function(env, command) {
 molmil.commandLines.pyMol.viewCommand = function(env, command) {
   command = command.match(/view[\s]*(([a-zA-Z0-9_.]+)[\s]*(,[\s]*([a-zA-Z0-9_.]+))?)?/);
   try {molmil.commandLines.pyMol.view.apply(env, [command[2], command[4]]);}
+  catch (e) {console.error(e); return false;}
+  return true;
+}
+
+molmil.commandLines.pyMol.resetCommand = function(env, command) {
+  command = command.match(/reset[\s]+/);
+  try {molmil.commandLines.pyMol.reset.apply(env, []);}
   catch (e) {console.error(e); return false;}
   return true;
 }
@@ -750,6 +758,11 @@ molmil.commandLines.pyMol.view = function(key, action) {
     
     this.console.log("view null; turn x, "+X+"; turn y, "+Y+"; turn z, "+Z+"; move x, "+this.cli_soup.renderer.camera.x+"; move y, "+this.cli_soup.renderer.camera.y+"; move z, "+this.cli_soup.renderer.camera.z+";");
   }
+}
+
+molmil.commandLines.pyMol.reset = function() {
+  this.cli_soup.renderer.camera.reset();
+  this.cli_soup.renderer.camera.z = this.cli_soup.calcZ();
 }
 
 molmil.commandLines.pyMol.findseq = function(seq, target, selName) {
