@@ -311,7 +311,6 @@ molmil.commandLines.pyMol.disableCommand = function(env, command) {
 
 molmil.commandLines.pyMol.turnCommand = function(env, command) {
   var cmd = command.match(/turn[\s]+([xyz]),[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*(,[\s]*([-+]?[0-9]*\.?[0-9]+)[\s]*(,[\s]*([-+]?[0-9]*\.?[0-9]+))?)?/);
-  console.log(cmd);
   if (cmd != null) {
     try {molmil.commandLines.pyMol.turn.apply(env, [cmd[1], cmd[2], cmd[4], cmd[6]]);}
     catch (e) {console.error(e); return false;}
@@ -778,6 +777,8 @@ molmil.commandLines.pyMol.findseq = function(seq, target, selName) {
 }
   
 molmil.commandLines.pyMol.delete = function(atoms) {
+  var soup = this.cli_soup, deleted=false;
+  
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
     else {
@@ -796,11 +797,20 @@ molmil.commandLines.pyMol.delete = function(atoms) {
         }
         return console.error("Unknown mesh...");
       }
+      else if (atoms.startsWith("label ")) {
+        var idnr = atoms.split("label ")[1].trim();
+        for (var i=0; i<soup.texturedBillBoards.length; i++) {
+          if (soup.texturedBillBoards[i].text == idnr) {
+            soup.texturedBillBoards.splice(i, 1);
+            this.cli_soup.renderer.canvas.update = true;
+            return;
+          }
+        }
+        
+      }
       else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
     }
   }
-  
-  var soup = this.cli_soup, deleted=false;
   
   var idx, a;
   for (a=0; a<atoms.length; a++) {
@@ -970,7 +980,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
 
 molmil.commandLines.pyMol.styleif = function(cmds) {
   if (! this.cli_soup.canvas.setupDone) return molmil_dep.asyncStart(molmil.commandLines.pyMol.styleif, [cmds], this, 100);
-  cmds = cmds.split(",").map(function(x){return x.trim()});
+  cmds = cmds ? cmds.split(",").map(function(x){return x.trim()}) : ["structure"];
   this.cli_soup.UI.styleif(cmds[0], cmds.slice(1));
 }
 
