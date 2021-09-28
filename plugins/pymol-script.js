@@ -778,7 +778,6 @@ molmil.commandLines.pyMol.findseq = function(seq, target, selName) {
   
 molmil.commandLines.pyMol.delete = function(atoms) {
   var soup = this.cli_soup, deleted=false;
-  
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
     else {
@@ -1375,8 +1374,10 @@ molmil.commandLines.pyMol.hide = function(repr, key, quiet) {
 molmil.commandLines.pyMol.enable = function(atoms) {
   var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) selection = this[atoms];
-    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    try {
+      if (this.hasOwnProperty(atoms)) selection = this[atoms];
+      else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    } catch (e) {selection = [];}
     if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
   
@@ -1400,8 +1401,10 @@ molmil.commandLines.pyMol.enable = function(atoms) {
 molmil.commandLines.pyMol.disable = function(atoms) {
   var selection = atoms, selMode = 1;
   if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) selection = this[atoms];
-    else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    try {
+      if (this.hasOwnProperty(atoms)) selection = this[atoms];
+      else {selection = molmil.commandLines.pyMol.select.apply(this, [atoms]) || []; selMode = 1;}
+    } catch (e) {selection = [];}
     if (! selection.length) {selection = molmil.commandLines.pyMol.selectModel.apply(this, [atoms]) || []; selMode = 2}
   }
 
