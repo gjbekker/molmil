@@ -10,6 +10,7 @@ If you use Molmil, please <a href="https://jcheminf.biomedcentral.com/articles/1
 - Rotate: hold left mouse button and drag
 - Translate (x/y): (hold left+right mouse button, or hold scroll button, or hold left mouse button + shift key) and drag
 - Zoom (z): hold right mouse button and drag
+- Rotate around atom: left-click atom, then hold Ctrl while holding left mouse button and dragging to rotate
 
 #### Atom/bond information
 
@@ -39,10 +40,10 @@ If you use Molmil, please <a href="https://jcheminf.biomedcentral.com/articles/1
   Molmil menu -> Settings (quality, loop/sheet smoothing, fog, projection mode, color scheme, background color)
 
 - Slab:<br/>
-  Molmil menu -> View -> Configure slab
+  Molmil menu -> Settings -> Slab
 
 - Show Biological Unit:<br/>
-  Molmil menu -> View -> Configure BU
+  Molmil menu -> View -> Configure BU (for structures that contain BU metadata)
 
 - Animation (PDB model or MD trajectory):<br/>
   Molmil menu -> Animation
@@ -51,7 +52,7 @@ If you use Molmil, please <a href="https://jcheminf.biomedcentral.com/articles/1
   Molmil menu -> Enable full-screen
 
 - WebVR:<br/>
-  Molmil menu -> Enable WebVR
+  Molmil menu -> Enable WebVR (on compatible platforms only)
 
 - Show Command line interface:
   1) Molmil menu -> Toggle CLI
@@ -116,11 +117,11 @@ examples:
   
 ### `show`<br/>
   Show atoms: `show _repr_, atom-list/expression`<br/>
-  `_repr_`: spheres, ball_stick, sticks, lines, cartoon, ca-trace
+  `_repr_`: spheres, ball_stick, sticks, lines, cartoon, ca-trace, label
 
 ### `hide`<br/>
   Hide atoms: `hide _repr_, atom-list/expression`<br/>
-  `_repr_`: hydro, all, cartoon, solvent, spheres, ball_stick, sticks
+  `_repr_`: hydro, all, cartoon, snfg-icon, solvent, coarse-surface, spheres, ball_stick, sticks, lines, cell, label
   
 ### `enable`
 Show file/model
@@ -133,12 +134,15 @@ Hide file/model
   `disable file.pdb`
   
 ### `turn`<br/>
-  Rotate the system: turn axis, degrees<br/>
+  Rotate the camera/system: turn axis, degrees<br/>
   axis: x, y, z
   
 ### `move`<br/>
-  Translate the system: move axis, Angstrom<br/>
+  Translate the camera/system: move axis, Angstrom<br/>
   axis: x, y, z
+  
+### `translate`<br/>
+  Translate a selection of atoms along an axis: `translate [x,y,z], atom-list/expression`</br>
 
 ### `fetch`<br/>
   Fetch a PDB entry from PDBj: fetch pdbid
@@ -173,6 +177,34 @@ Hide file/model
   
   Enable fog: `set depth_cue, 1`<br/>
   Disable fog: `set depth_cue, 0`
+  
+  Settings:
+  - `stick_radius` float
+  - `depth_cue` 1/0
+  - `cartoon_highlight_color` 1/color
+  - `field_of_view` float
+  - `orthoscopic` on/off
+  - `label_bg_color` color
+  - `label_outline_color` color
+  - `label_color` color
+  - `label_border` on/off
+  - `label_position` (dx,dy,dz)
+  - `label_atom_center` all OR atom name
+  - `label_size` float
+  - `label_front` 1/0
+  - `cartoon_smooth_loops` int
+  - `all_states` on/off
+  - `movie_mode` forward/backward/swing/swing-once
+  - `edmap_sigma` float
+  - `mesh_color` color
+  - `surface_color` color
+  - `cif_use_auth` on/off
+  - `stereo_mode` 10(anaglyph)/5(side-by-side)/2(cross-eyed)
+  - `connect_cutoff` float
+  - `backface_cull` 1/0
+  
+  Here, color is either a pre-configured color name, or an rgba array: [r,g,b,a], e.g. [255, 0, 0, 255] for red
+  
 
 ### `bg_color`<br/>
   Set the background color: bg_color color
@@ -192,6 +224,9 @@ Hide file/model
   
   Save the current view as "test": `view test, store`<br/>
   Recall (restore) the view "test": `view test`
+  
+### `reset`<br/>
+  Resets the camera the default position and orientation (identity matrix, but zoomed out to show the molecules)
   
 ### `findseq`<br/>
   Finds a specific sequence: findseq sequence, selection, name
@@ -248,6 +283,7 @@ Hide file/model
   - `style-if edmap`
   - `style-if sites`
   - `style-if align`
+  - `style-if settings`
   - `style-if hide`
 
 ### `align`
