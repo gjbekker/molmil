@@ -801,12 +801,11 @@ molmil.commandLines.pyMol.delete = function(atoms) {
         var idnr = atoms.split("label ")[1].trim();
         for (var i=0; i<soup.texturedBillBoards.length; i++) {
           if (soup.texturedBillBoards[i].text == idnr) {
-            soup.texturedBillBoards.splice(i, 1);
+            soup.texturedBillBoards[i].remove();
             this.cli_soup.renderer.canvas.update = true;
             return;
           }
         }
-        
       }
       else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
     }
@@ -1306,13 +1305,13 @@ molmil.commandLines.pyMol.set_color = function(name, rgba) {
   this.colors[name] = rgba;
 }
 
-molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
-  var backboneAtoms = molmil.configBox.backboneAtoms4Display;
-  
-  if (typeof atoms != "object") {
-    if (this.hasOwnProperty(atoms)) atoms = this[atoms];
-    //else atoms = molmil.commandLines.pyMol.select(atoms);
-    else atoms = molmil.commandLines.pyMol.select.apply(this, [atoms]);
+molmil.commandLines.pyMol.hide = function(repr, key, quiet) {
+  var backboneAtoms = molmil.configBox.backboneAtoms4Display, atoms = [];
+
+  if (typeof key != "object") {
+    if (this.hasOwnProperty(key)) atoms = this[key];
+    //else atoms = molmil.commandLines.pyMol.select(key);
+    else atoms = molmil.commandLines.pyMol.select.apply(this, [key]);
   }
   
   if (repr == "hydro" || repr == "h.") {
@@ -1358,7 +1357,14 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
     this.cli_soup.hideCell();
   }
   else if (repr == "label") {
-    // ....
+    var soup = molmil.cli_soup;
+    for (var i=0; i<soup.texturedBillBoards.length; i++) {
+      if (soup.texturedBillBoards[i].text == key) {
+        soup.texturedBillBoards[i].display = false;
+        this.cli_soup.renderer.canvas.update = true;
+        return;
+      }
+    }
   }
 
   this.cli_soup.renderer.rebuildRequired = true;
@@ -1892,6 +1898,15 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
         selection[i].display = false;
         if (selection[i].structures) selection[i].structures.forEach(function(x) {for (var m=0; m<x.programs.length; m++) if (! x.programs[m].settings.solid) x.programs[m].toggleWF();});
         else {for (var m=0; m<selection[i].programs.length; m++) if (! selection[i].programs[m].settings.solid) selection[i].programs[m].toggleWF();}
+      }
+    }
+    else if (repr = "label") {
+      for (var i=0; i<soup.texturedBillBoards.length; i++) {
+        if (soup.texturedBillBoards[i].text == atoms) {
+          soup.texturedBillBoards[i].display = true;
+          this.cli_soup.renderer.canvas.update = true;
+          return;
+        }
       }
     }
   }
