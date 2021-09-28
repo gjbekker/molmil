@@ -1348,6 +1348,9 @@ molmil.commandLines.pyMol.hide = function(repr, atoms, quiet) {
   else if (repr == "sticks") {
     for (var i=0; i<atoms.length; i++) if (atoms[i].displayMode == 3) atoms[i].displayMode = 0;
   }
+  else if (repr == "lines") {
+    for (var i=0; i<atoms.length; i++) if (atoms[i].displayMode == 4) atoms[i].displayMode = 0;
+  }
   else if (repr == "solvent") {
     this.cli_soup.waterToggle(false);
   }
