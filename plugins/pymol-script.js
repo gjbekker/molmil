@@ -609,7 +609,10 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
   for (i=0; i<expr.length; i++) {
     if (expr[i].match(/\s/) || expr[i] == ")") {
       word = word.trim();
-      if (word.length == 0) continue;
+      if (word.length == 0) {
+        if (expr[i] == "(" || expr[i] == ")") new_expr.push(expr[i]);
+        continue;
+      }
       toUpper_ = false, ss_ = false;
       operator = NOT ? "!=" : "=="; NOT = false;
       if (word == "name") {key = "this.soupObject.atomRef[a].atomName "+operator+" '%s'"; toUpper_ = true;}
