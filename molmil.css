@@ -448,18 +448,24 @@
   
   pointer-events: none;
   color: rgb(var(--FOREGROUND_COLOR));
+  
 }
 
 #styleif > div {
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   pointer-events: auto;
+  
+  
+  transition: background .2s linear !important;
 }
 
 #styleif:hover > div {
   background-color: rgba(var(--BACKGROUND_COLOR), .67);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  
+  transition: none !important;
 }
 
 #styleif > :nth-child(1) {
@@ -500,25 +506,6 @@
   border-width: 0;
 }
 
-#styleif > :nth-child(1) ul {
-  margin-top: 0;
-}
-
-#styleif > :nth-child(1) li {
-  list-style-type: none;
-  padding: .25em;
-  display: inline-block;
-  border: 1px solid rgb(var(--FOREGROUND_COLOR));
-  margin: .25em;
-  border-radius: 1em;
-}
-
-#styleif > :nth-child(1) li:hover {
-  cursor: pointer;
-  color: #C8323A;
-  border-color: #C8323A;
-}
-
 #styleif > :nth-child(2) {
   border: 1px solid rgb(var(--FOREGROUND_COLOR));
   border-top: none;
@@ -530,11 +517,19 @@
   
   margin-left: 50%;
   transform: translate(-50%, 0);
+  letter-spacing: 1px;
+  width: 7em;
+  text-align: center;
 }
 
 #styleif > :nth-child(2):hover {
   color: #C8323A;
   cursor: pointer;
+  text-decoration: underline;
+  font-weight: bold;
+  letter-spacing: 0px;
+  padding-left: calc(0.5em + 0.5px);
+  padding-right: calc(0.5em + 0.5px);
 }
 
 
@@ -542,7 +537,7 @@
   border: 1px solid rgb(var(--FOREGROUND_COLOR));
   border-radius: 1em;
   padding: .25em;
-  margin-top: .25em;
+  margin-top: .125em;
   
   display: inline-block;
   
@@ -552,6 +547,7 @@
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease-out;
+  width: 7.5em;
 }
 
 #styleif > :nth-child(3).visible {
@@ -564,19 +560,36 @@
   padding: .25em;
 }
 
-
-
-
 #styleif > :nth-child(3) > div:hover {
   color: #C8323A;
   cursor: pointer;
 }
+
+#styleif table span, #styleif table input {
+  vertical-align: middle;
+} 
 
 canvas {
   background-color: rgb(var(--BACKGROUND_COLOR));
 }
 
 #styleif form {
+}
+
+button {
+  padding: .33em .67em .33em .67em;
+  display: inline-block;
+  border: 1px solid rgb(var(--BACKGROUND_LIGHT_COLOR));
+  margin: .25em;
+  border-radius: 1em;
+  background: linear-gradient(rgb(var(--BACKGROUND_LIGHT_COLOR)), rgb(var(--BACKGROUND_COLOR)));
+  font-weight: bold;
+  color: rgb(var(--FOREGROUND_COLOR));
+}
+
+button:hover {
+  cursor: pointer;
+  background: linear-gradient(rgb(var(--BACKGROUND_COLOR)), rgb(var(--BACKGROUND_LIGHT_COLOR)));
 }
 
 #nw_edmap_dl {

@@ -416,7 +416,8 @@ molmil.initSettings = function () {
   molmil.configBox.glsl_fog = molmil.localStorageGET("molmil.settings_glsl_fog") == 1;
   molmil.configBox.projectionMode = molmil.localStorageGET("molmil.settings_PROJECTION") || 1;
   molmil.configBox.stereoMode = parseInt(molmil.localStorageGET("molmil.settings_STEREO")) || 0;
-  
+  molmil.configBox.slab_near_ratio = parseFloat(molmil.localStorageGET("molmil.settings_slab_near_ratio")) || 0;
+  molmil.configBox.slab_far_ratio = parseFloat(molmil.localStorageGET("molmil.settings_slab_far_ratio")) || 1;
   molmil.configBox.smoothFactor = molmil.localStorageGET("molmil.settings_BBSF") || 2;
   
   var tmp = molmil.localStorageGET("molmil.settings_BGCOLOR");
@@ -435,6 +436,9 @@ molmil.updateBGcolor = function() {
   let root = document.documentElement;
   root.style.setProperty("--BACKGROUND_COLOR", (molmil.configBox.BGCOLOR[0]*255).toFixed()+","+(molmil.configBox.BGCOLOR[1]*255).toFixed()+","+(molmil.configBox.BGCOLOR[2]*255).toFixed());
   root.style.setProperty("--FOREGROUND_COLOR", (fgcolor[0]*255).toFixed()+","+(fgcolor[1]*255).toFixed()+","+(fgcolor[2]*255).toFixed());  
+
+  var sf = .75, isf = 1-sf;
+  root.style.setProperty("--BACKGROUND_LIGHT_COLOR", ((molmil.configBox.BGCOLOR[0]*sf + fgcolor[0]*isf)*255).toFixed()+","+((molmil.configBox.BGCOLOR[1]*sf + fgcolor[1]*isf)*255).toFixed()+","+((molmil.configBox.BGCOLOR[2]*sf + fgcolor[2]*isf)*255).toFixed());
 }
 
 // display modes
@@ -7941,8 +7945,6 @@ molmil.createViewer = function (target, width, height, soupObject) {
     height = window.innerHeight || document.documentElement.clientHeight;
     window.onresize = function() {
       var dpr = devicePixelRatio || 1;
-      canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
-      canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
       if (molmil.configBox.stereoMode != 3) {
         canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
         canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
@@ -7953,9 +7955,6 @@ molmil.createViewer = function (target, width, height, soupObject) {
   }
   
   canvas.width = width*dpr; canvas.height = height*dpr; canvas.defaultSize = [width, height];
-
-  canvas.style.width = width+"px";
-  canvas.style.height = height+"px";
 
   canvas.setSize = function(w, h) {
     var dpr = window.devicePixelRatio || 1;

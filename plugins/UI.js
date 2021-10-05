@@ -122,7 +122,7 @@ molmil.UI.prototype.showContextMenuAtom=function(x, y, pageX) {
   else {
     var atom = atoms[0];
     var sgl = atom.molecule.atoms.length > 1;
-    title = (sgl ? atom.atomName : atom.element) + " - " + (sgl ? (atom.molecule.name || "") + " " : "") + (atom.molecule.RSID || "") + (  atom.chain.name ? " - Chain " + atom.chain.name : "") + " - " + atom.chain.entry.meta.idnr;
+    title = (sgl ? atom.atomName : atom.element) + " - " + (sgl ? (atom.molecule.name || "") + " " : "") + (atom.molecule.RSID || "") + (  atom.chain.name ? " - Chain " + atom.chain.name : "") + " - " + atom.chain.entry.meta.idnr + (atom.customText ? " - "+atom.customText : "");
   }
   this.buildComplexMenu(title, this.contextMenuCanvas, null, atoms);
 };
@@ -456,16 +456,15 @@ molmil.UI.prototype.showLM=function(icon) {
   
   e = menu.appendChild(document.createElement("div")); e.UI = this; e.LM = icon;
   e.className = "molmil_UI_ME";
-  e.innerHTML = "Settings";
-  e.title = "Opens Molmil's advanced settings panel";
-  e.onclick = function() {this.LM.onclick(); this.UI.settings();};
+  e.innerHTML = "Style IF";
+  e.title = "Opens Molmil's styling interface";
+  e.onclick = function() {this.LM.onclick(); UI.styleif("structure");};
   
   e = menu.appendChild(document.createElement("div")); e.UI = this; e.LM = icon;
   e.className = "molmil_UI_ME";
-  e.innerHTML = "View >";
-  e.title = "View options";
-  e.onclick = function() {this.UI.view(menu.sub);};
-  
+  e.innerHTML = "Settings";
+  e.title = "Opens Molmil's advanced settings panel";
+  e.onclick = function() {this.LM.onclick(); UI.styleif("settings");};
   
   var number_of_frames = this.soup.structures.length ? this.soup.structures[0].number_of_frames : 0;
   
@@ -542,325 +541,24 @@ molmil.UI.prototype.showLM=function(icon) {
 
 molmil.UI.prototype.view=function(sub) {
   molmil_dep.Clear(sub);
-  var e;
+  var e, UI = this;
   sub.style.display = "";
   e = sub.pushNode("div", "Reset zoom", "molmil_UI_ME");
-  e.UI = this;
   e.onclick = function() {
-    if (this.UI.LM && this.UI.LM.parentNode.childNodes.length > 1) this.UI.LM.onclick();
-    this.UI.soup.renderer.camera.z = this.UI.soup.calcZ();
-    this.UI.soup.canvas.update = true;
+    if (UI.LM && UI.LM.parentNode.childNodes.length > 1) UI.LM.onclick();
+    UI.soup.renderer.camera.z = UI.soup.calcZ();
+    UI.soup.canvas.update = true;
   };
-  
-  e = sub.pushNode("div", "Configure slab", "molmil_UI_ME");
-  e.UI = this;
-  e.onclick = function() {this.UI.configureSlab.apply(this.UI);};
   
   if (! this.soup.AisB) {
     e = sub.pushNode("div", "Configure BU", "molmil_UI_ME");
-    e.UI = this;
-    e.onclick = function() {this.UI.configureBU.apply(this.UI);};
+    e.onclick = function() {
+      UI.styleif("bu");
+      if (UI.LM && UI.LM.parentNode.childNodes.length > 1) UI.LM.onclick();
+      if (UI.onLMshow) UI.onLMshow();
+    };
   }
 }
-
-molmil.UI.prototype.configureBU = function(target) {
-  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
-  if (this.onLMshow) this.onLMshow();
-
-  var assembly = this.soup.infoBag.BU_assembly || -1; // make this configurable...
-  var rm = this.soup.infoBag.BU_rm || [3, 2]; // make this configurable...
-  
-  var popup = molmil_dep.dcE("div");
-  popup.setClass("molmil_menu_popup");
-  
-  popup.pushNode("div", "Biological Unit configuration");
-  popup.pushNode("hr");
-  
-  var table = popup.pushNode("table"), tr, td;
-  var US, BUrm;
-  
-  tr = table.pushNode("tr");
-  td = tr.pushNode("td", "Unit selection:");
-  
-  US = tr.pushNode("td").pushNode("select");
-  
-  
-  var soup = this.soup;
-  var noc = 0, i, c, tmp;
-  for (c=0; c<soup.chains.length; c++) {if (soup.poly_asym_ids.indexOf(soup.chains[c].name) != -1) noc++;}
-
-  td = US.pushNode("option", "Asymmetric unit (%NOC)".replace("%NOC", noc)); td.value = -1;
-  
-  var assembly_id = -1;
-  if (Object.keys(soup.BUmatrices).length > 1 || Object.keys(soup.BUassemblies).length > 1) {
-    for (var e in soup.BUassemblies) {
-      noc = 0;
-      for (i=0; i<soup.BUassemblies[e].length; i++) {
-        tmp = 0;
-        for (c=0; c<soup.BUassemblies[e][i][1].length; c++) {if (soup.poly_asym_ids.indexOf(soup.BUassemblies[e][i][1][c]) != -1) tmp++;}
-        noc += tmp*soup.BUassemblies[e][i][0].length;
-      }
-
-      td = US.pushNode("option", "Biological unit %N (%NOC)".replace("%NOC", noc).replace("%N", e)); td.value = e;
-    }
-    if (assembly && (assembly == -1 || soup.BUassemblies.hasOwnProperty(assembly))) assembly_id = assembly;
-    else {
-      assembly = figureOutAssemblyId(soup.pdbxData, soup.BUassemblies);
-      if (soup.BUassemblies.hasOwnProperty(assembly)) assembly_id = assembly;
-    }
-  }
-  
-  US.value = assembly_id;
-  
-  tr = table.pushNode("tr");
-  td = tr.pushNode("td", "Unit repr.:");
-  
-  BUrm = tr.pushNode("td").pushNode("select");
-  
-  td = BUrm.pushNode("option", "Only backbone, colored by CPK"); td.value = [1, 1];
-  td = BUrm.pushNode("option", "Only backbone, colored by each asymmetric chain"); td.value = [1, 2];
-  td = BUrm.pushNode("option", "Only backbone, colored by each chain"); td.value = [1, 3];
-  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by CPK"); td.value = [2, 1];
-  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by each asymmetric chain"); td.value = [2, 2];
-  td = BUrm.pushNode("option", "Only alpha carbon and phosphorus, colored by each chain"); td.value = [2, 3];
-  
-  
-  td = BUrm.pushNode("option", "Tube, colored by each asymmetric chain"); td.value = [3, 2];
-  td = BUrm.pushNode("option", "Tube, colored by each chain"); td.value = [3, 3];
-  td = BUrm.pushNode("option", "Tube, colored by secondary structure"); td.value = [3, 4];
-  td = BUrm.pushNode("option", "Cartoon, colored by each asymmetric chain"); td.value = [4, 2];
-  td = BUrm.pushNode("option", "Cartoon, colored by each chain"); td.value = [4, 3];
-  td = BUrm.pushNode("option", "Cartoon, colored by secondary structure"); td.value = [4, 4];
-  td = BUrm.pushNode("option", "Rocket, colored by each asymmetric chain"); td.value = [6, 2];
-  td = BUrm.pushNode("option", "Rocket, colored by each chain"); td.value = [6, 3];
-  td = BUrm.pushNode("option", "Rocket, colored by secondary structure"); td.value = [6, 4];
-  
-  td = BUrm.pushNode("option", "Coarse surface, colored by each asymmetric chain"); td.value = [5, 2];
-  td = BUrm.pushNode("option", "Coarse surface, colored by each chain"); td.value = [5, 3];
-  
-  BUrm.value = rm;
-  
-  US.soup = BUrm.soup = soup;
-  
-  US.oninput = BUrm.oninput = function() {
-    var tmp = BUrm.value.split(",");
-    this.soup.infoBag.BU_assembly = US.value;
-    this.soup.infoBag.BU_rm = [parseInt(tmp[0]), parseInt(tmp[1])];
-    
-    molmil.toggleBU(this.soup.infoBag.BU_assembly, this.soup.infoBag.BU_rm[0], this.soup.infoBag.BU_rm[1], null, this.soup);
-  }
-  
-  var closeButton = popup.pushNode("button", "Close");
-  closeButton.style.marginLeft = "1em";
-  var UI = this;
-  closeButton.onclick = function() {
-    popup.parentNode.removeChild(popup);
-    if (UI.onLMhide) UI.onLMhide();
-  };
-  
-  if (target) target.pushNode(popup);
-  else this.LM.parentNode.pushNode(popup);
-}
-
-molmil.UI.prototype.configureSlab=function(target) {
-  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
-  if (this.onLMshow) this.onLMshow();
-  
-  var canvas = this.soup.canvas;
-  
-  var popup = molmil_dep.dcE("div");
-  popup.setClass("molmil_menu_popup");
-  
-  popup.pushNode("div", "Slab configuration");
-  popup.pushNode("hr");
-  
-  
-  var table = popup.pushNode("table"), tr, td;
-  var slab_near, slab_far
-  tr = table.pushNode("tr");
-  tr.pushNode("td", "Slab near:");
-  slab_near = tr.pushNode("td").pushNode("input");
-  slab_near.type = "range";
-  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
-  
-  tr = table.pushNode("tr");
-  tr.pushNode("td", "Slab far:");
-  slab_far = tr.pushNode("td").pushNode("input");
-  slab_far.type = "range";
-  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
-  
-  slab_near.oninput = function() { // handle modification of the slab-near slider
-    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
-    if (parseFloat(slab_far.value) <= parseFloat(this.value)) {
-      slab_far.value = parseFloat(this.value)+1;
-      slab_far.oninput();
-    }
-    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
-  };
-  
-  slab_far.oninput = function() { // handle modification of the slab-far slider
-    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
-    if (parseFloat(slab_near.value) >= parseFloat(this.value)) {
-      slab_near.value = parseFloat(this.value)-1;
-      slab_near.oninput();
-    }
-    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
-  };
-
-  var szI = Math.min(this.soup.geomRanges[0], this.soup.geomRanges[2], this.soup.geomRanges[4]) + molmil.configBox.zNear;
-  var szA = Math.max(this.soup.geomRanges[1], this.soup.geomRanges[3], this.soup.geomRanges[5]) + molmil.configBox.zNear;
-
-  if (szI > szA - 1) szA = szI + 1;
- 
-  slab_near.min = slab_far.min = szI;
-  slab_near.max = slab_far.max = szA;
-  
-  slab_near.step = slab_far.step = .1;
-  
-  slab_near.value = this.soup.renderer.settings.slabNear || szI;
-  slab_far.value = this.soup.renderer.settings.slabFar || szA
-
-  slab_near.oninput();
-  slab_far.oninput();
-  
-  
-  var closeButton = popup.pushNode("button", "Close");
-  closeButton.style.marginLeft = "1em";
-  var UI = this;
-  closeButton.onclick = function() {popup.parentNode.removeChild(popup); if (UI.onLMhide) UI.onLMhide();};
-  
-  if (target) target.pushNode(popup);
-  else this.LM.parentNode.pushNode(popup);
-  
-}
-
-molmil.UI.prototype.settings=function() { // also make these inputs more dynamic -> make stuff update immediately (also, if possible without rebuilding anything)
-  if (this.onLMshow) this.onLMshow();
-  var popup = molmil_dep.dcE("div");
-  popup.setClass("molmil_menu_popup");
-  
-  popup.pushNode("div", "Settings");
-  popup.pushNode("hr");
-  
-  var saveButton = molmil_dep.dcE("button"), tmp;
-
-  saveButton.qlv = molmil_dep.dcE("input");
-  saveButton.qlv.type = "range"; saveButton.qlv.min = "0"; saveButton.qlv.max = "4"; saveButton.qlv.step = "1";
-  saveButton.qlv.value = localStorage.getItem("molmil.settings_QLV");
-  saveButton.qlv.ref = molmil_dep.dcE("span"); saveButton.qlv.ref.innerHTML = saveButton.qlv.value;
-  saveButton.qlv.onmousemove = function() {this.ref.innerHTML = this.value;};
-  
-  saveButton.bbsf = molmil_dep.dcE("input");
-  saveButton.bbsf.value = molmil.configBox.smoothFactor;
-  
-  saveButton.fog = molmil_dep.dcE("input");
-  saveButton.fog.type = "checkbox";
-  saveButton.fog.checked = localStorage.getItem("molmil.settings_glsl_fog") == 1;
-  
-  saveButton.projectionMode = molmil_dep.dcE("select");
-  tmp = saveButton.projectionMode.pushNode("option", "Perspective projection"); tmp.value = 1;
-  tmp = saveButton.projectionMode.pushNode("option", "Orthographic projection"); tmp.value = 2;
-  if (molmil.configBox.projectionMode == 2) tmp.selected = true;
-  
-  saveButton.stereoMode = molmil_dep.dcE("select");
-  tmp = saveButton.stereoMode.pushNode("option", "None"); tmp.value = 0;
-  tmp = saveButton.stereoMode.pushNode("option", "Anaglyph"); tmp.value = 1;
-  if (molmil.configBox.stereoMode == 1) tmp.selected = true;
-  tmp = saveButton.stereoMode.pushNode("option", "Side-by-side"); tmp.value = 2;
-  if (molmil.configBox.stereoMode == 2) tmp.selected = true;
-  tmp = saveButton.stereoMode.pushNode("option", "Cross-eyed"); tmp.value = 4;
-  if (molmil.configBox.stereoMode == 4) tmp.selected = true;
-  
-  //change this to a proper color input + slider for alpha
-  saveButton.bgcolor = molmil_dep.dcE("span");
-  saveButton.bgcolor.pushNode("span", "R: ");
-  saveButton.bgcolor.R = saveButton.bgcolor.pushNode("input");
-  saveButton.bgcolor.pushNode("span", " G: ");
-  saveButton.bgcolor.G = saveButton.bgcolor.pushNode("input");
-  saveButton.bgcolor.pushNode("span", " B: ");
-  saveButton.bgcolor.B = saveButton.bgcolor.pushNode("input");
-  saveButton.bgcolor.pushNode("span", " A: ");
-  saveButton.bgcolor.A = saveButton.bgcolor.pushNode("input");
-  saveButton.bgcolor.R.style.width = saveButton.bgcolor.G.style.width = saveButton.bgcolor.B.style.width = saveButton.bgcolor.A.style.width = "2.5em";
-  saveButton.bgcolor.R.value = Math.round(molmil.configBox.BGCOLOR[0]*255); saveButton.bgcolor.G.value = Math.round(molmil.configBox.BGCOLOR[1]*255); saveButton.bgcolor.B.value = Math.round(molmil.configBox.BGCOLOR[2]*255); saveButton.bgcolor.A.value = Math.round(molmil.configBox.BGCOLOR[3]*255);
-  saveButton.bgcolor.pushNode("span", "<br/>Apply color in png:");
-  saveButton.bgcolor.keepbgpng = saveButton.bgcolor.pushNode("input");
-  saveButton.bgcolor.keepbgpng.type = "checkbox";
-  saveButton.bgcolor.keepbgpng.checked = molmil.configBox.keepBackgroundColor;
-
-  var tbl = popup.pushNode("table"), tr, tmp;
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "Quality:");
-  tmp = molmil_dep.dcE("div");
-  tmp.pushNode(saveButton.qlv);
-  tmp.pushNode(saveButton.qlv.ref);
-  tr.pushNode("td").pushNode(tmp);
-  
-  
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "Sheet/loop backbone smooth factor:");
-  tmp = molmil_dep.dcE("div");
-  tmp.pushNode(saveButton.bbsf);
-  tr.pushNode("td").pushNode(tmp);
-  
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "Fog:");
-  tmp = molmil_dep.dcE("div");
-  tmp.pushNode(saveButton.fog);
-  tr.pushNode("td").pushNode(tmp);
-  
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "Projection mode:");
-  tr.pushNode("td").pushNode(saveButton.projectionMode);
-  
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "Stereoscopy:");
-  tr.pushNode("td").pushNode(saveButton.stereoMode);
-  
-  tr = tbl.pushNode("tr");
-  tr.pushNode("td", "BG color:");
-  tr.pushNode("td").pushNode(saveButton.bgcolor);
-  
-  popup.pushNode("hr");
-  
-  saveButton.innerHTML = "Apply";
-  saveButton.UI = this; saveButton.popup = popup;
-  saveButton.onclick = function() {
-    // save settings
-    localStorage.setItem("molmil.settings_QLV", this.qlv.value);
-    localStorage.setItem("molmil.settings_glsl_fog", (molmil.configBox.glsl_fog=this.fog.checked) ? "1" : "0");
-    localStorage.setItem("molmil.settings_PROJECTION", this.projectionMode.value);
-    localStorage.setItem("molmil.settings_STEREO", this.stereoMode.value);
-    localStorage.setItem("molmil.settings_BGCOLOR", JSON.stringify([parseFloat(this.bgcolor.R.value)/255, parseFloat(this.bgcolor.G.value)/255, parseFloat(this.bgcolor.B.value)/255, parseFloat(this.bgcolor.A.value)/255]));
-    localStorage.setItem("molmil.settings_keepBackgroundColor", this.bgcolor.keepbgpng.checked ? "1" : "0");
-    localStorage.setItem("molmil.settings_BBSF", this.bbsf.value);
-    
-    // reload settings
-    molmil.initSettings();
-    this.UI.soup.reloadSettings();
-    molmil.configBox.projectionMode = this.projectionMode.value; molmil.configBox.stereoMode = parseInt(this.stereoMode.value); this.UI.soup.renderer.resizeViewPort();
-    molmil.shaderEngine.recompile(this.UI.soup.renderer);
-    //this.UI.soup.renderer.initShaders(molmil.configBox.glsl_shaders);
-    
-    // re-render
-    this.UI.soup.renderer.initBuffers();
-    this.UI.soup.canvas.update = true;
-    
-    // close
-    this.popup.parentNode.removeChild(this.popup);
-    if (this.onLMhide) this.onLMhide();
-  };
-  
-  popup.pushNode(saveButton);
-  
-  var cancelButton = popup.pushNode("button", "Cancel");
-  cancelButton.style.marginLeft = "1em";
-  var UI = this;
-  cancelButton.onclick = function() {popup.parentNode.removeChild(popup); if (UI.onLMhide) UI.onLMhide();};
-  
-  this.LM.parentNode.pushNode(popup);
-  
-};
 
 molmil.UI.prototype.toggleWaters=function(show) {
   this.soup.waterToggle(show);
@@ -2410,54 +2108,93 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   contentBox.pushNode("h1", "Structure styling options");
   contentBox.pushNode("hr");
   
-  contentBox.pushNode("span", "Quick styling options:");
+  contentBox.pushNode("b", "Quick styling options:");
   
-  var ul = contentBox.pushNode("ul"), opt;
-  opt = ul.pushNode("li", "Default");
+  var ul = contentBox.pushNode("div"), opt;
+  opt = ul.pushNode("button", "Group cartoon");
   opt.onclick = function() {
     molmil.quickModelColor("newweb-au", {do_styling: true}, UI.soup);
   };
-  opt = ul.pushNode("li", "Default with sidechains");
+  opt = ul.pushNode("button", "Group cartoon with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("newweb-au-sc", {do_styling: true}, UI.soup);
   };
   
-  opt = ul.pushNode("li", "Cartoon");
+  opt = ul.pushNode("button", "Cartoon");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon", {do_styling: true}, UI.soup);
   };
-  opt = ul.pushNode("li", "Cartoon with sidechains");
+  opt = ul.pushNode("button", "Cartoon with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-sc", {do_styling: true}, UI.soup);
   };
   
-  opt = ul.pushNode("li", "Cartoon, colored by chain");
+  opt = ul.pushNode("button", "Cartoon, colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-chainc", {do_styling: true}, UI.soup);
   };
-  opt = ul.pushNode("li", "Cartoon, color by chain with sidechains");
+  opt = ul.pushNode("button", "Cartoon, color by chain with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-chainc-sc", {do_styling: true}, UI.soup);
   };
   
-  opt = ul.pushNode("li", "Sticks (CPK)");
+  opt = ul.pushNode("button", "Sticks (CPK)");
   opt.onclick = function() {
     molmil.quickModelColor("sticks", {do_styling: true}, UI.soup);
   };
-  opt = ul.pushNode("li", "Sticks (CPK), colored by chain");
+  opt = ul.pushNode("button", "Sticks (CPK), colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("sticks-chainc", {do_styling: true}, UI.soup);
   };
   
-  opt = ul.pushNode("li", "Wireframe (CPK)");
+  opt = ul.pushNode("button", "Wireframe (CPK)");
   opt.onclick = function() {
     molmil.quickModelColor("lines", {do_styling: true}, UI.soup);
   };
-  opt = ul.pushNode("li", "Wireframe (CPK), colored by chain");
+  opt = ul.pushNode("button", "Wireframe (CPK), colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("lines-chainc", {do_styling: true}, UI.soup);
   };
   
+  contentBox.pushNode("br");
+  
+  contentBox.pushNode("b", "Quick operations:");
+  
+  ul = contentBox.pushNode("div");
+  opt = ul.pushNode("button", "Reposition camera");
+  opt.onclick = function() {
+    UI.soup.renderer.camera.reset();
+    UI.soup.renderer.camera.z = UI.soup.calcZ();
+    UI.canvas.update = true;
+  };
+  
+  opt = ul.pushNode("button", "Orient camera to structure");
+  opt.onclick = function() {
+    molmil.orient(null, UI.soup);
+    UI.canvas.update = true;
+  };
+  
+  if (navigator.clipboard) {
+    opt = ul.pushNode("button", "Copy image to clipboard");
+    opt.onclick = function() {
+      if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) {
+        var opacity = molmil.configBox.BGCOLOR[3]; molmil.configBox.BGCOLOR[3] = 0;
+      }
+      var canvas = molmil.fetchCanvas();
+      canvas.renderer.selectDataContext();
+      canvas.update = true;
+      canvas.renderer.render();
+      canvas.toBlob(function(blob) {
+        navigator.clipboard.write([new ClipboardItem({"image/png": blob})]);
+        console.log("Image pasted to clipboard.");
+      });
+      canvas.renderer.selectDefaultContext();
+      if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
+      canvas.update = true; canvas.renderer.render();
+    };
+  }
+  
+  contentBox.pushNode("br");
   
   contentBox.pushNode("span", "For more advanced styling, please use the command line (bottom of the page), the structure menu (right-side of the page) or right-click on an atom/cartoon to show a context menu with styling options.")
 };
@@ -2977,6 +2714,7 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
     options.onclick = function(ev) {
       UI.styleif_mesh(this.mesh, ev, {filename: this.filename});
     }
+    UI.showSites = true;
   }
   
   for (var s=0; s<this.soup.structures.length; s++) {
@@ -3180,6 +2918,7 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
     molmil_dep.Clear(alignmentInfo);
     
     var alignment = alignments[aid];
+    if (! alignment) return;
 
     var name1 = alignment.chain1.entry.meta.id.indexOf("_") == -1 ? alignment.chain1.entry.meta.pdbid + alignment.chain1.name : alignment.chain1.entry.meta.id;
     var name2 = alignment.chain2.entry.meta.id.indexOf("_") == -1 ? alignment.chain2.entry.meta.pdbid + alignment.chain2.name : alignment.chain2.entry.meta.id;
@@ -3221,11 +2960,288 @@ molmil.UI.prototype.styleif_align = function(contentBox) {
   show(0);
 };
 
-molmil.UI.prototype.styleif_misc = function(contentBox) {};
+molmil.UI.prototype.styleif_settings = function(contentBox) {
+/*
+
+  if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
+  
+  var canvas = this.soup.canvas;
+  
+  var popup = molmil_dep.dcE("div");
+  popup.setClass("molmil_menu_popup");
+  
+  popup.pushNode("div", "Slab configuration");
+  popup.pushNode("hr");
+  
+  
+  var table = popup.pushNode("table"), tr, td;
+  var slab_near, slab_far
+  tr = table.pushNode("tr");
+  tr.pushNode("td", "Slab near:");
+  slab_near = tr.pushNode("td").pushNode("input");
+  slab_near.type = "range";
+  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
+  
+  tr = table.pushNode("tr");
+  tr.pushNode("td", "Slab far:");
+  slab_far = tr.pushNode("td").pushNode("input");
+  slab_far.type = "range";
+  td = tr.pushNode("td", "0"); td.style.minWidth = "4em"; td.style.textAlign = "right";
+  
+  slab_near.oninput = function() { // handle modification of the slab-near slider
+    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
+    if (parseFloat(slab_far.value) <= parseFloat(this.value)) {
+      slab_far.value = parseFloat(this.value)+1;
+      slab_far.oninput();
+    }
+    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
+  };
+  
+  slab_far.oninput = function() { // handle modification of the slab-far slider
+    this.parentNode.nextSibling.innerHTML = Math.round(parseFloat(this.value)*10)/10;
+    if (parseFloat(slab_near.value) >= parseFloat(this.value)) {
+      slab_near.value = parseFloat(this.value)-1;
+      slab_near.oninput();
+    }
+    else molmil.setSlab(parseFloat(slab_near.value), parseFloat(slab_far.value), canvas.molmilViewer); // sets the slab values
+  };
+
+  var szI = Math.min(this.soup.geomRanges[0], this.soup.geomRanges[2], this.soup.geomRanges[4]) + molmil.configBox.zNear;
+  var szA = Math.max(this.soup.geomRanges[1], this.soup.geomRanges[3], this.soup.geomRanges[5]) + molmil.configBox.zNear;
+
+  if (szI > szA - 1) szA = szI + 1;
+ 
+  slab_near.min = slab_far.min = szI;
+  slab_near.max = slab_far.max = szA;
+  
+  slab_near.step = slab_far.step = .1;
+  
+  slab_near.value = this.soup.renderer.settings.slabNear || szI;
+  slab_far.value = this.soup.renderer.settings.slabFar || szA
+
+  slab_near.oninput();
+  slab_far.oninput();
+  
+  
+  var closeButton = popup.pushNode("button", "Close");
+  closeButton.style.marginLeft = "1em";
+  var UI = this;
+  closeButton.onclick = function() {popup.parentNode.removeChild(popup); if (UI.onLMhide) UI.onLMhide();};
+  
+  if (target) target.pushNode(popup);
+  else this.LM.parentNode.pushNode(popup);
+
+
+*/
+  
+  var UI = this;
+  var saveContainer = {}, tmp;
+  
+  var easySet = function(what, to) {
+    if (localStorage.getItem(what) == to) return;
+    localStorage.setItem(what, to);
+    return true;
+  };
+  
+  var applyUpdate = function() {
+    var resizeVP = false, recompile = false, rebuild = false, slab = false;
+    
+    // save settings
+    if (easySet("molmil.settings_QLV", saveContainer.qlv.value)) {
+      rebuild = true;
+    }
+    if (easySet("molmil.settings_glsl_fog", (molmil.configBox.glsl_fog=saveContainer.fog.checked) ? "1" : "0")) {
+      recompile = true;
+      if (saveContainer.fog.checked) saveContainer.slab.toggle.checked = UI.soup.renderer.settings.slab = false;
+    }
+    if (easySet("molmil.settings_PROJECTION", saveContainer.projectionMode.value)) {
+      resizeVP = true;
+    }
+    if (easySet("molmil.settings_STEREO", saveContainer.stereoMode.value)) {
+      
+    }
+    if (easySet("molmil.settings_BGCOLOR", JSON.stringify(molmil.hex2rgb(saveContainer.bgcolor.RGB.value).concat([parseInt(saveContainer.bgcolor.A.value)]).map(function(x){return x/255;})))) {
+      
+    }
+    if (easySet("molmil.settings_keepBackgroundColor", saveContainer.bgcolor.keepbgpng.checked ? "1" : "0")) {
+      
+    }
+    if (easySet("molmil.settings_BBSF", saveContainer.bbsf.value)) {
+      rebuild = true;
+      molmil.geometry.reInitChains = true;
+    }
+    
+    if (easySet("molmil.settings_slab_near_ratio", saveContainer.slab.near.value)) slab = true;
+    if (easySet("molmil.settings_slab_far_ratio", saveContainer.slab.far.value)) slab = true;
+    
+    // reload settings
+    molmil.initSettings();
+    UI.soup.reloadSettings();
+    molmil.configBox.projectionMode = saveContainer.projectionMode.value; molmil.configBox.stereoMode = parseInt(saveContainer.stereoMode.value); 
+    
+    if (saveContainer.slab.toggle.checked != UI.soup.renderer.settings.slab) {
+      UI.soup.renderer.settings.slab = saveContainer.slab.toggle.checked;
+      slab = true;
+      recompile = true;
+    }
+    
+    if (resizeVP) UI.soup.renderer.resizeViewPort();
+    if (recompile) molmil.shaderEngine.recompile(UI.soup.renderer);
+    if (slab) {
+      var szI = Math.min(UI.soup.geomRanges[0], UI.soup.geomRanges[2], UI.soup.geomRanges[4]) + molmil.configBox.zNear;
+      var szA = Math.max(UI.soup.geomRanges[1], UI.soup.geomRanges[3], UI.soup.geomRanges[5]) + molmil.configBox.zNear;
+      if (szI > szA - 1) szA = szI + 1;
+      
+      var tot = szA-szI;
+      UI.soup.renderer.settings.slabNear = parseFloat(saveContainer.slab.near.value)*tot + szI;
+      UI.soup.renderer.settings.slabFar = parseFloat(saveContainer.slab.far.value)*tot + szI;
+    }
+    
+    // re-render
+    if (rebuild) UI.soup.renderer.initBuffers();
+    UI.soup.canvas.update = true;
+  };
+  
+  
+  contentBox.id = "nw_settings";
+
+  contentBox.pushNode("h1", "Settings");
+  contentBox.pushNode("hr");
+  
+  
+
+  saveContainer.qlv = molmil_dep.dcE("input");
+  saveContainer.qlv.type = "range"; saveContainer.qlv.min = "0"; saveContainer.qlv.max = "4"; saveContainer.qlv.step = "1";
+  saveContainer.qlv.value = localStorage.getItem("molmil.settings_QLV");
+  saveContainer.qlv.ref = molmil_dep.dcE("span"); saveContainer.qlv.ref.innerHTML = saveContainer.qlv.value;
+  saveContainer.qlv.onmousemove = function() {this.ref.innerHTML = this.value;};
+  saveContainer.qlv.onchange = function() {applyUpdate();}
+  
+  saveContainer.bbsf = molmil_dep.dcE("input");
+  saveContainer.bbsf.type = "range"; saveContainer.bbsf.min = "0"; saveContainer.bbsf.max = "4"; saveContainer.bbsf.step = "1";
+  saveContainer.bbsf.value = molmil.configBox.smoothFactor;
+  saveContainer.bbsf.ref = molmil_dep.dcE("span"); saveContainer.bbsf.ref.innerHTML = saveContainer.bbsf.value;
+  saveContainer.bbsf.onmousemove = function() {this.ref.innerHTML = this.value;};
+  saveContainer.bbsf.onchange = function() {applyUpdate();}
+  
+  
+  // split into basic and slab modes...
+  
+  saveContainer.fog = molmil_dep.dcE("input");
+  saveContainer.fog.type = "checkbox";
+  saveContainer.fog.checked = localStorage.getItem("molmil.settings_glsl_fog") == 1;
+  saveContainer.fog.onchange = function() {
+    saveContainer.slab.toggle.disabled = saveContainer.slab.near.disabled = saveContainer.slab.far.disabled = saveContainer.fog.checked;
+    applyUpdate();
+  }
+  
+  saveContainer.slab = molmil_dep.dcE("span");
+  saveContainer.slab.toggle = saveContainer.slab.pushNode("input");
+  saveContainer.slab.pushNode("span", "&nbsp;|&nbsp;Near:&nbsp;");
+  
+  saveContainer.slab.near = saveContainer.slab.pushNode("input");
+  saveContainer.slab.pushNode("span", "&nbsp;|&nbsp;Far:&nbsp;");
+  saveContainer.slab.far = saveContainer.slab.pushNode("input");
+  
+  saveContainer.slab.toggle.type = "checkbox";
+  saveContainer.slab.near.type = saveContainer.slab.far.type = "range";
+  
+  saveContainer.slab.near.min = saveContainer.slab.far.min = 0;
+  saveContainer.slab.near.max = saveContainer.slab.far.max = 1;
+  saveContainer.slab.near.step = saveContainer.slab.far.step = 0.001;
+
+  saveContainer.slab.toggle.disabled = saveContainer.slab.near.disabled = saveContainer.slab.far.disabled = saveContainer.fog.checked;
+  
+  saveContainer.slab.toggle.checked = UI.soup.renderer.settings.slab;
+  saveContainer.slab.near.value = molmil.configBox.slab_near_ratio;
+  saveContainer.slab.far.value = molmil.configBox.slab_far_ratio;
+  saveContainer.slab.near.oninput = saveContainer.slab.far.oninput = function() {applyUpdate();}
+  saveContainer.slab.toggle.onchange = function() {applyUpdate();}
+  
+  
+  saveContainer.projectionMode = molmil_dep.dcE("select");
+  tmp = saveContainer.projectionMode.pushNode("option", "Perspective projection"); tmp.value = 1;
+  tmp = saveContainer.projectionMode.pushNode("option", "Orthographic projection"); tmp.value = 2;
+  if (molmil.configBox.projectionMode == 2) tmp.selected = true;
+  saveContainer.projectionMode.onchange = function() {applyUpdate();}
+  
+  saveContainer.stereoMode = molmil_dep.dcE("select");
+  tmp = saveContainer.stereoMode.pushNode("option", "None"); tmp.value = 0;
+  tmp = saveContainer.stereoMode.pushNode("option", "Anaglyph"); tmp.value = 1;
+  if (molmil.configBox.stereoMode == 1) tmp.selected = true;
+  tmp = saveContainer.stereoMode.pushNode("option", "Side-by-side"); tmp.value = 2;
+  if (molmil.configBox.stereoMode == 2) tmp.selected = true;
+  tmp = saveContainer.stereoMode.pushNode("option", "Cross-eyed"); tmp.value = 4;
+  if (molmil.configBox.stereoMode == 4) tmp.selected = true;
+  saveContainer.stereoMode.onchange = function() {applyUpdate();}
+  
+  //change this to a proper color input + slider for alpha
+  saveContainer.bgcolor = molmil_dep.dcE("span");
+  
+  saveContainer.bgcolor.RGB = saveContainer.bgcolor.pushNode("input");
+  saveContainer.bgcolor.RGB.value = molmil.rgb2hex(molmil.configBox.BGCOLOR[0]*255, molmil.configBox.BGCOLOR[1]*255, molmil.configBox.BGCOLOR[2]*255);
+  saveContainer.bgcolor.RGB.type = "color";
+  saveContainer.bgcolor.RGB.onchange = function() {applyUpdate();}
+  
+  saveContainer.bgcolor.pushNode("span", "&nbsp;Transparency:");
+  saveContainer.bgcolor.A = saveContainer.bgcolor.pushNode("input");
+  saveContainer.bgcolor.A.type = "range";
+  saveContainer.bgcolor.A.min = 0; saveContainer.bgcolor.A.max = 255; saveContainer.bgcolor.A.step = 1; saveContainer.bgcolor.A.value = molmil.configBox.BGCOLOR[3]*255;
+  saveContainer.bgcolor.A.ref = saveContainer.bgcolor.pushNode("span"); saveContainer.bgcolor.A.ref.innerHTML = saveContainer.bgcolor.A.value;
+  saveContainer.bgcolor.A.onmousemove = function() {this.ref.innerHTML = this.value;};
+  saveContainer.bgcolor.A.onchange = function() {applyUpdate();}
+  
+  saveContainer.bgcolor.pushNode("span", "<br/>Apply BG color in png:");
+  saveContainer.bgcolor.keepbgpng = saveContainer.bgcolor.pushNode("input");
+  saveContainer.bgcolor.keepbgpng.type = "checkbox";
+  saveContainer.bgcolor.keepbgpng.checked = molmil.configBox.keepBackgroundColor;
+  saveContainer.bgcolor.keepbgpng.onchange = function() {applyUpdate();}
+
+  var tbl = contentBox.pushNode("table"), tr, tmp;
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Quality:");
+  tmp = molmil_dep.dcE("div");
+  tmp.pushNode(saveContainer.qlv);
+  tmp.pushNode(saveContainer.qlv.ref);
+  tr.pushNode("td").pushNode(tmp);
+  
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Sheet/loop backbone smooth factor:");
+  tmp = molmil_dep.dcE("div");
+  tmp.pushNode(saveContainer.bbsf);
+  tmp.pushNode(saveContainer.bbsf.ref);
+  tr.pushNode("td").pushNode(tmp);
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Fog:");
+  tmp = molmil_dep.dcE("div");
+  tmp.pushNode(saveContainer.fog);
+  tr.pushNode("td").pushNode(tmp);
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Slab:");
+  tmp = molmil_dep.dcE("div");
+  tmp.pushNode(saveContainer.slab);
+  tr.pushNode("td").pushNode(tmp);
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Projection mode:");
+  tr.pushNode("td").pushNode(saveContainer.projectionMode);
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "Stereoscopy:");
+  tr.pushNode("td").pushNode(saveContainer.stereoMode);
+  
+  tr = tbl.pushNode("tr");
+  tr.pushNode("td", "BG color:");
+  tr.pushNode("td").pushNode(saveContainer.bgcolor);
+};
+
 
 molmil.UI.prototype.styleif = function(showOption, callOptions) {
   var UI = this;
-  
   var initStruct = function(struct) {
     if (! struct.meta.id) return;
     var pdbid = struct.meta.pdbid.toLowerCase();
@@ -3234,6 +3250,11 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
       request.OnDone = function() {
         var jso = JSON.parse(this.request.responseText);
         struct.meta.styleif = Object.values(jso)[0];
+        var has_2fofc = struct.meta.styleif.__files.type.includes("2fo-fc-mtz"), has_fofc = struct.meta.styleif.__files.type.includes("fo-fc-mtz");
+        if (has_2fofc) UI.showEDMap = true;
+        var tmp1 = struct.meta.styleif.struct_site_pdbmlplus || {info_subtype: []};
+        var tmp2 = struct.meta.pdbxData.struct_site || struct.meta.styleif.struct_site || {id: []};
+        if (tmp1.info_subtype.length || tmp2.id.length) UI.showSites = true;
       };
       request.Send(molmil.settings.newweb_rest+"fetch/rdb?entryId="+pdbid+"&schemaName=pdbj&tables=__files,struct_site_pdbmlplus,struct_site_gen_pdbmlplus"+("entity_poly" in struct.meta.pdbxData ? "" : ",entity_poly,struct_site,struct_site_gen"));
     }
@@ -3247,11 +3268,11 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     nwif = this.canvas.parentNode.pushNode("div");
     nwif.id = "styleif";
     nwif.contentBox = nwif.pushNode("div");
-    nwif.button = nwif.pushNode("div", "Style menu");
+    nwif.button = nwif.pushNode("div", "Style menu"); // see if we can also make this button dragable, so that it can be used to resize the menu...
     nwif.options = nwif.pushNode("div");
     
-    // it's better if things like BU, EDMap are hidden, if not available...
-    var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["EDMap", "edmap"], ["Sites", "sites"], ["Alignment", "align"], ["Miscellaneous", "misc"], ["Hide", "hide"]];
+    // see if we can also hide the sites option, if none are available...
+    var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["EDMap", "edmap", function() {return UI.showEDMap;}], ["Sites", "sites", function() {return UI.showSites;}], ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}], ["Settings", "settings"], ["Hide", "hide"]];
     
     var doHandler = function(ev, callOptions) {
       if (this.value == "structure") {
@@ -3279,9 +3300,9 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
         UI.styleif_align(nwif.contentBox);
         nwif.contentBox.classList.add("visible");
       }
-      else if (this.value == "misc") {
+      else if (this.value == "settings") {
         molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_misc(nwif.contentBox);
+        UI.styleif_settings(nwif.contentBox);
         nwif.contentBox.classList.add("visible");
       }
       else if (this.value == "hide") {
@@ -3298,13 +3319,15 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     };
     
     for (var i=0; i<options.length; i++) {
-      if (options[i][2] && ! options[i][2]()) continue;
       var opt = nwif.options.pushNode("div", options[i][0]);
+      if (options[i][2]) opt.checkHandler = options[i][2];
+      else opt.checkHandler = function() {return true;};
       opt.value = options[i][1];
       opt.onclick = doHandler;
     }
     
     nwif.button.onclick = function() {
+      for (var i=0; i<nwif.options.childNodes.length; i++) nwif.options.childNodes[i].style.display = nwif.options.childNodes[i].checkHandler() ? "" : "none";
       nwif.options.classList.toggle("visible");
     }
   }
