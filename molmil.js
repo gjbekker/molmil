@@ -7946,14 +7946,16 @@ molmil.createViewer = function (target, width, height, soupObject) {
     window.onresize = function() {
       var dpr = devicePixelRatio || 1;
       if (molmil.configBox.stereoMode != 3) {
-        canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
-        canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+        var width = window.innerWidth || document.documentElement.clientWidth, height = window.innerHeight || document.documentElement.clientHeight;
+        canvas.width = width*dpr; canvas.height = height*dpr;
+        canvas.style.width = width+"px"; canvas.style.height = height+"px";
         canvas.renderer.resizeViewPort();
       }
       canvas.update = true;
     };
   }
   
+  canvas.style.width = width+"px"; canvas.style.height = height+"px";
   canvas.width = width*dpr; canvas.height = height*dpr; canvas.defaultSize = [width, height];
 
   canvas.setSize = function(w, h) {
