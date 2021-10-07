@@ -1044,8 +1044,8 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else if ((format+"").toLowerCase() == "gromacs-xtc") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
-      this.target.loadGromacsXTC(this.request.response, this.filename);
-      return this.target.structures[0];
+      this.target.loadGromacsXTC(this.request.response, settings || {});
+      return null;
     };
   }
   else if ((format+"").toLowerCase() == "psygene-traj" || (format+"").toLowerCase() == "presto-traj") {
@@ -1127,8 +1127,8 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   request.Send();
 };
 
-molmil.viewer.prototype.loadGromacsXTC = function(buffer) { 
-  return molmil.loadPlugin(molmil.settings.src+"plugins/md-anal.js", this.loadGromacsXTC, this, [buffer]);
+molmil.viewer.prototype.loadGromacsXTC = function(buffer, settings) { 
+  return molmil.loadPlugin(molmil.settings.src+"plugins/md-anal.js", this.loadGromacsXTC, this, [buffer, settings]);
 }
 
 molmil.viewer.prototype.loadGromacsTRR = function(buffer) {
@@ -5206,8 +5206,6 @@ molmil.prepare2DRepr = function (chain, mdl) {
     }
     n += currentBlock.molecules.length;
   }
-  
-  
   
   for (b=0, n=0; b<twoDcache.length; b++) {
     currentBlock = twoDcache[b];

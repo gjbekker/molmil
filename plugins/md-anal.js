@@ -128,10 +128,12 @@ var xtc_magicints = new Uint32Array([
   4194304, 5284491, 6658042, 8388607, 10568983, 13316085, 16777216 
 ]);
  
-molmil.viewer.prototype.loadGromacsXTC = function(buffer) { 
-  var chains = this.structures[0].chains, coffset = [], c, traj = [];
+molmil.viewer.prototype.loadGromacsXTC = function(buffer, settings) {
+  var structure = settings && settings.structure ? settings.structure : this.structures[0];
+  var chains = structure.chains, coffset = [], c, traj = [], mn = 1e99;
+  for (c=0; c<chains.length; c++) if (chains[c].atoms[0].AID < mn) mn = chains[c].atoms[0].AID;
   for (c=0; c<chains.length; c++) {
-    coffset.push([(chains[c].atoms[0].AID-1)*3, chains[c].atoms.length*3]);
+    coffset.push([(chains[c].atoms[0].AID-mn)*3, chains[c].atoms.length*3]);
     chains[c].modelsXYZ = []; // don't use original pdb data, only use it for the topology...
   }
   
@@ -311,8 +313,8 @@ molmil.viewer.prototype.loadGromacsXTC = function(buffer) {
     
     if (offset >= buffer.byteLength) break;
   }
-  
-  this.structures[0].number_of_frames = this.structures[0].chains.length ? this.structures[0].chains[0].modelsXYZ.length : 0;
+
+  structure.number_of_frames = structure.chains.length ? structure.chains[0].modelsXYZ.length : 0;
   
   return [];
 }

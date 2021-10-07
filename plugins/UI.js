@@ -3243,7 +3243,7 @@ molmil.UI.prototype.styleif_settings = function(contentBox) {
 molmil.UI.prototype.styleif = function(showOption, callOptions) {
   var UI = this;
   var initStruct = function(struct) {
-    if (! struct.meta.id) return;
+    if (! struct.meta.id || ! struct.meta.pdbid) return;
     var pdbid = struct.meta.pdbid.toLowerCase();
     if (struct.meta.styleif === undefined) {
       var request = new molmil_dep.CallRemote("GET"); request.ASYNC = true; 
