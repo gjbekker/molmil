@@ -530,6 +530,11 @@ molmil.UI.prototype.showLM=function(icon) {
   e.className = "molmil_UI_ME";
   e.innerHTML = "Manual"; e.LM = icon;
   e.onclick = function() {window.open(molmil.settings.src+"manual.html"); this.LM.onclick();};
+  
+  e = menu.appendChild(document.createElement("div")); e.UI = this;
+  e.className = "molmil_UI_ME";
+  e.innerHTML = "Paper"; e.LM = icon;
+  e.onclick = function() {window.open("https://doi.org/10.1186/s13321-016-0155-1"); this.LM.onclick();};
 
   icon.parentNode.appendChild(menu);
   menu.sub = icon.parentNode.appendChild(document.createElement("div"));
