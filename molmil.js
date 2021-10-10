@@ -1299,6 +1299,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
         chain.bonds.push([chain.molecules[0].N, chain.molecules[m1].C, 1]);
         chain.showBBatoms.push(chain.molecules[0].N);
         chain.showBBatoms.push(chain.molecules[m1].C);
+        chain.isCyclic = true;
       }
     }
   }
@@ -6791,7 +6792,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       var atmDM = settings.newweb ? 2 : 3;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        if (settings.newweb && chain.molWeight < 550) chain.displayMode = 1;
+        if (settings.newweb && chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic)) chain.displayMode = 1;
         else chain.displayMode = 3;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
@@ -6803,7 +6804,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
               else mol.atoms[a].displayMode = atmDM;
             }
           }
-          else if (! mol.SNFG && (mol.ligand || chain.molWeight < 550)) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
+          else if (! mol.SNFG && (mol.ligand || chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic))) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
           else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
           mol.displayMode = 3;
           mol.showSC = mol.weirdAA;
