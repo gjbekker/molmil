@@ -68,6 +68,20 @@ If you use Molmil, please <a href="https://jcheminf.biomedcentral.com/articles/1
 - Toggle hydrogens: <br/>
   Open the Structures menu (top right >>>) -> click the 3 dots -> Show/Hide hydrogens
 
+#### Style interface
+
+- Enable interface:
+  Molmil menu -> Style IF
+
+- Change tabs
+  In the Style IF panel, click [Style menu], and then choose one of the available options
+  
+- Hide panel
+  In the Style IF panel, click [Style menu], and then choose "Hide"
+  
+- Resize panel
+  In the Style IF panel in the bottom right corner, left-click and drag on the resize icon (diagonal line) and drag upwards to make the panel smaller and downwards to make it larger
+
 #### Add a label to a file/chain/residue/atom: 
   1) Right click on a file/chain/residue -> Label
   2) Any atom in the canvas -> Label -> Atom/Residue/Chain

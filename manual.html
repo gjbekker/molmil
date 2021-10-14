@@ -4,7 +4,11 @@
     var molmil = {};
     function showManual() {
       var req = new molmil_dep.CallRemote("GET"); req.ASYNC = true;
-      req.OnDone = function() {document.body.innerHTML = marked(this.request.responseText);};
+      req.OnDone = function() {
+        document.body.innerHTML = marked(this.request.responseText);
+        var obj = document.getElementById(window.location.hash.substr(1));
+        if (obj) obj.scrollIntoView();
+      };
       req.Send("manual.md?t="+(new Date()).getTime());
     }
   </script>
