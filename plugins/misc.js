@@ -2469,22 +2469,21 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     else if (object.type == "dotted-cylinder") {
       tmpObj = object.lowQuality ? cylinderLQ : cylinder;
       cylNverts = tmpObj.vertices.length/3
-      tmp1 = [object.coords[0][0], object.coords[0][1], object.coords[0][2]];
       tmp2 = [(object.coords[1][0]-object.coords[0][0])/object.N, (object.coords[1][1]-object.coords[0][1])/object.N, (object.coords[1][2]-object.coords[0][2])/object.N];
+      var x0, y0, z0, x1, y1, z1;
       for (i=0; i<object.N; i++) {
-        object.coords[0][0] = tmp1[0] + tmp2[0]*(i+.25);
-        object.coords[0][1] = tmp1[1] + tmp2[1]*(i+.25);
-        object.coords[0][2] = tmp1[2] + tmp2[2]*(i+.25);
+        x0 = object.coords[0][0] + tmp2[0]*(i+.25);
+        y0 = object.coords[0][1] + tmp2[1]*(i+.25);
+        z0 = object.coords[0][2] + tmp2[2]*(i+.25);
         
-        object.coords[1][0] = tmp1[0] + tmp2[0]*(i+.75);
-        object.coords[1][1] = tmp1[1] + tmp2[1]*(i+.75);
-        object.coords[1][2] = tmp1[2] + tmp2[2]*(i+.75);
-
+        x1 = object.coords[0][0] + tmp2[0]*(i+.75);
+        x2 = object.coords[0][1] + tmp2[1]*(i+.75);
+        x3 = object.coords[0][2] + tmp2[2]*(i+.75);
 
         // cap 1
-        vBuffer[vP++] = object.coords[0][0];
-        vBuffer[vP++] = object.coords[0][1];
-        vBuffer[vP++] = object.coords[0][2];
+        vBuffer[vP++] = x0;
+        vBuffer[vP++] = y0;
+        vBuffer[vP++] = z0;
       
         normal[0] = tmp2[0]; normal[1] = tmp2[1]; normal[2] = tmp2[2];
         vec3.normalize(normal, normal); vec3.negate(normal, normal);
@@ -2511,9 +2510,9 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
         genCylinder();
         
         // cap 2
-        vBuffer[vP++] = object.coords[1][0];
-        vBuffer[vP++] = object.coords[1][1];
-        vBuffer[vP++] = object.coords[1][2];
+        vBuffer[vP++] = x1;
+        vBuffer[vP++] = y1;
+        vBuffer[vP++] = z1;
       
         normal[0] = tmp2[0]; normal[1] = tmp2[1]; normal[2] = tmp2[2];
         vec3.normalize(normal, normal); 
