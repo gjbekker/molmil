@@ -2197,6 +2197,35 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
       if (molmil.configBox.stereoMode != 1 && ! molmil.configBox.keepBackgroundColor) molmil.configBox.BGCOLOR[3] = opacity;
       canvas.update = true; canvas.renderer.render();
     };
+    
+    
+    opt = ul.pushNode("button", "Copy URL for current orientation to clipboard");
+    opt.onclick = function() {
+      var x = UI.soup.renderer.camera.QView[0], y = UI.soup.renderer.camera.QView[1], z = UI.soup.renderer.camera.QView[2], w = UI.soup.renderer.camera.QView[3], t0, t1, X, Y, Z;
+      
+      t0 = 2.0 * (w * x + y * z);
+      t1 = 1.0 - 2.0 * (x * x + y * y);
+      X = Math.atan2(t0, t1);
+
+      t2 = 2.0 * (w * y - z * x);
+      if(t2 > 1.0) t2 = 1.0;
+      else if(t2 < -1.0) t2 = -1.0;
+      Y = Math.asin(t2);
+
+      t3 = 2.0 * (w * z + x * y);
+      t4 = 1.0 - 2.0 * (y * y + z * z);
+      Z = Math.atan2(t3, t4);
+      
+      X *= 180/Math.PI;
+      Y *= 180/Math.PI;
+      Z *= 180/Math.PI;
+      
+      var command = window.location + "; view null; turn x, "+X+"; turn y, "+Y+"; turn z, "+Z+"; move x, "+UI.soup.renderer.camera.x+"; move y, "+UI.soup.renderer.camera.y+"; move z, "+UI.soup.renderer.camera.z+";"
+      
+      navigator.clipboard.writeText(command);
+      
+    };
+    
   }
   
   contentBox.pushNode("br");
