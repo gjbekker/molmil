@@ -1104,8 +1104,17 @@ molmil.bindCanvasInputs = function(canvas) {
   }
 
   var dropDB = function (ev) {
-    ev.preventDefault()
-      
+    ev.preventDefault();
+    processFiles(ev.dataTransfer.items, ev.dataTransfer.files);
+    return false;
+  }
+  
+  var pasteDB = function(ev) {
+    ev.preventDefault();
+    processFiles([], ev.clipboardData.files);
+  };
+  
+  var processFiles = function(files, files2) {
     var fr, i, j, mjsFile = null, file;
     
     var dict = {}, item, entry, bakacounter = 0;
@@ -1171,19 +1180,19 @@ molmil.bindCanvasInputs = function(canvas) {
       directoryReader.readEntries(function(entries) {entries.forEach(processEntry); bakacounter -= 1;});
     };
     
-    for (var i=0; i<ev.dataTransfer.items.length; i++) {
-      item = ev.dataTransfer.items[i];
+    for (var i=0; i<files.length; i++) {
+      item = files[i];
       if (item.kind != 'file') continue;
       if (item.getAsEntry) entry = item.getAsEntry();
       else if (item.webkitGetAsEntry) entry = item.webkitGetAsEntry();
       else {dict = null; break;} // not supported
       processEntry(entry);
     }
-    
-    if (dict == null) {
+
+    if (dict == null || files.length == 0) {
       var count = 0, files = [];
-      try{
-        files = ev.dataTransfer.files;
+      try {
+        files = files2;
         count = files.length;
       } catch (e) {}
       
@@ -1191,10 +1200,11 @@ molmil.bindCanvasInputs = function(canvas) {
       for (i=0; i<count; i++) dict[files[i].name] = files[i];
       bakacheck();
     }
-    
-    return false;
-  }
+  };
+  
+  
 
+  window.addEventListener("paste", pasteDB);
   canvas.addEventListener("dragover", cancelDB);
   canvas.addEventListener("dragenter", cancelDB);
   canvas.addEventListener("drop", dropDB);
