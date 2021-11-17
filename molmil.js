@@ -4233,49 +4233,49 @@ molmil.geometry.generateCartoon = function() {
       currentBlock = chain.twoDcache[b];
       if (chain.displayMode > 2) {
         if (currentBlock.sndStruc == 2) {
-          t = this.buildSheet(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, currentBlock.isFirst, currentBlock.isLast); // bad
+          t = this.buildSheet(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, currentBlock.isFirst, currentBlock.isLast, chain.cartoonRadius || this.radius); // bad
           continue;
         }
         else if (currentBlock.rocket) {
           if (currentBlock.skip) continue;
 
           
-          t = this.buildLoop(t_ranges[b], t_ranges[b]+currentBlock.rocketPre+(currentBlock.rocketPre ? 1 : 0), line, tangents, normals, binormals, rgba, aid);
-          t = this.buildRocket(t_ranges[b]+currentBlock.rocketPre, t_ranges[b+1]-currentBlock.rocketPost, line, tangents, normals, binormals, rgba, aid, currentBlock.isLast);
-          t = this.buildLoop(t_ranges[b+1]-currentBlock.rocketPost, t_ranges[b+1], line, tangents, normals, binormals, rgba, aid);
+          t = this.buildLoop(t_ranges[b], t_ranges[b]+currentBlock.rocketPre+(currentBlock.rocketPre ? 1 : 0), line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius);
+          t = this.buildRocket(t_ranges[b]+currentBlock.rocketPre, t_ranges[b+1]-currentBlock.rocketPost, line, tangents, normals, binormals, rgba, aid, currentBlock.isLast, chain.cartoonRadius || this.radius);
+          t = this.buildLoop(t_ranges[b+1]-currentBlock.rocketPost, t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius);
 
           continue;
         }
         else if (currentBlock.sndStruc == 3) { // caps also need to be added...
           if (currentBlock.isFirst) {
-            this.buildLoopNcap(t_ranges[b], line, tangents, normals, binormals, rgba, aid); t++;
+            this.buildLoopNcap(t_ranges[b], line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius); t++;
             t_ranges[b] += 1;
           }
-          t = this.buildHelix(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, currentBlock);
+          t = this.buildHelix(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, currentBlock, chain.cartoonRadius || this.radius);
           if (currentBlock.isLast) {
-            this.buildLoopCcap(t_ranges[b+1]-1, line, tangents, normals, binormals, rgba, aid);
+            this.buildLoopCcap(t_ranges[b+1]-1, line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius);
           }
           continue;
         }
       }
 
       if (currentBlock.isFirst) {
-        this.buildLoopNcap(t_ranges[b], line, tangents, normals, binormals, rgba, aid); t++;
+        this.buildLoopNcap(t_ranges[b], line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius); t++;
         t_ranges[b] += 1;
       }
       
-      t = this.buildLoop(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid);
+      t = this.buildLoop(t_ranges[b], t_ranges[b+1], line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius);
       
       if (currentBlock.isLast) {
-        this.buildLoopCcap(t_ranges[b+1]-1, line, tangents, normals, binormals, rgba, aid);
+        this.buildLoopCcap(t_ranges[b+1]-1, line, tangents, normals, binormals, rgba, aid, chain.cartoonRadius || this.radius);
       }
     }
   }
 };
 
 // ** n-terminal loop (cap) **
-molmil.geometry.buildLoopNcap = function(t, P, T, N, B, rgba, aid) {
-  var dome = this.dome[0], radius = this.radius, i, ringTemplate = this.ringTemplate;
+molmil.geometry.buildLoopNcap = function(t, P, T, N, B, rgba, aid, coreRadius) {
+  var dome = this.dome[0], radius = coreRadius, i, ringTemplate = this.ringTemplate;
   
   var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_,
   vBuffer8 = this.buffer3.vertexBuffer8, vP8 = vP*4;
@@ -4329,8 +4329,8 @@ molmil.geometry.buildLoopNcap = function(t, P, T, N, B, rgba, aid) {
 };
 
 // ** c-terminal loop (cap) **
-molmil.geometry.buildLoopCcap = function(t, P, T, N, B, rgba, aid) {
-  var dome = this.dome[1], radius = this.radius, i, ringTemplate = this.ringTemplate;
+molmil.geometry.buildLoopCcap = function(t, P, T, N, B, rgba, aid, coreRadius) {
+  var dome = this.dome[1], radius = coreRadius, i, ringTemplate = this.ringTemplate;
   
   var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_,
   vBuffer8 = this.buffer3.vertexBuffer8, vP8 = vP*4;
@@ -4366,10 +4366,10 @@ molmil.geometry.buildLoopCcap = function(t, P, T, N, B, rgba, aid) {
 };
 
 // ** build loop representation **
-molmil.geometry.buildLoop = function(t, t_next, P, T, N, B, rgba, aid) {
-  var dome = this.dome[0], radius = this.radius, i, novpr = this.novpr;
+molmil.geometry.buildLoop = function(t, t_next, P, T, N, B, rgba, aid, coreRadius) {
+  var dome = this.dome[0], radius = coreRadius, i, novpr = this.novpr;
   
-  var ringTemplate = this.ringTemplate, radius = this.radius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
+  var ringTemplate = this.ringTemplate, radius = coreRadius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
   
   var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP,
   vBuffer8 = this.buffer3.vertexBuffer8, vP8 = vP*4;
@@ -4424,7 +4424,7 @@ molmil.geometry.buildLoop = function(t, t_next, P, T, N, B, rgba, aid) {
 
 // note that everything has been optimized for an alpha helix...
 // how does this work for other helices???
-molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast) {
+molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast, coreRadius) {
   var radius = 1.15, i, novpr = this.novpr, go = false;
   var ringTemplate = this.ringTemplate, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
   
@@ -4582,10 +4582,10 @@ molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast)
   p_pre = p-novpr;
     
     
-  radius = this.radius;
+  radius = coreRadius;
 
   if (! isLast) {
-    var h = this.radius;
+    var h = coreRadius;
 
     for (i=0; i<ringTemplate.length; i++, vP8+=32) {
       vBuffer[vP++] = h*ringTemplate[i][0] * Nx + h*ringTemplate[i][1] * Bx + Px  - Tx*radius*2;
@@ -4614,10 +4614,10 @@ molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast)
 }
 
 // ** build helix representation **
-molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentBlock) {
-  var dome = this.dome[0], radius = this.radius, i, novpr = this.novpr;
+molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentBlock, coreRadius) {
+  var dome = this.dome[0], radius = coreRadius, i, novpr = this.novpr;
 
-  var ringTemplate = this.ringTemplate, radius = this.radius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
+  var ringTemplate = this.ringTemplate, radius = coreRadius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
   var cartoon_highlight_color = molmil.configBox.cartoon_highlight_color;
   
   var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP,
@@ -4691,9 +4691,9 @@ molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentB
 };
 
 // ** build sheet representation **
-molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst, isLast) {
-  var dome = this.dome[0], radius = this.radius, i, novpr = this.novpr;
-  var ringTemplate = this.ringTemplate, radius = this.radius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
+molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst, isLast, coreRadius) {
+  var dome = this.dome[0], radius = coreRadius, i, novpr = this.novpr;
+  var ringTemplate = this.ringTemplate, radius = coreRadius, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_;
   
   var cartoon_highlight_color = molmil.configBox.cartoon_highlight_color;
   
@@ -9893,6 +9893,84 @@ molmil.record = function(canvas, video_path, video_framerate) {
 molmil.end_record = function(canvas) {
   finalizeVideo();
   canvas.renderer.onRenderFinish = undefined;
+}
+
+molmil.getState = function() {
+  var canvas = molmil.fetchCanvas(), commands = [];
+  
+  
+  var structures = [];
+  
+  for (var i=0; i<canvas.molmilViewer.structures.length; i++) {
+    if (! canvas.molmilViewer.structures[i].pdbid) continue;
+    structures.push(canvas.molmilViewer.structures[i]);
+  }
+  
+  for (var i=0; i<structures.length; i++) {
+    if (structures[i].id.indexOf("_") == -1) commands.push("fetch "+structures[i].id);
+    else commands.push("fetch-chain "+structures[i].id);
+    
+    var cartoon = [], tube = [];
+    for (var c=0; c<structures.chains.length; c++) {
+      if (structures.chains[c].displayMode == 2) tube.push(structures.chains[c].name);
+      else if (structures.chains[c].displayMode == 3) cartoon.push(structures.chains[c].name);
+    }
+    
+    if (tube.length == structures.chains.length) commands.push("show tube, model #"+(i+1));
+    else if (cartoon.length == structures.chains.length) commands.push("show cartoon, model #"+(i+1));
+    else {
+      commands.push("hide cartoon, model #"+(i+1));
+      if (tube.length) commands.push("show tube, model #"+(i+1)+" and ("+tube.map(function(x) {return "chain "+x;}).join(" or ")+")");
+      if (cartoon.length) commands.push("show cartoon, model #"+(i+1)+" and ("+cartoon.map(function(x) {return "chain "+x;}).join(" or ")+")");
+    }
+    
+    for (var c=0; c<structures.chains.length; c++) {
+      var sticks = [], sticks_sc, ballsticks = [], ballsticks_sc = [], spheres = [], spheres_sc = [], lines = [], lines_sc = [];
+      for (var m=0, mol, atm; m<structures.chains[c].molecules.length; m++) {
+        mol = structures.chains[c].molecules[m];
+        if (mol.displayMode == 0) {
+          atm = mol.CA || mol.atoms[0];
+          if (atm.displayMode == 1) {
+            if (mol.showSC) spheres_sc.push(mol);
+            else spheres.push(mol);
+          }
+          else if (atm.displayMode == 2) {
+            if (mol.showSC) ballsticks_sc.push(mol);
+            else ballsticks.push(mol);
+          }
+          else if (atm.displayMode == 3) {
+            if (mol.showSC) sticks_sc.push(mol);
+            else sticks.push(mol);
+          }
+          else if (atm.displayMode == 4) {
+            if (mol.showSC) lines_sc.push(mol);
+            else lines.push(mol);
+          }
+        }
+      }
+      
+      // now, figure out how to efficiently create a query that lists the shown residues...
+      
+    }   
+    
+    
+  }
+
+/*
+
+chain.displayMode = 0; => hidden
+chain.displayMode = 1; => all-atom
+chain.displayMode = 2; => tube
+chain.displayMode = 3; => cartoon
+
+mol.displayMode = 0; => hidden
+mol.displayMode = 1; => spacefill
+mol.displayMode = 2; => ballstick
+mol.displayMode = 3; => stick
+mol.displayMode = 4; => wireframe
+
+*/
+  
 }
 
 if (typeof(requestAnimationFrame) != "undefined") molmil.animate_molmilViewers();
