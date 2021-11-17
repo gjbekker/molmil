@@ -1110,6 +1110,7 @@ molmil.bindCanvasInputs = function(canvas) {
   }
   
   var pasteDB = function(ev) {
+    if (ev.srcElement.className.includes("molmil_UI_cl_input")) return;
     ev.preventDefault();
     processFiles([], ev.clipboardData.files);
   };
