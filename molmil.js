@@ -1726,8 +1726,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         else if (atom.atomName == "C") {currentMol.C = atom; currentMol.ligand = isLigand;}
         else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = isLigand; currentMol.xna = false; }
         //do special stuff for dna/rna
-        else if (! isHet && atom.atomName == "P" && ! (currentMol.O || currentMol.N || currentMol.CA)) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
-        else if (! isHet && atom.atomName == "O3'" && ! (currentMol.O || currentMol.N || currentMol.CA)) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA)) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "O3'" && ! (currentMol.C)) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
       }
       
       atom.Bfactor = B_iso_or_equiv[a] || 0.0;
