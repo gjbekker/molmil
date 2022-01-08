@@ -2241,7 +2241,7 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   
   contentBox.pushNode("br");
   
-  contentBox.pushNode("span", "For more advanced styling, please use the command line (bottom of the page), the structure menu (right-side of the page) or right-click on an atom/cartoon to show a context menu with styling options. Also, see <a href=\""+molmil.settings.src+"manual.html#style-interface\" target=\"_blank\">our manual</a> for more information.")
+  contentBox.pushNode("span", "For more advanced styling, please use the command line (bottom of the page), the structure menu (right-side of the page) or right-click on an atom/cartoon to show a context menu with styling options. Also, see <a href=\""+molmil.settings.src+"manual.html#style-interface\" target=\"_blank\">our manual</a> or <a href=\"https://doi.org/10.1002/pro.4211\" target=\"blank\">our recent paper</a> for more information.")
 };
 
 molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
@@ -3330,7 +3330,6 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["EDMap", "edmap", function() {return UI.showEDMap;}], ["Sites", "sites", function() {return UI.showSites;}], ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}], ["Settings", "settings"], ["Hide", "hide"]];
     
     var doHandler = function(ev, callOptions) {
-      console.trace('test123')
       if (this.value == "structure") {
         molmil_dep.Clear(nwif.contentBox);
         UI.styleif_au(nwif.contentBox);

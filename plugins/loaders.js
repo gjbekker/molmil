@@ -796,7 +796,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     currentChain.atoms.push(atom);
     if (atom.element == "H") atom.display = this.showHydrogens;
     else atom.display = true;
-
+    atom.Bfactor = parseFloat(tmp[8]);
     
     atom.AID = this.AID++;
     this.atomRef[atom.AID] = atom;
