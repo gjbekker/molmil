@@ -1858,6 +1858,7 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
   if (! struct) {for (var i=0; i<soup.structures.length; i++) if (soup.structures[i] instanceof molmil.entryObject) {struct = soup.structures[i]; break;}}
   
   var atom_site = {group_PDB: [], type_symbol: [], label_atom_id: [], label_alt_id: [], label_comp_id: [], label_asym_id: [], label_entity_id: [], label_seq_id: [], Cartn_x: [], Cartn_y: [], Cartn_z: [], auth_asym_id: [], id: []};
+  var pdbx_chain_remapping = {entity_id: [], label_asym_id: [], auth_asym_id: [], orig_label_asym_id: [], orig_auth_asym_id: [], applied_operations: []};
   if (options.modelMode) atom_site.pdbx_PDB_model_num = [];
   
   if (assembly_id == -1) var BU = [[[null], undefined]];
@@ -1868,20 +1869,30 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
   var oldChain, oldResidue, oldAtom;
   var xyzin = vec3.create(), xyzout = vec3.create(), cp, bucounter = 1;
   
+  var buid_identity = null;
+  for (p in soup.BUmatrices) if (soup.BUmatrices[p][0] == "identity operation") {buid_identity = p; break;}
+
   for (p=0; p<BU.length; p++) {
     asym_ids = BU[p][1] ? new Set(BU[p][1]) : BU[p][1];
     
     for (cp=0; cp<BU[p][0].length; cp++) {
       m = BU[p][0][cp] == null ? ["identity operation", mat4.create()] : soup.BUmatrices[BU[p][0][cp]];
-      if (options.modelMode) {
-        buid = "";
-      }
+      if (options.modelMode) buid = null;
       if (m[0] == "identity operation") buid = "";
-      else {buid = "_"+bucounter; bucounter++;}
+      else {buid = "-"+BU[p][0][cp]; bucounter++;}
       matrix = m[1];
 
       for (c=0; c<struct.chains.length; c++) {
         oldChain = struct.chains[c];
+        
+        pdbx_chain_remapping.entity_id.push(oldChain.entity_id);
+        pdbx_chain_remapping.label_asym_id.push(oldChain.name+buid);
+        pdbx_chain_remapping.auth_asym_id.push(oldChain.authName+buid);
+        pdbx_chain_remapping.orig_label_asym_id.push(oldChain.name);
+        pdbx_chain_remapping.orig_auth_asym_id.push(oldChain.authName);
+        if (buid == "") pdbx_chain_remapping.applied_operations.push(buid_identity);
+        else pdbx_chain_remapping.applied_operations.push(buid.substr(1));
+
         if (asym_ids !== undefined && ! asym_ids.has(oldChain.name)) continue;
 
         for (m=0; m<oldChain.molecules.length; m++) {
@@ -1899,7 +1910,7 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
             atom_site.Cartn_x.push(xyzout[0]);
             atom_site.Cartn_y.push(xyzout[1]);
             atom_site.Cartn_z.push(xyzout[2]);
-            atom_site.auth_asym_id.push(oldChain.authName);
+            atom_site.auth_asym_id.push(oldChain.authName+buid);
             atom_site.label_asym_id.push(oldChain.name+buid);
             atom_site.label_alt_id.push(oldAtom.label_alt_id);
             atom_site.label_atom_id.push(oldAtom.atomName);
@@ -1915,7 +1926,10 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
       }
     }
   }
-  return {atom_site: atom_site};
+  
+  var obj = {atom_site: atom_site};
+  if (! options.modelMode) obj.pdbx_chain_remapping = pdbx_chain_remapping;
+  return obj;
 }
 
 // the goal of this function is to simply duplicate the BU (i.e. instead of doing on the GPU, create explicit in-memory copies of the structure and transform its location...)

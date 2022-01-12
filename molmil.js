@@ -2010,7 +2010,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           // build new matrices
           for (j=0; j<tmp1[0].length; j++) {
             for (k=0; k<tmp1[1].length; k++) {
-              poly = "combi_"+tmp1[0][j]+"_"+tmp1[1][k];
+              poly = tmp1[0][j]+"-"+tmp1[1][k];
               if (! this.BUmatrices.hasOwnProperty(poly)) {
                 mat4.multiply(tmp3, this.BUmatrices[tmp1[0][j]][1], this.BUmatrices[tmp1[1][k]][1]);
                 if ( tmp3[ 0] == 1 && tmp3[ 1] == 0 && tmp3[ 2] == 0 && tmp3[ 3] == 0 && 
