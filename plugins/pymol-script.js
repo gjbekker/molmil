@@ -70,7 +70,7 @@ molmil.commandLines.pyMol.selectCommand = function(env, command) {
 }
     
 molmil.commandLines.pyMol.labelCommand = function(env, command) {
-  command = command.match(/label[\s]+(.*)[\s]*,[\s]*(.*)/);
+  command = command.match(/label[\s]+([^,]*)[\s]*,[\s]*(.*)/);
   try {molmil.commandLines.pyMol.label.apply(env, [command[1], command[2]]);}
   catch (e) {console.error(e); return false;}
   return true;
@@ -1101,12 +1101,25 @@ molmil.commandLines.pyMol.label = function(atoms, lbl) {
   }
   
   var text = lbl, settings = {};
-  
-  //var info = molmil.calcCenter(atoms);
-  
-  
-  
-  molmil.addLabel(text, {atomSelection: atoms, dz_: 2}, this.cli_soup);
+  var regex = new RegExp('"[\s]*%[\s]*\\(');
+  if (regex.test(text)) { // dynamic mode
+    var tmp = text.split(regex);
+    var content = tmp[0].substr(1), vars = tmp[1].slice(0,-1).split(",").map(function(x) {return x.trim();});
+    for (var a=0; a<atoms.length; a++) {
+      var data = [];
+      for (var i=0; i<vars.length; i++) {
+        if (vars[i] == "name") data.push(atoms[a].atomName)
+        else if (vars[i] == "resn") data.push(atoms[a].molecule.name);
+        else if (vars[i] == "resi") data.push(atoms[a].molecule.RSID);
+        else if (vars[i] == "chain") data.push(atoms[a].chain.authName);
+        else if (vars[i] == "b") data.push(atoms[a].Bfactor);
+        else data.push("??");
+      }
+      var dtext = content.replace(/%s/g, function () {return data.shift();});
+      molmil.addLabel(dtext, {atomSelection: [atoms[a]], dz_: 2}, this.cli_soup);
+    }
+  }
+  else molmil.addLabel(text, {atomSelection: atoms, dz_: 2}, this.cli_soup);
 }
     
 molmil.commandLines.pyMol.cartoon_color = function(clr, atoms, quiet) {
