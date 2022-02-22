@@ -738,6 +738,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   struc.chains.push(currentChain = new molmil.chainObject("", struc));
   currentChain.CID = this.CID++;
   
+  var refmap = {};
   for (i=0; i<atomData.length; i++) {
     if (! atomData[i]) continue;
     tmp = atomData[i].split(/\s+/g) || [];
@@ -749,7 +750,6 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     
     //atomType = atomData[i].substring(40, 49).trim();
     //resID = atomData[i].substring(49, 54).trim();
-    
     atomName = tmp[1];
     x = parseFloat(tmp[2]);
     y = parseFloat(tmp[3]);
@@ -794,6 +794,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
     
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType, currentMol, currentChain));
     currentChain.atoms.push(atom);
+    refmap[tmp[0]] = atom;
     if (atom.element == "H") atom.display = this.showHydrogens;
     else atom.display = true;
     atom.Bfactor = parseFloat(tmp[8]);
@@ -807,13 +808,10 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   for (i=0; i<bondData.length; i++) {
     if (! bondData[i]) continue;
     tmp = bondData[i].split(/[ ,\t]+/);
-    a1 = parseInt(tmp[1])-1;
-    a2 = parseInt(tmp[2])-1;
     if (tmp[3] == "ar") tmp[3] = 2;
     if (tmp[3] == "am") tmp[3] = 1;
     bt = parseInt(tmp[3]);
-
-    currentChain.bonds.push([currentChain.atoms[a1], currentChain.atoms[a2], bt]);
+    currentChain.bonds.push([refmap[tmp[1]], refmap[tmp[2]], bt]);
   }
   currentChain.bondsOK = true;
   
