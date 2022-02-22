@@ -1,0 +1,22 @@
+{
+  "name": "molmil",
+  "description": "WebGL-based molecular viewer",
+  "version": "2.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.com:pdbjapan/molmil.git"
+  },
+  "main": "",
+  "dependencies": {
+    "clean-css": "^5.2.4",
+    "html-minifier-terser": "^7.0.0-alpha.1",
+    "terser": "^5.10.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "node build.mjs"
+  },
+  "author": "Gert-Jan Bekker",
+  "license": "LGPL-3.0"
+}
