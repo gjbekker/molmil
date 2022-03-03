@@ -1132,10 +1132,13 @@ molmil.bindCanvasInputs = function(canvas) {
       if (mjsFile != null) {
         canvas.mjs_fileBin = {};
         for (i=0; i<count; i++) {
-          fr = new FileReader();
           file = dict[items[i]];
-          fr.filename = file.name;
-          fr.fileHandle = file;
+          if (file instanceof File) {
+            fr = new FileReader();
+            fr.filename = file.name;
+            fr.fileHandle = file;
+          }
+          else fr = file;
           canvas.mjs_fileBin[items[i]] = fr;
         }
         mjsFunc(canvas, canvas.mjs_fileBin[mjsFile]);
@@ -1144,10 +1147,13 @@ molmil.bindCanvasInputs = function(canvas) {
       nfilesproc[1] = count;
 
       for (i=0; i<count; i++) {
-        fr = new FileReader();
         file = dict[items[i]];
-        fr.filename = file.name;
-        fr.fileHandle = file;
+        if (file instanceof File) {
+          fr = new FileReader();
+          fr.filename = file.name;
+          fr.fileHandle = file;
+        }
+        else fr = file;
         var ok = false;
       
         for (j=0; j<canvas.inputFunctions.length; j++) {
@@ -1230,6 +1236,41 @@ molmil.bindCanvasInputs = function(canvas) {
       }
       canvas.molmilViewer.downloadInProgress = true;
       fr.readAsArrayBuffer(fr.fileHandle);
+      return true;
+    }
+  });
+  
+  // .zip file
+  canvas.inputFunctions.push(function(canvas, fr) {
+    if (fr.filename.endsWith(".zip")) {
+      if (! window.hasOwnProperty("unzip")) {var obj = molmil_dep.dcE("script"); obj.src = "https://unpkg.com/unzipit@1.4.0/dist/unzipit.min.js"; document.getElementsByTagName("head")[0].appendChild(obj);}
+      fr.onload = function(e) {
+        if (! window.hasOwnProperty("unzipit")) return molmil_dep.asyncStart(this.onload, [e], this, 50);
+        unzipit.unzip(e.target.result).then(function(zipfile) {
+          var files = Object.values(zipfile.entries), files2 = [];
+          for (var f=0; f<files.length; f++) {
+            if (files[f].isDirectory) continue;
+            files2.push({
+              name: files[f].name,
+              filename: files[f].name,
+              fileObj: files[f],
+              onload: function() {},
+              readAsText: function() {
+                var fobj = this;
+                this.fileObj.text().then(function(data) {fobj.onload({target: {result: data}});});
+              },
+              readAsArrayBuffer: function() {
+                var fobj = this;
+                this.fileObj.arrayBuffer().then(function(data) {fobj.onload({target: {result: data}});});
+              }
+            });
+          }
+          processFiles([], files2);
+          canvas.molmilViewer.downloadInProgress = false;
+        });
+      }
+      fr.readAsArrayBuffer(fr.fileHandle);
+      canvas.molmilViewer.downloadInProgress = true;
       return true;
     }
   });
@@ -1487,7 +1528,7 @@ molmil.animationObj.prototype.initialise = function(infoBox) { // redo
 molmil.animationObj.prototype.updateInfoBox = function() {
   if (! this.infoBox) return;
   if (this.infoBox.timeBox) {
-    if (this.soup.frameInfo) this.infoBox.timeBox.innerHTML = this.soup.frameInfo[this.frameNo][1].toFixed(1)+"ps";
+    if (this.soup.frameInfo) this.infoBox.timeBox.innerHTML = this.soup.frameInfo[this.frameNo][1].toFixed(1)+" ps ("+(this.frameNo+1)+")";
     else this.infoBox.timeBox.innerHTML = this.frameNo;
   }
   if (this.infoBox.sliderBox) {
