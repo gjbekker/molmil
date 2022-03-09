@@ -2484,15 +2484,16 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
       tmpObj = object.lowQuality ? cylinderLQ : cylinder;
       cylNverts = tmpObj.vertices.length/3
       tmp2 = [(object.coords[1][0]-object.coords[0][0])/object.N, (object.coords[1][1]-object.coords[0][1])/object.N, (object.coords[1][2]-object.coords[0][2])/object.N];
+      var tmp3 = object.coords[0];
       var x0, y0, z0, x1, y1, z1;
       for (i=0; i<object.N; i++) {
-        x0 = object.coords[0][0] + tmp2[0]*(i+.25);
-        y0 = object.coords[0][1] + tmp2[1]*(i+.25);
-        z0 = object.coords[0][2] + tmp2[2]*(i+.25);
-        
-        x1 = object.coords[0][0] + tmp2[0]*(i+.75);
-        x2 = object.coords[0][1] + tmp2[1]*(i+.75);
-        x3 = object.coords[0][2] + tmp2[2]*(i+.75);
+        x0 = tmp3[0] + tmp2[0]*(i+.25);
+        y0 = tmp3[1] + tmp2[1]*(i+.25);
+        z0 = tmp3[2] + tmp2[2]*(i+.25);
+        x1 = tmp3[0] + tmp2[0]*(i+.75);
+        y1 = tmp3[1] + tmp2[1]*(i+.75);
+        z1 = tmp3[2] + tmp2[2]*(i+.75);
+        object.coords = [[x0, y0, z0], [x1, y1, z1]];
 
         // cap 1
         vBuffer[vP++] = x0;
