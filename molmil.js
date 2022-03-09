@@ -7964,6 +7964,7 @@ molmil.createViewer = function (target, width, height, soupObject) {
     this.style.width = (w/dpr)+"px";
     this.style.height = (h/dpr)+"px";
     this.renderer.resizeViewPort(); this.update = true; this.renderer.render();
+    if (window.local_file_saver !== undefined) window.resizeTo(w+(window.outerWidth-window.innerWidth), h+(window.outerHeight-window.innerHeight)); // molmil-app
   };
   
   if (soupObject) {
@@ -8986,22 +8987,34 @@ molmil.addLabel = function(text, settings, soup) {
     }
     
     textCtx.fillStyle = molmil.rgb2hex(settings.color[0], settings.color[1], settings.color[2]);
+    
+    if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
+    else textCtx.strokeStyle = "#000000";
 
     if (settings.textAlign == "left") {
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], 0, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
+      for (var i=0; i<tmp.length; i++) {
+        textCtx.fillText(tmp[i], 0, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset);
+        if (! settings.addBorder) {
+          textCtx.strokeText(tmp[i], 0, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset);
+        }
+      }
     }
     else if (settings.textAlign == "right") {
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
+      for (var i=0; i<tmp.length; i++) {
+        textCtx.fillText(tmp[i], w, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset);
+        if (! settings.addBorder) textCtx.strokeText(tmp[i], w, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset);
+      }
     }
     else {
       textCtx.textAlign = settings.textAlign = "center";
-      for (var i=0; i<tmp.length; i++) textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.75) + (settings.fontSize*i) + Yoffset);
+      for (var i=0; i<tmp.length; i++) {
+        textCtx.fillText(tmp[i], w / 2, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset);
+        if (! settings.addBorder) textCtx.strokeText(tmp[i], w / 2, (settings.fontSize / 1.5) + (settings.fontSize*i) + Yoffset); 
+      }
     }
 
 
     if (settings.addBorder) {
-      if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
-      else textCtx.strokeStyle = "#000000";
       textCtx.beginPath();
       textCtx.ellipse(textCtx.canvas.width*.5, textCtx.canvas.height*.5, (textCtx.canvas.width*.5)-settings.fontSize*.05, (textCtx.canvas.height*.5)-settings.fontSize*.05, 0, 0, Math.PI * 2, false);
       textCtx.lineWidth = settings.fontSize*.1;
