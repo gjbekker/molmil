@@ -2416,7 +2416,7 @@ molmil.geometry.generate = function(structures, render, detail_or) {
   //this.generateRockets();
   
   this.generateSurfaces(cchains, render.soup);
-  
+
   this.registerPrograms(render);
   
   if (! this.skipClearBuffer) this.reset();
@@ -2855,9 +2855,10 @@ molmil.geometry.registerPrograms = function(renderer, initOnly) {
     renderer.addProgram(renderer.program2);
   }
   if (! renderer.program3 || ! renderer.gl.programInit) {
-    renderer.program3 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.program3 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true, alphaMode: this.buffer3 ? this.buffer3.alphaMode : false});
     renderer.addProgram(renderer.program3);
   }
+  else renderer.program3.settings.alphaMode = this.buffer3 ? this.buffer3.alphaMode : false;
   if (! renderer.program4 || this.buffer4.reinit || ! renderer.gl.programInit) {
     if (renderer.program4) renderer.programs.splice(renderer.programs.indexOf(renderer.program4), 1);
     renderer.program4 = this.build_simple_render_program(null, null, renderer, {has_ID: false, solid: true, alphaMode: this.buffer4 ? this.buffer4.alphaMode : false});
@@ -3453,6 +3454,7 @@ molmil.geometry.initCartoon = function(chains) {
   }
   
   var buffer3 = this.buffer3;
+  buffer3.alphaMode = false;
   buffer3.vertexBuffer = new Float32Array(vs*8); // x, y, z, nx, ny, nz, rgba, aid
   buffer3.vertexBuffer8 = new Uint8Array(buffer3.vertexBuffer.buffer);
   if (molmil.configBox.OES_element_index_uint) buffer3.indexBuffer = new Uint32Array(is*3);
@@ -4277,11 +4279,13 @@ molmil.geometry.generateCartoon = function() {
 molmil.geometry.buildLoopNcap = function(t, P, T, N, B, rgba, aid, coreRadius) {
   var dome = this.dome[0], radius = coreRadius, i, ringTemplate = this.ringTemplate;
   
+  
   var vBuffer = this.buffer3.vertexBuffer, iBuffer = this.buffer3.indexBuffer, vP = this.buffer3.vP, iP = this.buffer3.iP, Px, Py, Pz, Nx, Ny, Nz, Bx, By, Bz, Tx, Ty, Tz, rgba_, aid_,
   vBuffer8 = this.buffer3.vertexBuffer8, vP8 = vP*4;
   var p = vP*.125;
 
   Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+  if (rgba_[3] != 255) this.buffer3.alphaMode = true;
   for (i=0; i<dome.vertices.length; i++, vP8+=32) {
     vBuffer[vP++] = radius*dome.vertices[i][0] * Nx + radius*dome.vertices[i][1] * Bx + radius*dome.vertices[i][2] * Tx + Px;
     vBuffer[vP++] = radius*dome.vertices[i][0] * Ny + radius*dome.vertices[i][1] * By + radius*dome.vertices[i][2] * Ty + Py;
@@ -4337,6 +4341,7 @@ molmil.geometry.buildLoopCcap = function(t, P, T, N, B, rgba, aid, coreRadius) {
   var p = vP*.125;
   
   Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+  if (rgba_[3] != 255) this.buffer3.alphaMode = true;
   for (i=0; i<dome.vertices.length; i++, vP8+=32) {
     vBuffer[vP++] = radius*dome.vertices[i][0] * Nx + radius*dome.vertices[i][1] * Bx + radius*dome.vertices[i][2] * Tx + Px;
     vBuffer[vP++] = radius*dome.vertices[i][0] * Ny + radius*dome.vertices[i][1] * By + radius*dome.vertices[i][2] * Ty + Py;
@@ -4378,6 +4383,7 @@ molmil.geometry.buildLoop = function(t, t_next, P, T, N, B, rgba, aid, coreRadiu
   
   for (t; t<t_next; t++) {
     Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<ringTemplate.length; i++, vP8+=32) {
       vBuffer[vP++] = radius*ringTemplate[i][0] * Nx + radius*ringTemplate[i][1] * Bx + Px;
       vBuffer[vP++] = radius*ringTemplate[i][0] * Ny + radius*ringTemplate[i][1] * By + Py;
@@ -4438,6 +4444,7 @@ molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast,
   // N-terminal cap: flat (1-ring + 1 vertices)
   
   Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+  if (rgba_[3] != 255) this.buffer3.alphaMode = true;
 
   vBuffer[vP++] = Px;
   vBuffer[vP++] = Py;
@@ -4488,6 +4495,7 @@ molmil.geometry.buildRocket = function(t, t_next, P, T, N, B, rgba, aid, isLast,
   
   for (t; t<t_next; t++) {
     Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<ringTemplate.length; i++, vP8+=32) {
       vBuffer[vP++] = radius*ringTemplate[i][0] * Nx + radius*ringTemplate[i][1] * Bx + Px;
       vBuffer[vP++] = radius*ringTemplate[i][0] * Ny + radius*ringTemplate[i][1] * By + Py;
@@ -4632,6 +4640,7 @@ molmil.geometry.buildHelix = function(t, t_next, P, T, N, B, rgba, aid, currentB
   var tmp = [0, 0], noi = this.noi, t_start = t, n = Nresume ? noi : 0;
   for (t; t<t_next; t++) {
     Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
 
     if (! Nresume && t < t_start+noi) {factor = (n/noi); n++;}
     else if (! Cresume && t > t_next-noi-2) {factor = (n/(noi)); n--;}
@@ -4709,6 +4718,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
   if (! isFirst) {
     Px = (P[t][0]*.75)+(P[t+1][0]*.25), Py = (P[t][1]*.75)+(P[t][1]*.25), Pz = (P[t][2]*.75)+(P[t][2]*.25), Tx = T[t-1][0], Ty = T[t-1][1], Tz = T[t-1][2], 
     Nx = N[t-1][0], Ny = N[t-1][1], Nz = N[t-1][2], Bx = B[t-1][0], By = B[t-1][1], Bz = B[t-1][2], rgba_ = rgba[t-1], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<ringTemplate.length; i++, vP8+=32) {
       vBuffer[vP++] = h*.5*ringTemplate[i][0] * Nx + h*.5*ringTemplate[i][1] * Bx + Px;
       vBuffer[vP++] = h*.5*ringTemplate[i][0] * Ny + h*.5*ringTemplate[i][1] * By + Py;
@@ -4752,6 +4762,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
   // draw arrow bottom
 
   Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+  if (rgba_[3] != 255) this.buffer3.alphaMode = true;
   for (i=0; i<4; i++, vP8+=32) {
     vBuffer[vP++] = h*squareVertices[i][0] * Nx + w*squareVertices[i][1] * Bx + Px;
     vBuffer[vP++] = h*squareVertices[i][0] * Ny + w*squareVertices[i][1] * By + Py;
@@ -4792,6 +4803,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
   var n = 0;
   for (t; t<as; t++, n++) {
     Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<4; i++, vP8+=32) {
       
       vBuffer[vP++] = h*squareVertices[i][0] * Nx + w*squareVertices[i][1] * Bx + Px;
@@ -4867,6 +4879,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
     if (t >= as) w -= dw;
 
     Px = P[t][0], Py = P[t][1], Pz = P[t][2], Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<4; i++, vP8+=32) {
     
       vBuffer[vP++] = h*squareVertices[i][0] * Nx + w*squareVertices[i][1] * Bx + Px;
@@ -4938,7 +4951,7 @@ molmil.geometry.buildSheet = function(t, t_next, P, T, N, B, rgba, aid, isFirst,
   // draw arrow head
   if (! isLast) {
     Tx = T[t][0], Ty = T[t][1], Tz = T[t][2], Nx = N[t][0], Ny = N[t][1], Nz = N[t][2], Bx = B[t][0], By = B[t][1], Bz = B[t][2], rgba_ = rgba[t], aid_ = aid[t];
-    
+    if (rgba_[3] != 255) this.buffer3.alphaMode = true;
     for (i=0; i<ringTemplate.length; i++, vP8+=32) {
       vBuffer[vP++] = Px;
       vBuffer[vP++] = Py;
