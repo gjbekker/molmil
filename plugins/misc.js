@@ -2331,11 +2331,11 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     p += tmpObj.vertices.length / 3;
   }
   
-  var genSphere = function(idx) {
+  var genSphere = function(idx, radius) {
     // create a sphere with radius object.radius on object.coords[0]
     tmpObj = object.lowQuality ? detail_lv_LQ : detail_lv;
     idx = idx || 0;
-    tmpObj = molmil.geometry.getSphere(object.radius, tmpObj);
+    tmpObj = molmil.geometry.getSphere(radius || object.radius, tmpObj);
 
     for (v=0; v<tmpObj.indices.length; v++, iP++) iBuffer[iP] = tmpObj.indices[v]+p;
 
@@ -2373,8 +2373,10 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     
     tmpObj = object.lowQuality ? ringTemplateLQ : ringTemplate;
     var CB_NOVPR__ = object.lowQuality ? CB_NOVPR_LQ : CB_NOVPR;
+
+    var delta_radius = 0;
+    if (object.radius2) delta_radius = (object.radius2-object.radius)/(object.coords.length-1);
     
-    r = object.radius;
     
     for (i=0; i<tmpObj.length; i++) {
       iBuffer[iP++] = p+i+2;
@@ -2399,6 +2401,8 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     vec3.normalize(tangents[v], tangents[v]);
     
     for (v=0; v<object.coords.length; v++) {
+      r = object.radius + (v*delta_radius);
+      
       if (object.hasOwnProperty("rgbaPath")) rgba = object.rgbaPath[v];
       if (v == 0) {
         smallest = Number.MAX_VALUE;
@@ -2470,7 +2474,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     p = vP / 7;
     
     if (object.hasOwnProperty("rgbaPath")) rgba = object.rgbaPath[object.coords.length-1];
-    genSphere(object.coords.length-1);
+    genSphere(object.coords.length-1, object.radius2);
   }
   
   for (var o=0; o<objects.length; o++) {
