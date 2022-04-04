@@ -631,6 +631,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "hydro") new_expr.push("this.soupObject.atomRef[a].molecule.water "+operator+" true");
       else if (word == "hetatm") new_expr.push("this.soupObject.atomRef[a].molecule.ligand "+operator+" true");
       else if (word == "snfg") new_expr.push("this.soupObject.atomRef[a].molecule.SNFG "+operator+" true");
+      else if (word == "altloc") {key = "this.soupObject.atomRef[a].label_alt_id "+operator+" '%s'";}
       else if (word == "model") {
         // two modes, by name & by number (1-...)
         if (expr[i+1] == "#") key = "this.soupObject.atomRef[a].chain.entry.meta.idnr "+operator+" '%s'";
@@ -675,6 +676,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         else if (toLower) word = word.toLowerCase();
         if (ss) word = ss_conv[word];
         if (word == "=") word = "==";
+        if (word == "''") word = "";
         key = key.replace("%s", word)
         if (key.indexOf("%s") == -1) {
           new_expr.push(key);

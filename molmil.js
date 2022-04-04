@@ -1666,11 +1666,6 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         baka++;
         if (baka > 1) continue;
       }
-
-      if (label_alt_id[a]) {
-        if (alt_loc_handler == null) alt_loc_handler = label_alt_id[a];
-        else if (label_alt_id[a] != alt_loc_handler) continue; // deal with junk
-      }
     
       if ((pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) || ! struc) {
         if (struc && ! molmil.configBox.loadModelsSeparately) break;
@@ -1702,8 +1697,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
 
       Xpos = currentChain.modelsXYZ[0].length;
       currentChain.modelsXYZ[0].push(Cartn_x[a], Cartn_y[a], Cartn_z[a]);
-    
+
       currentMol.atoms.push(atom=new molmil.atomObject(Xpos, auth_atom_id[a] || label_atom_id[a] || "", type_symbol[a] || "", currentMol, currentChain));
+      
+      if (label_alt_id[a]) {
+        if (alt_loc_handler == null) alt_loc_handler = label_alt_id[a];
+        if (label_alt_id[a] != alt_loc_handler) atom.display = false;
+      }
       
       if (! atom.element) {
         for (offset=0; offset<atom.atomName.length; offset++) if (! molmil_dep.isNumber(atom.atomName[offset])) break;
@@ -1716,7 +1716,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       if (group_PDB.length) {if (group_PDB[a] != "HETATM" || polyTypes.hasOwnProperty(currentMol.name)) isHet = false;}
       else isHet = false;
 
-      atom.label_alt_id = label_alt_id[a];
+      atom.label_alt_id = label_alt_id[a] || "";
       if (currentMol.water) currentChain.display = this.showWaters;
       if (atom.element == "H") atom.display = this.showHydrogens;
       else if (atom.display) {
