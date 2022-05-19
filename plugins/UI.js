@@ -176,7 +176,7 @@ molmil.UI.prototype.showRM=function(icon, reset) {
       item.name.className = "optCat_n";
       item.style.color = file.display ? "" : "lightgrey"
       item.plus.onclick = item.name.onclick = function(ev) {
-        if (ev.ctrlKey) {
+        if (ev.ctrlKey || ev.metaKey) {
           if (this.parentNode.payload[0].display) {
             molmil.displayEntry(this.parentNode.payload, molmil.displayMode_None, true, this.UI.soup);
             this.parentNode.style.color = "lightgrey";
@@ -252,7 +252,7 @@ molmil.UI.prototype.showChains=function(target, payload) {
     if (chain.display) item.style.color = "";
     item.style.color = chain.display ? "" : "lightgrey"
     item.plus.onclick = item.name.onclick = function(ev) {
-      if (ev.ctrlKey) {
+      if (ev.ctrlKey || ev.metaKey) {
         if (this.parentNode.payload.display) {
           molmil.displayEntry(this.parentNode.payload, molmil.displayMode_None, true, this.UI.soup);
           this.parentNode.style.color = "lightgrey";

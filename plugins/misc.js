@@ -1,3 +1,159 @@
+var Zmatinfo = {};
+Zmatinfo["ACE"] = [["C", "N(+1)", "CA(+1)", "C(+1)", 1.34, 120, -73], ["O", "C", "N(+1)", "CA(+1)", 1.23, 120, 0], ["CH3", "O", "C", "N(+1)", 1.5, 120, 180]];
+Zmatinfo["NME"] = [["N", "C(-1)", "O(-1)", "CA(-1)", 1.34, 120, -180], ["CH3", "N", "C(-1)", "O(-1)", 1.45, 120, 0]];
+
+molmil.setAngle = function(a1, a2, a3, angle) {
+  // vec should be perpendicular to the plane defined by a1,a2,a3
+  
+  var A = vec3.sub([0, 0, 0], a1, a2); vec3.normalize(A, A);
+  var B = vec3.sub([0, 0, 0], a3, a2); vec3.normalize(B, B);
+  var vec = vec3.cross([0, 0, 0], A, B); vec3.normalize(vec, vec);
+  
+  var curAngle = molmil.calcAngle(a1, a2, a3);
+  
+  a1[0] -= a2[0]; a1[1] -= a2[1]; a1[2] -= a2[2];
+  var rotmat = mat4.create(); mat4.fromRotation(rotmat, (curAngle-angle)*(Math.PI/180.), vec);
+  vec3.transformMat4(a1, a1, rotmat);
+  a1[0] += a2[0]; a1[1] += a2[1]; a1[2] += a2[2];
+};
+
+molmil.setTorsion = function(a1, a2, a3, a4, angle) {
+  var vec = vec3.sub([0, 0, 0], a3, a2); vec3.normalize(vec, vec);
+  
+  var curTorsion = molmil.calcTorsion(a1, a2, a3, a4);
+  a1[0] -= a2[0]; a1[1] -= a2[1]; a1[2] -= a2[2];
+  var rotmat = mat4.create(); mat4.fromRotation(rotmat, (curTorsion-angle)*(Math.PI/180.), vec);
+  vec3.transformMat4(a1, a1, rotmat);
+  a1[0] += a2[0]; a1[1] += a2[1]; a1[2] += a2[2];
+};
+
+molmil.attachResidue = function(parentResidue, newResType, soup) {
+  if (! Zmatinfo.hasOwnProperty(newResType)) {
+    console.error("Unsupported residue type:", newResType)
+    return;
+  }
+  soup = soup || molmil.cli_soup;
+  
+  var resType = Zmatinfo[newResType], plusOne = false, minusOne = false;
+  for (var i=0; i<resType.length; i++) {
+    for (var j=0; j<4; j++) {
+      plusOne = plusOne || resType[i][j].endsWith("(+1)");
+      minusOne = minusOne || resType[i][j].endsWith("(-1)");
+    }
+  }
+  
+  if (! plusOne && minusOne && ! parentResidue.next) resIdx = 1;
+  else if (! minusOne && plusOne && ! parentResidue.previous) resIdx = -1;
+  else if (! parentResidue.previous) resIdx = -1;
+  else if (! parentResidue.next) resIdx = 1;
+  else {
+    console.error("Cannot attach...");
+    return;
+  }
+
+  var newRes = new molmil.molObject(newResType, parseInt(parentResidue.id)+resIdx, parentResidue.chain);
+  newRes.RSID = newRes.id+"";
+  
+  var a1, a2, a3, a4, atom;
+  
+  var name, refMol, ap;
+  var fetchAtom = function(name) {
+    if (name.indexOf("(-1)") != -1) {
+      name = name.replace("(-1)", "");
+      refMol = parentResidue;
+    }
+    else if (name.indexOf("(+1)") != -1) {
+      name = name.replace("(+1)", "")
+      refMol = parentResidue;
+    }
+    else refMol = newRes;
+    for (ap=0; ap<refMol.atoms.length; ap++) {
+      if (refMol.atoms[ap].atomName == name) return refMol.atoms[ap];
+    }
+  };
+
+  var atomName, element, offset, Xpos;
+  for (a=0; a<resType.length; a++) {
+    a2 = fetchAtom(resType[a][1]); 
+    a3 = fetchAtom(resType[a][2]); a4 = fetchAtom(resType[a][3]);
+    if (! a2) {
+      console.error("Missing atom (2):", resType[a][1]);
+      return;
+    }
+    if (! a3) {
+      console.error("Missing atom (3):", resType[a][2]);
+      return;
+    }
+    if (! a4) {
+      console.error("Missing atom (4):", resType[a][3]);
+      return;
+    }
+    a2 = molmil.getAtomXYZ(a2, soup);
+    a3 = molmil.getAtomXYZ(a3, soup);
+    a4 = molmil.getAtomXYZ(a4, soup);
+
+    a1 = [a2[0], a2[1], a2[2]+resType[a][4]]; // set distance
+    
+    molmil.setAngle(a1, a2, a3, resType[a][5]);
+    molmil.setTorsion(a1, a2, a3, a4, resType[a][6]);
+    
+    atomName = resType[a][0];
+    
+    if (molmil.AATypes.hasOwnProperty(newRes.name.substr(0, 3))) {
+      for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
+      if (atomName.length > 1 && ! molmil_dep.isNumber(atomName[1]) && atomName[1] == atomName[1].toLowerCase()) element = atomName.substring(offset, offset+2);
+      else element = atomName.substring(offset, offset+1);
+    }
+    else {
+      element = "";
+      for (offset=0; offset<atomName.length; offset++) {
+        if (molmil_dep.isNumber(atomName[offset])) {
+          if (element.length) break;
+          else continue;
+        }
+        element += atomName[offset];
+      }
+      if (element.length == 2) {
+        element = element[0].toUpperCase() + element[1].toLowerCase();
+        if (! molmil.configBox.vdwR.hasOwnProperty(element)) element = element[0];
+      }
+      else element = element[0].toUpperCase();
+    }
+    Xpos = newRes.chain.modelsXYZ[0].length;
+    newRes.chain.modelsXYZ[0].push(a1[0], a1[1], a1[2]);
+    
+    newRes.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, newRes, newRes.chain));
+  }
+  
+  // add the new residue to the soup.....
+  
+  var pidx = parentResidue.chain.molecules.indexOf(parentResidue);
+  
+  if (resIdx == -1) {
+    parentResidue.chain.molecules.splice(pidx, 0, newRes);
+    parentResidue.previous = newRes;
+    newRes.next = parentResidue;
+  }
+  else { 
+    parentResidue.chain.molecules.splice(pidx+1, 0, newRes);
+    parentResidue.next = newRes;
+    newRes.previous = parentResidue;
+  }
+  
+  if (resIdx == -1) pidx = parentResidue.chain.atoms.indexOf(parentResidue.atoms[0]);
+  else pidx = parentResidue.chain.atoms.indexOf(parentResidue.atoms.slice(-1)[0])+1;
+  
+  for (a=0; a<newRes.atoms.length; a++) {
+    newRes.chain.atoms.splice(pidx, 0, newRes.atoms[a]);
+    newRes.atoms[a].AID = soup.AID++;
+    soup.atomRef[newRes.atoms[a].AID] = newRes.atoms[a];
+  }
+  newRes.MID = soup.MID++;
+  
+  newRes.ligand = ! molmil.AATypes.hasOwnProperty(newRes.name.substr(0, 3));
+  return newRes;
+}
+
 // ** build coarse surface representation **
 molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't draw simple tubes, it adds volume (radii at different positions along the tube) to the tube
   if (chains instanceof molmil.chainObject) chains = [chains];
@@ -1955,6 +2111,8 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
   
   var xyzin = vec3.create(), xyzout = vec3.create(), cp;
   
+  var keep_chains = [];
+  
   for (p=0; p<BU.length; p++) {    
     asym_ids = BU[p][1];
     
@@ -1962,7 +2120,10 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
       m = soup.BUmatrices[BU[p][0][cp]];
       matrix = m[1];
       
-      if (m[0] == "identity operation") continue;
+      if (m[0] == "identity operation") {
+        keep_chains = keep_chains.concat(asym_ids)
+        continue;
+      }
       
       newStruc = new molmil.entryObject({id: "bu_"+cpID, "idnr": struct.meta.idnr+"."+cpID});
       newStruc.soup = soup;
@@ -2033,6 +2194,47 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
       if (newStruc.chains.length) {newStrucs.push(newStruc); soup.structures.push(newStruc); cpID++;}
     }
   }
+
+  keep_chains = new Set(keep_chains);
+  for (c=0; c<struct.chains.length; c++) { // add some functionality to check whether no changes to the AU were made, and if not --> don't update this stuff...
+    if (! keep_chains.has(struct.chains[c].name)) {
+      struct.chains.splice(c, 1); c--;
+    }
+  }
+  
+/*
+
+  for (c=0; c<struct.chains.length; c++) { // add some functionality to check whether no changes to the AU were made, and if not --> don't update this stuff...
+    if (toggleIdentity.hasOwnProperty(struct.chains[c].name)) {
+      asym_ids = toggleIdentity[struct.chains[c].name];
+      
+      if (asym_ids instanceof Array) {
+        b = false;
+        for (i=0; i<asym_ids.length; i++) {
+          if (toggleIdentity.hasOwnProperty(asym_ids[i])) {b = true; break;}
+        }
+        
+        if (struct.chains[c].molecules[0].water && ! soup.showWaters) b = false; // make sure that waters are hidden...
+        
+        if (! b) {
+          struct.chains[c].display = soup.sceneBU.displayedChains[struct.chains[c].name] = false;
+          update = true;
+          continue;
+        }
+      }
+      if (! struct.chains[c].display) {
+        struct.chains[c].display = soup.sceneBU.displayedChains[struct.chains[c].name] = true;
+        update = true;
+      }
+    }
+    else if (struct.chains[c].display) {
+      struct.chains[c].display = soup.sceneBU.displayedChains[struct.chains[c].name] = false;
+      update = true;
+    }
+  }
+
+*/
+  
   
   if (! options.skipInit) {
     soup.calculateCOG();

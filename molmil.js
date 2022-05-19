@@ -788,6 +788,8 @@ molmil.viewer.prototype.gotoMol = function(mol) {
 
   quat.fromMat3(this.renderer.camera.QView, mat3.fromMat4(mat3.create(), matrix));
   quat.normalize(this.renderer.camera.QView, this.renderer.camera.QView);
+  
+  this.canvas.update = true;
 };
 
 molmil.viewer.prototype.waterToggle = function(show) {
@@ -1684,7 +1686,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         currentChain.entity_id = label_entity_id[a];
       }
 
-      if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1) {
+      if ((label_seq_id[a] || auth_seq_id[a]) != cmid || ! currentMol || cmid == -1 || currentMol.name != (label_comp_id[a] || auth_comp_id[a])) {
         currentChain.molecules.push(currentMol = new molmil.molObject((label_comp_id[a] || auth_comp_id[a]), (label_seq_id[a] || auth_seq_id[a]), currentChain));
         currentMol.RSID = (auth_seq_id[a] || label_seq_id[a] || "")+(pdbx_PDB_ins_code[a] || "");
         currentMol.MID = this.MID++;
@@ -1728,6 +1730,16 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         //do special stuff for dna/rna
         else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA)) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
         else if (! isHet && atom.atomName == "O3'" && ! (currentMol.C)) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+      }
+      else {
+        currentChain.isHet = false;
+        if (atom.atomName == "N") {currentMol.N = currentMol.N || atom; currentMol.ligand = isLigand;}
+        else if (atom.atomName == "CA") {currentMol.CA = currentMol.CA || atom; currentMol.ligand = isLigand;}
+        else if (atom.atomName == "C") {currentMol.C = currentMol.C || atom; currentMol.ligand = isLigand;}
+        else if (atom.atomName == "O") {currentMol.O = currentMol.O || atom; currentMol.ligand = isLigand; currentMol.xna = false; }
+        //do special stuff for dna/rna
+        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA)) {currentMol.N = currentMol.N || atom; currentMol.CA = currentMol.CA || atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "O3'" && ! (currentMol.C)) {currentMol.C = currentMol.C || atom; currentMol.xna = true; currentMol.ligand = isLigand;}
       }
       
       atom.Bfactor = B_iso_or_equiv[a] || 0.0;
@@ -1877,6 +1889,10 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       }
       else {
         for (var i=0; i<struc.chains.length; i++ ) {
+          if (! struc.chains[i].isHet && struc.chains[i].molecules.length == 1) {
+            struc.chains[i].isHet = true;
+            struc.chains[i].molecules[0].ligand = true;
+          }
           if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
           else this.buildAminoChain(struc.chains[i]);
         }
@@ -2034,6 +2050,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
     struc.meta.pdbxData = pdb;
     if (! settings.skipDeleteJSO) delete pdb.atom_site;
   }
+  
+  
 
   return structs;
 };
@@ -8752,6 +8770,8 @@ molmil.resetFocus = function(soup, t) {
 
 molmil.zoomTo = function(newCOR, oldCOR, newXYZ, soup, t) {
   for (var i=0; i<soup.canvases.length; i++) soup.canvases[i].molmilViewer.COR = newCOR;
+  soup.lastKnownAS = newCOR;
+  soup.avgXYZ = newCOR;
   
   var framerate = 50, nFrames = Math.round(t*(1000./framerate));
   if (nFrames > 1) {
@@ -8769,7 +8789,7 @@ molmil.zoomTo = function(newCOR, oldCOR, newXYZ, soup, t) {
       soup.canvas.update = true;
       if (fid < nFrames-1) molmil.zoomTID = molmil_dep.asyncStart(updateCamera, [fid+1], null, framerate);
     }
-    if (dX > 0.01 || dY > 0.01 || dZ > 0.01) return updateCamera(0);
+    return updateCamera(0);
   }
   
   soup.renderer.camera.x = newXYZ[0]; soup.renderer.camera.y = newXYZ[1]; soup.renderer.camera.z = newXYZ[2];
@@ -9003,6 +9023,7 @@ molmil.addLabel = function(text, settings, soup) {
     
     if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
     else textCtx.strokeStyle = "#000000";
+    textCtx.lineWidth = Math.ceil(settings.fontSize / 30);
 
     if (settings.textAlign == "left") {
       for (var i=0; i<tmp.length; i++) {
@@ -9488,31 +9509,31 @@ function processExternalCommand(cmd, commandBuffer) {
   if (cmd.hasOwnProperty("extraREST")) {
     var soup = canvas.molmilViewer;
     for (var e in cmd.extraREST) soup.extraREST[e] = soup.extraREST[e];
-    if (commandBuffer !== undefined) commandBuffer.push({"extraREST": cmd.extraREST});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"extraREST": cmd.extraREST});
   }
   if (cmd.hasOwnProperty("extraRESTHeaders")) {
     var soup = canvas.molmilViewer;
     for (var e in cmd.extraRESTHeaders) soup.extraRESTHeaders[e] = soup.extraRESTHeaders[e];
-    if (commandBuffer !== undefined) commandBuffer.push({"extraRESTHeaders": cmd.extraRESTHeaders});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"extraRESTHeaders": cmd.extraRESTHeaders});
   }
   if (cmd.hasOwnProperty("__cwd__")) {
     var soup = canvas.molmilViewer;
     soup.__cwd__ = cmd.__cwd__;
-    if (commandBuffer !== undefined) commandBuffer.push({"__cwd__": cmd.__cwd__});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"__cwd__": cmd.__cwd__});
   }
   if (cmd.hasOwnProperty("load")) {
     var soup = canvas.molmilViewer;
     soup.loadStructureData(cmd.load[0], cmd.load[1], cmd.load[2]);
-    if (commandBuffer !== undefined) commandBuffer.push({"load": cmd.load});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"load": cmd.load});
   }
   if (cmd.hasOwnProperty("run-command")) {
     canvas.commandLine.environment.console.runCommand(cmd["run-command"]);
     //runCommand
-    if (commandBuffer !== undefined) commandBuffer.push({"run-command": cmd["run-command"]});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"run-command": cmd["run-command"]});
   }
   if (cmd.hasOwnProperty("custom") && window.hasOwnProperty(cmd["custom"][0])) {
     molmil_dep.asyncStart(window[cmd["custom"][0]], cmd["custom"][1], null, 0);
-    if (commandBuffer !== undefined) commandBuffer.push({"custom": cmd["custom"]});
+    if (commandBuffer !== undefined && !cmd.nobuffer) commandBuffer.push({"custom": cmd["custom"]});
   }
 };
 

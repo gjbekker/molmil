@@ -1,5 +1,5 @@
 molmil.commandLine.prototype.bindPymolInterface = function() {
-  this.environment.console.log("Pymol-like command interface bound.");
+  //this.environment.console.log("Pymol-like command interface bound.");
   this.pyMol = {};
   this.pyMol.keywords = {
     select: molmil.commandLines.pyMol.selectCommand, 
@@ -42,6 +42,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     repr: molmil.commandLines.pyMol.reprCommand,
     "style-if": molmil.commandLines.pyMol.styleifCommand,
     align: molmil.commandLines.pyMol.alignCommand,
+    reinitialize: molmil.commandLines.pyMol.reinitializeCommand,
     quit: molmil.commandLines.pyMol.quitCommand
   };
   this.altCommandIF = molmil.commandLines.pyMol.tryExecute;
@@ -188,6 +189,13 @@ molmil.commandLines.pyMol.styleifCommand = function(env, command) {
   return true;
 }
 
+
+molmil.commandLines.pyMol.reinitializeCommand = function(env, command) {
+  var canvas = molmil.fetchCanvas();
+  molmil.clear(canvas);
+  return true;
+}
+
 molmil.commandLines.pyMol.alignCommand = function(env, command) {
   command = command.match(/align[\s]+(.*),[\s]*(.*)[\s]*/);
   try {molmil.commandLines.pyMol.align.apply(env, [command[1], command[2]]);}
@@ -195,7 +203,7 @@ molmil.commandLines.pyMol.alignCommand = function(env, command) {
   return true;
 }
 
-molmil.commandLines.pyMol.quitCommand = function(env, command) {
+molmil.quit = molmil.commandLines.pyMol.quitCommand = function(env, command) {
   if (molmil.configBox.customExitFunction) molmil.configBox.customExitFunction();
   else {} // ??
   return true;
@@ -614,7 +622,8 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         continue;
       }
       toUpper_ = false, ss_ = false;
-      operator = NOT ? "!=" : "=="; NOT = false;
+      //operator = NOT ? "!=" : "=="; NOT = false;
+      operator = "==";
       if (word == "name") {key = "this.soupObject.atomRef[a].atomName "+operator+" '%s'"; toUpper_ = true;}
       else if (word == "index") key = "this.soupObject.atomRef[a].AID "+operator+" %s";
       else if (word == "symbol") key = "this.soupObject.atomRef[a].element "+operator+" '%s'";
@@ -658,7 +667,8 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         TEMPLIST.push(atomList);
         new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1");
       }
-      else if (word.toLowerCase() == "not" || word == "!") NOT = true;
+      //else if (word.toLowerCase() == "not" || word == "!") NOT = true;
+      else if (word.toLowerCase() == "not" || word == "!") new_expr.push("!");
       else if (word == "and") new_expr.push("&&");
       else if (word == "or") new_expr.push("||");
       else if (word == "backbone") {
@@ -711,7 +721,8 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     }
     
     else if (expr[i] == "(" || expr[i] == ")") new_expr.push(expr[i]);
-    else if (expr[i] == "!") NOT = true;
+    //else if (expr[i] == "!") NOT = true;
+    else if (expr[i] == "!") new_expr.push("!");
     else word += expr[i];
   }
   return executeExpr.apply(this, [new_expr.join(" ")]);
@@ -834,9 +845,10 @@ molmil.commandLines.pyMol.delete = function(atoms) {
     delete soup.atomRef[atoms[a].AID];
     idx = atoms[a].chain.atoms.indexOf(atoms[a]);
     if (idx != -1) atoms[a].chain.atoms.splice(idx, 1);
+
     if (atoms[a].chain.atoms.length == 0) {
       idx = atoms[a].chain.entry.chains.indexOf(atoms[a].chain);
-      atoms[a].chain.entry.chains.splice(idx, 1);
+      if (idx != -1) atoms[a].chain.entry.chains.splice(idx, 1);
     }
     
   }

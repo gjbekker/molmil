@@ -30,9 +30,9 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
     
           rname = atom.molecule.name;
     
-          rid = (atom.molecule.RSID||"").substr(0,4);
+          rid = molmil.configBox.save_pdb_label ? (atom.molecule.id||"") : (atom.molecule.RSID||"").substr(0,4);
 
-          cname = (atom.chain.authName || atom.chain.name || "").substr(0,2);
+          cname = (atom.chain.authName || atom.chain.name || "").substr(0,1);
 
           x = atom.chain.modelsXYZ[modelId_][atom.xyz].toFixed(3);
           y = atom.chain.modelsXYZ[modelId_][atom.xyz+1].toFixed(3);
