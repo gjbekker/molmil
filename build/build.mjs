@@ -105,3 +105,5 @@ archive.append(fs.createReadStream("../public/molmil.ico"), { name: "molmil.ico"
 archive.append(fs.createReadStream("../public/index.html"), { name: "index.html" });
 archive.append(fs.createReadStream("../public/manual.html"), { name: "manual.html" });
 archive.append(fs.createReadStream("../public/manual.md"), { name: "manual.md" });
+
+archive.finalize();
