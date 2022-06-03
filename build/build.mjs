@@ -78,4 +78,30 @@ async function processFolder(folder) {
   }
 }
 
-processFolder("../");
+await processFolder("../");
+
+const archiver = (await import("archiver")).default;
+
+const output = fs.createWriteStream("../public/molmil-core.zip");
+const archive = archiver("zip", {zlib: { level: 9 }});
+
+archive.on("warning", function(err) {
+  if (err.code === "ENOENT") console.log(err);
+  else throw err;
+});
+
+archive.on("error", function(err) {throw err;});
+
+archive.pipe(output);
+
+archive.directory("../public/plugins/", "plugins");
+archive.directory("../public/shaders/", "shaders");
+archive.directory("../public/lib/", "lib");
+
+archive.append(fs.createReadStream("../public/molmil.js"), { name: "molmil.js" });
+archive.append(fs.createReadStream("../public/molmil.css"), { name: "molmil.css" });
+archive.append(fs.createReadStream("../public/molmil_dep.js"), { name: "molmil_dep.js" });
+archive.append(fs.createReadStream("../public/molmil.ico"), { name: "molmil.ico" });
+archive.append(fs.createReadStream("../public/index.html"), { name: "index.html" });
+archive.append(fs.createReadStream("../public/manual.html"), { name: "manual.html" });
+archive.append(fs.createReadStream("../public/manual.md"), { name: "manual.md" });

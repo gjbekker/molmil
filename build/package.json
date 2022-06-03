@@ -8,11 +8,11 @@
   },
   "main": "",
   "dependencies": {
-    "clean-css": "^5.2.4",
+    "archiver": "^5.3.1",
+    "clean-css": "^5.3.0",
     "html-minifier-terser": "^7.0.0-alpha.1",
-    "terser": "^5.10.0"
+    "terser": "^5.14.0"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "node build.mjs"
