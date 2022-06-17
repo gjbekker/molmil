@@ -1237,7 +1237,6 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
   var newChains = {}, chainRef, rC, m1;
   
   // add some functionality to better deal with weird amino acids (i.e. build some way to detect and show a continuous chain...)
-  
   for (c=0; c<struc.chains.length; c++) this.buildAminoChain(struc.chains[c]);
   
   for (c=0; c<struc.chains.length; c++) {
@@ -1311,7 +1310,12 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
     }
   }
 
-  for (c=0; c<struc.chains.length; c++) this.chains.push(struc.chains[c]);
+  for (c=0; c<struc.chains.length; c++) {
+    this.chains.push(struc.chains[c]);
+    var chain = struc.chains[c];
+    chain.molWeight = 0.0;
+    for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
+  }
   
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   

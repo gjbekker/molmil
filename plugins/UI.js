@@ -2203,6 +2203,10 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   opt.onclick = function() {
     molmil.quickModelColor("sticks-chainc", {do_styling: true}, UI.soup);
   };
+  opt = ul.pushNode("button", "Sticks (CPK), colored by bfactor");
+  opt.onclick = function() {
+    molmil.quickModelColor("sticks-bfactor", {do_styling: true}, UI.soup);
+  };
   
   opt = ul.pushNode("button", "Wireframe (CPK)");
   opt.onclick = function() {

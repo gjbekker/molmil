@@ -1005,8 +1005,8 @@ molmil.commandLines.pyMol.align = function(name1, name2) {
   if (name1 in this.fileObjects) obj1 = this.fileObjects[name1[0]];
   if (name2 in this.fileObjects) obj2 = this.fileObjects[name2[0]];
 
-  if (!obj1) obj1 = this.cli_soup.structures.find(function(x) {return x.meta.id == name1[0]});
-  if (!obj2) obj2 = this.cli_soup.structures.find(function(x) {return x.meta.id == name2[0]});
+  if (!obj1) obj1 = this.cli_soup.structures.find(function(x) {return x.meta.id == name1[0] || x.meta.idnr == name1[0]});
+  if (!obj2) obj2 = this.cli_soup.structures.find(function(x) {return x.meta.id == name2[0] || x.meta.idnr == name2[0]});
 
   if (! obj1) return this.console.log("Unknown object", name1);
   if (! obj2) return this.console.log("Unknown object", name2);

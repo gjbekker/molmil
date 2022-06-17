@@ -1226,6 +1226,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
   var m1, m2, xyz1, xyz2, rC, newChains, struc = chain.entry, dx, dy, dz, r, tmpArray;
   var xyzRef = chain.modelsXYZ[0];
   chain.bonds = [];
+  
   for (m1=0; m1<chain.molecules.length; m1++) {
     rC = 17;
     if (chain.molecules[m1].xna) {
@@ -1288,7 +1289,6 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
         }
       }
     }
-    
     // cyclic check...
     if (chain.molecules[0].N && chain.molecules[m1].C) {
       xyz1 = chain.molecules[0].N.xyz;
@@ -1895,6 +1895,9 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           }
           if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
           else this.buildAminoChain(struc.chains[i]);
+          var chain = struc.chains[i];
+          chain.molWeight = 0.0;
+          for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
         }
       }
   
@@ -6823,7 +6826,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       var atmDM = settings.newweb ? 2 : 3;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        if (settings.newweb && chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic)) chain.displayMode = 1;
+        if (chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic)) chain.displayMode = 1;
         else chain.displayMode = 3;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
@@ -7376,13 +7379,6 @@ molmil.quickModelColor = function(type, options, soup) {
   else if (type == "newweb-au" || type == "newweb-au-sc") {
     
     var c, chain, a;
-    if (type == "newweb-au") {
-      for (c=0; c<soup.chains.length; c++) {
-        chain = soup.chains[c];
-        chain.molWeight = 0.0;
-        for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
-      }
-    }
     molmil.displayEntry(soup.structures, molmil.displayMode_Default, false, soup, {newweb: true});
     if (type == "newweb-au-sc") molmil.displayEntry(soup.structures, molmil.displayMode_Stick_SC, false, soup);
     
@@ -7408,9 +7404,31 @@ molmil.quickModelColor = function(type, options, soup) {
     if (type == "cartoon-chainc-sc") molmil.displayEntry(soup.structures, molmil.displayMode_Stick_SC, false, soup);
     molmil.colorEntry(soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, false, soup);
   }
-  else if (type == "sticks" || type == "sticks-chainc") {
+  else if (type == "sticks" || type == "sticks-chainc" || type == "sticks-bfactor") {
     molmil.displayEntry(soup.structures, molmil.displayMode_Stick, false, soup);
     if (type == "sticks-chainc") molmil.colorEntry(soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, false, soup);
+    else if (type == "sticks-bfactor") {
+      var selection = [];
+      for (var s=0; s<soup.structures.length; s++) {
+        var obj = soup.structures[s];
+        for (c=0; c<obj.chains.length; c++) {
+          chain = obj.chains[c];
+          for (a=0; a<chain.atoms.length; a++) selection.push(chain.atoms[a]);
+        }
+      }
+      var values = []
+      for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
+      if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
+      else var min = Math.min.apply(null, values);
+      if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
+      else var max = Math.max.apply(null, values); 
+      var diffInv = 1./(max-min), tmp;
+      for (var i=0; i<selection.length; i++) {
+        tmp = 1-((values[i]-min)*diffInv); ///TODO
+        selection[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); selection[i].rgba[0] *= 255; selection[i].rgba[1] *= 255; selection[i].rgba[2] *= 255; selection[i].rgba.push(255);
+        if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
+      }
+    }
     else molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
   }
   else if (type == "lines" || type == "lines-chainc") {
