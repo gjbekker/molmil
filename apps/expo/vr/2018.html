@@ -46,8 +46,6 @@
       //return;
 
       var visualize_1ema = function(strucs) {
-        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1ema, [strucs], null, 50);
-
         canvas.commandLine.environment.struc_1ema = molmil.quickSelect("model "+strucs[0].meta.idnr);
 
         canvas.commandLine.eval("show cartoon, struc_1ema and chain A");
@@ -73,12 +71,10 @@
         canvas.commandLine.eval("label struc_1ema and resi 176-187 and name CA, D");
         canvas.commandLine.eval("label struc_1ema and resi 199-207 and name CA, G");
         canvas.commandLine.eval("label struc_1ema and resi 220-227 and name CA, H");*/
-
+        
       };      
       
       var visualize_1mbn = function(strucs) {
-        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1mbn, [strucs], null, 50);
-
         canvas.commandLine.environment.struc_1mbn = molmil.quickSelect("model "+strucs[0].meta.idnr);
         canvas.commandLine.eval("show cartoon, struc_1mbn and chain A");
         canvas.commandLine.eval("cartoon_color group, struc_1mbn and chain A");
@@ -88,8 +84,6 @@
         canvas.commandLine.eval("color tan, struc_1mbn and symbol C and resn HEM");
       };
       var visualize_dna = function(strucs) {
-        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_dna, [strucs], null, 50);
-
         canvas.commandLine.environment.struc_dna = molmil.quickSelect("model "+strucs[0].meta.idnr);
         canvas.commandLine.eval("show sticks, struc_dna");
         canvas.commandLine.eval("color khaki, struc_dna and symbol C and resn DC");
@@ -98,8 +92,6 @@
         canvas.commandLine.eval("color mediumseagreen, struc_dna and symbol C and resn DT");
       };
       var visualize_1tph = function(strucs) {
-        if (! canvas.commandLine || ! molmil.quickSelect) return molmil_dep.asyncStart(visualize_1tph, [strucs], null, 50);
-        
         canvas.commandLine.environment.struc_1tph = molmil.quickSelect("model "+strucs[0].meta.idnr);
         canvas.commandLine.eval("show cartoon, struc_1tph and chain A");
         canvas.commandLine.eval("delete struc_1tph and chain B");
@@ -115,7 +107,7 @@
 
       list.push(["structures/3j3q.mpbf", [498.1543841381684, 609.675326993088, 470.2615158019828], 593.63]);
       list.push(["1ema", [25.630047272727257, 27.931607272727298, 39.48978545454547], 27, visualize_1ema]);
-      list.push(["structures/1bbt.mpbf", [0, 0, 0], 161.08]);
+      list.push(["../../agora/vr/structures/1bbt.mpbf", [0, 0, 0], 161.08]);
       list.push(["structures/5ire.mpbf", [0.07820328432419131, 0.1991919628225624, 0.3876471288888365], 258.48]);
       list.push(["1mbn", [14.077157360406089, 22.322335025380728, 7.487817258883243], 21.01, visualize_1mbn]);
       list.push(["dna", [0.051772277227722416, -0.01682178217821778, 15.21], 19.76, visualize_dna]);
@@ -145,6 +137,9 @@
   
   <script type="text/javascript" src="../../agora/vr/script.js" charset="utf-8"></script>
   <script type="text/javascript" src="../../../molmil.js"></script>
+  
+  <link rel="preload" href="../../../plugins/pymol-script.js" as="script">
+  <link rel="preload" href="../../../plugins/UI.js" as="script">
   
 </head>
 <body onload="initViewer()">
