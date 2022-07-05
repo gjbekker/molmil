@@ -9026,7 +9026,7 @@ molmil.addLabel = function(text, settings, soup) {
     }
     
     
-    textCtx.canvas.width = w; textCtx.canvas.height = h;
+    textCtx.canvas.width = w; textCtx.canvas.height = h*1.2;
     textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
     textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
     
@@ -9041,7 +9041,7 @@ molmil.addLabel = function(text, settings, soup) {
     
     if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
     else textCtx.strokeStyle = "#000000";
-    textCtx.lineWidth = Math.ceil(settings.fontSize / 30);
+    textCtx.lineWidth = Math.max(Math.round(settings.fontSize / 30), 1);
 
     if (settings.textAlign == "left") {
       for (var i=0; i<tmp.length; i++) {
@@ -10059,8 +10059,8 @@ molmil.initVR = function(soup, callback) {
         BUFFER_SCALE: 1.0, // Default: 0.5.
       }
       var polyfill = new WebVRPolyfill(config);
-      navigator.getVRDisplays().then(function(displays) {molmil.vrDisplays = displays; molmil.VRstatus = true; 
-      molmil.initVR(soup, callback);
+      navigator.getVRDisplays().then(function(displays) {
+        if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup, callback);}
     });};
     var head = document.getElementsByTagName("head")[0];
     head.appendChild(dep);

@@ -2198,6 +2198,7 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
   keep_chains = new Set(keep_chains);
   for (c=0; c<struct.chains.length; c++) { // add some functionality to check whether no changes to the AU were made, and if not --> don't update this stuff...
     if (! keep_chains.has(struct.chains[c].name)) {
+      for (a=0; a<struct.chains[c].atoms.length; a++) delete soup.atomRef[struct.chains[c].atoms[a].AID];
       struct.chains.splice(c, 1); c--;
     }
   }

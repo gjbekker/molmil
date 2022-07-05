@@ -632,6 +632,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "resid") key = "this.soupObject.atomRef[a].molecule.id "+operator+" %s";
       else if (word == "ss") {key = "this.soupObject.atomRef[a].molecule.sndStruc "+operator+" %s"; ss_ = true;}
       else if (word == "entity") key = "this.soupObject.atomRef[a].molecule.chain.entity_id "+operator+" %s";
+      else if (word == "chain-auth") key = "this.soupObject.atomRef[a].molecule.chain.authName "+operator+" '%s'";
       else if (word == "chain") {
         if (this.cif_use_auth) key = "this.soupObject.atomRef[a].molecule.chain.authName "+operator+" '%s'";
         else key = "this.soupObject.atomRef[a].molecule.chain.name "+operator+" '%s'";

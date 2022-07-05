@@ -127,8 +127,13 @@ function doRender() {
     canvas.molmilViewer.renderer.QLV = 1;
     canvas.molmilViewer.renderer.initBuffers();
     canvas.molmilViewer.renderer.canvas.update = true;
-    if (molmil.VRstatus) document.getElementsByClassName("startbutton")[0].style.display = "block";
+    blaat();
   }
+}
+
+function blaat() {
+  if (! molmil.VRstatus) return molmil.initVR(null, function() {blaat();});
+  if (molmil.VRstatus) document.getElementsByClassName("startbutton")[0].style.display = "block";
 }
 
 function loadEntry(pdbid, pos, text, r, nodebug, visualization, BUINFO) {
@@ -137,10 +142,11 @@ function loadEntry(pdbid, pos, text, r, nodebug, visualization, BUINFO) {
   if (! nodebug) molmil.configBox.skipClearGeometryBuffer = true;
   if (pdbid.indexOf(".mpbf") != -1) agoraMPBF(pdbid, pos, function(soup, struc) {
     var avg = [0, 0, 0, 0], Rg = 0.0, dx, dy, dz;
-    for (var i=0; i<struc.data.vertexBuffer.length; i+=7) {
-      avg[0] += struc.data.vertexBuffer[i];
-      avg[1] += struc.data.vertexBuffer[i+1];
-      avg[2] += struc.data.vertexBuffer[i+2];
+    var data = struc.structures[0].data;
+    for (var i=0; i<data.vertexBuffer.length; i+=7) {
+      avg[0] += data.vertexBuffer[i];
+      avg[1] += data.vertexBuffer[i+1];
+      avg[2] += data.vertexBuffer[i+2];
       avg[3] += 1;
     }
     avg[0] /= avg[3];
@@ -150,16 +156,16 @@ function loadEntry(pdbid, pos, text, r, nodebug, visualization, BUINFO) {
     var xMin = 1e99, xMax = -1e99, yMin = 1e99, yMax = -1e99, zMin = 1e99, zMax = -1e99;
   
     var tmp, n_tmp;
-    for (var i=0; i<struc.data.vertexBuffer.length; i+=7) {
-      tmp = struc.data.vertexBuffer[i]-avg[0];
+    for (var i=0; i<data.vertexBuffer.length; i+=7) {
+      tmp = data.vertexBuffer[i]-avg[0];
       if (tmp < xMin) xMin = tmp;
       if (tmp > xMax) xMax = tmp;
     
-      tmp = struc.data.vertexBuffer[i+1]-avg[1]; 
+      tmp = data.vertexBuffer[i+1]-avg[1]; 
       if (tmp < yMin) yMin = tmp;
       if (tmp > yMax) yMax = tmp;
     
-      tmp = struc.data.vertexBuffer[i+2]-avg[2];
+      tmp = data.vertexBuffer[i+2]-avg[2];
       if (tmp < zMin) zMin = tmp;
       if (tmp > zMax) zMax = tmp;
     }
@@ -234,7 +240,7 @@ function loadEntry(pdbid, pos, text, r, nodebug, visualization, BUINFO) {
 
     if (filename2name.hasOwnProperty(text)) text = filename2name[text];
     molmil.addLabel(text, {text: text, xyz: info[0], dy: info[1]+2, fontSize: label_fontSize}, soup);
-        
+    
     doRender();
   });
 }
