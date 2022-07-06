@@ -358,7 +358,7 @@ molmil.UI.prototype.showResidues=function(target, payload) {
 
 molmil.UI.prototype.showLM=function(icon) {
   var UI = this;
-  if (molmil.VRstatus === undefined) return molmil.initVR(null, function() {UI.showLM(icon);});
+  if (molmil.VRstatus === void 0) return molmil.initVR(null, function() {UI.showLM(icon);});
   
   try {
     if (icon.parentNode.childNodes.length > 1) {
