@@ -10047,7 +10047,7 @@ if (! window.molmil_dep) {
   head.appendChild(dep);
 }
 
-molmil.VRstatus = false;
+molmil.VRstatus = undefined;
 molmil.initVR = function(soup, callback) {
   var initFakeVR = function() {
     var dep = document.createElement("script")
@@ -10061,6 +10061,7 @@ molmil.initVR = function(soup, callback) {
       var polyfill = new WebVRPolyfill(config);
       navigator.getVRDisplays().then(function(displays) {
         if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup, callback);}
+        else {molmil.VRstatus = false; callback();}
     });};
     var head = document.getElementsByTagName("head")[0];
     head.appendChild(dep);
