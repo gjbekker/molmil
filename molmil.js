@@ -10047,7 +10047,6 @@ if (! window.molmil_dep) {
   head.appendChild(dep);
 }
 
-molmil.VRstatus = undefined;
 molmil.initVR = function(soup, callback) {
   var initFakeVR = function() {
     var dep = document.createElement("script")
