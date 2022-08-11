@@ -120,106 +120,6 @@ molmil.taubinSmoothing = molmil.taubinSmoothing || function(vertices, faces, lam
   return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", this.taubinSmoothing, this, [vertices, faces, lambda, mu, iter]); 
 }
 
-
-molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
-  settings = settings || {};
-  if (! settings.hasOwnProperty("solid")) settings.solid = true;
-  data = data.split("\n");
-  var info, i, line, ep, hp, r, g, b, triangles_list = [], hihi = [0, 0, 0, 0];
-  info = data[0].split(/\s/);
-  info.unshift(1);
-      
-  for (i=1; i<info.length; i++) info[i] = parseInt(info[i])+info[i-1];
-  
-  var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
-      
-  // load efvet data and convert into vertex & index arrays
-  var vertices = new Float32Array((info[1]-info[0])*7);
-  var vertices8 = new Uint8Array(vertices.buffer);
-  var indices = new Int32Array((info[3]-info[2])*3);
-  var offset = 0, offset8 = 0;
-      
-  for (i=info[0]; i<info[1]; i++, offset+=7, offset8+=28) {
-    line = data[i];
-         
-    ep = (Math.min(Math.max((parseFloat(line.substring(62, 73))+.1)/(.2), 0), 1)*2)-1;
-    hp = (parseFloat(line.substring(73, 84))+4.5)/9;
-          
-    r = g = b = 1;
-          
-    if (ep < 0) {
-      g = 1+ep+(hp*.5);
-      b = 1+ep;
-    }
-    else {
-      r = 1-ep;
-      g = 1-ep+(hp);
-      b = 1-hp;
-    }
-         
-    r = Math.min(Math.max(r, 0), 1);
-    g = Math.min(Math.max(g, 0), 1);
-    b = Math.min(Math.max(b, 0), 1);
-        
-    vertices[offset+0] = parseFloat(line.substring(0, 12));
-    vertices[offset+1] = parseFloat(line.substring(12, 25)); 
-    vertices[offset+2] = parseFloat(line.substring(25, 38)); 
-    vertices[offset+3] = parseFloat(line.substring(38, 46)); 
-    vertices[offset+4] = parseFloat(line.substring(46, 54)); 
-    vertices[offset+5] = parseFloat(line.substring(54, 62));
-    
-    
-    hihi[0] += vertices[offset+0];
-    hihi[1] += vertices[offset+1];
-    hihi[2] += vertices[offset+2];
-    hihi[3] += 1;
-    
-    
-    if (vertices[offset+0] < geomRanges[0]) geomRanges[0] = vertices[offset+0];
-    if (vertices[offset+0] > geomRanges[1]) geomRanges[1] = vertices[offset+0];
-      
-    if (vertices[offset+1] < geomRanges[2]) geomRanges[2] = vertices[offset+1];
-    if (vertices[offset+1] > geomRanges[3]) geomRanges[3] = vertices[offset+1];
-     
-    if (vertices[offset+2] < geomRanges[4]) geomRanges[4] = vertices[offset+2];
-    if (vertices[offset+2] > geomRanges[5]) geomRanges[5] = vertices[offset+2];
-    
-        
-    vertices8[offset8+24] = r*255;
-    vertices8[offset8+25] = g*255;
-    vertices8[offset8+26] = b*255;
-    vertices8[offset8+27] = 255;
-  }
-  
-  offset = 0;
-
-  for (i=info[2]; i<info[3]; i++, offset+=3) {
-    line = data[i].match(/\S+/g);
-    indices[offset+0] = parseInt(line[3])-1
-    indices[offset+1] = parseInt(line[4])-1;
-    indices[offset+2] = parseInt(line[5])-1;
-  }
-  
-  var struct = new molmil.polygonObject({filename: filename, COR: hihi}); this.canvas.molmilViewer.structures.push(struct);
-  struct.options = [];
-  struct.meta.geomRanges = geomRanges;
-  
-  var program = molmil.geometry.build_simple_render_program(vertices, indices, this.canvas.renderer, settings);
-  this.canvas.renderer.addProgram(program);
-  struct.programs.push(program);
-  
-  this.calculateCOG();
-  
-  this.canvas.renderer.initBuffers();
-  this.canvas.update = true;
-          
-  molmil.safeStartViewer(this.canvas);
-  
-  return struct;
-  
-}
-
-
 molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   if (! settings) settings = {solid: true};
   var rgba = [255, 255, 255, 255];
@@ -1124,7 +1024,8 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       }
       
       if (data[i].length >= 76) element = data[i].substr(76).trim().split(" ")[0];
-      else {
+      else element = undefined;
+      if (! element) {
         if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
           for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
           if (atomName.length > 1 && ! molmil_dep.isNumber(atomName[1]) && atomName[1] == atomName[1].toLowerCase()) element = atomName.substring(offset, offset+2);

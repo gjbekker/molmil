@@ -495,6 +495,8 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
   var canvas = molmil.fetchCanvas();
   var mjs_fileBin = canvas.mjs_fileBin || {};
   
+  if (cmd[1].startsWith('`') && cmd[1].endsWith('`')) cmd[1] = new Function("return "+cmd[1]+";")();
+  
   if (mjs_fileBin.hasOwnProperty(cmd[1])) {
     // load it manually...
     var fakeObj = mjs_fileBin[cmd[1]], ok = false;

@@ -1004,11 +1004,6 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
       return this.target.load_wrl(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename, settings);
     };
   }
-  else if ((format+"").toLowerCase() == "efvet") {
-    request.parse = function() {
-      return this.target.load_efvet(this.gz ? pako.inflate(new Uint8Array(this.request.response), {to: "string"}) : this.request.responseText, this.filename, settings);
-    };
-  }
   else if ((format+"").toLowerCase() == "stl") {
     request.ASYNC = true; request.responseType = "arraybuffer";
     request.parse = function() {
@@ -1179,7 +1174,6 @@ molmil.viewer.prototype.loadStructureData = function(data, format, filename, ond
     if (! window.vrmlParser) return molmil.loadPlugin(molmil.settings.src+"lib/vrml.min.js", this.loadStructureData, this, [data, format, filename, ondone, settings], true);
     structures = this.load_wrl(data, filename, settings);
   }
-  else if ((format+"").toLowerCase() == "efvet") structures = this.load_efvet(data, filename, settings);
   else if ((format+"").toLowerCase() == "psygene-traj" || (format+"").toLowerCase() == "presto-traj") structures = this.loadMyPrestoTrj(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
   else if ((format+"").toLowerCase() == "presto-mnt") structures = this.loadMyPrestoMnt(data, molmil_dep.getKeyFromObject(settings || {}, "fxcell", null));
   else if ((format+"").toLowerCase() == "gromacs-trr") structures = this.loadGromacsTRR(data);
@@ -1490,10 +1484,6 @@ molmil.viewer.prototype.getMolObject4ChainAlt = function(chain, RSID) {
 
 molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   return molmil.loadPlugin(molmil.settings.src+"plugins/loaders.js", this.load_obj, this, [data, filename, settings]);
-};
-
-molmil.viewer.prototype.load_efvet = function(data, filename, settings) {
-  return molmil.loadPlugin(molmil.settings.src+"plugins/loaders.js", this.load_efvet, this, [data, filename, settings]);
 };
 
 molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
@@ -6826,7 +6816,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       var atmDM = settings.newweb ? 2 : 3;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        if (chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic)) chain.displayMode = 1;
+        if (chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic) || chain.molecules.length < 4) chain.displayMode = 1;
         else chain.displayMode = 3;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
@@ -6838,7 +6828,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
               else mol.atoms[a].displayMode = atmDM;
             }
           }
-          else if (! mol.SNFG && (mol.ligand || chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic))) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
+          else if (! mol.SNFG && (chain.displayMode == 1)) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
           else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
           mol.displayMode = 3;
           mol.showSC = mol.weirdAA;
@@ -9345,7 +9335,6 @@ molmil.formatList[".obj"] = "obj";
 molmil.formatList[".wrl"] = "wrl";
 molmil.formatList[".stl"] = "stl";
 molmil.formatList[".ply"] = "ply";
-molmil.formatList[".efvet"] = "efvet";
 molmil.formatList[".mjs"] = "mjs";
 
 molmil.guess_format = function(name) {

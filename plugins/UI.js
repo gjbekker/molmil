@@ -1470,20 +1470,6 @@ molmil.bindCanvasInputs = function(canvas) {
       return true;
     }
   });
-  
-  // efvet
-  canvas.inputFunctions.push(function(canvas, fr) {
-    if (fr.filename.endsWith(".efvet")) {
-      fr.onload = function(e) {
-        canvas.molmilViewer.loadStructureData(e.target.result, "efvet", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
-      }
-      canvas.molmilViewer.downloadInProgress = true;
-      fr.readAsText(fr.fileHandle);
-      return true;
-    }
-  });
-  
 };
 
 
