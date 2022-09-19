@@ -901,12 +901,12 @@ molmil.UI.prototype.openID=function(dbid) {
     this.canvas.molmilViewer.loadStructure(this.url.replace("__ID__", popup.inp.value), 1, function(soup, struc) {
       molmil.displayEntry(struc, soup.AID > 1e5 ? 5 : 1);
       molmil.colorEntry(struc, 1, [], true, soup);
+      if (dbid == 1) UI.styleif("structure");
       UI.resetRM();
     });
     popup.cancel.onclick();
   };
   popup.inp.cancel = popup.cancel = popup.pushNode("button", "Cancel");
-  var UI = this;
   popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup); if (UI.onLMhide) UI.onLMhide();};
   popup.cancel.popup = popup;
   
@@ -2157,50 +2157,61 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   opt = ul.pushNode("button", "Group cartoon");
   opt.onclick = function() {
     molmil.quickModelColor("newweb-au", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Group cartoon with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("newweb-au-sc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   
   opt = ul.pushNode("button", "Cartoon");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Cartoon with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-sc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   
   opt = ul.pushNode("button", "Cartoon, colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-chainc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Cartoon, color by chain with sidechains");
   opt.onclick = function() {
     molmil.quickModelColor("cartoon-chainc-sc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   
   opt = ul.pushNode("button", "Sticks (CPK)");
   opt.onclick = function() {
     molmil.quickModelColor("sticks", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Sticks (CPK), colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("sticks-chainc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Sticks (CPK), colored by bfactor");
   opt.onclick = function() {
     molmil.quickModelColor("sticks-bfactor", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   
   opt = ul.pushNode("button", "Wireframe (CPK)");
   opt.onclick = function() {
     molmil.quickModelColor("lines", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   opt = ul.pushNode("button", "Wireframe (CPK), colored by chain");
   opt.onclick = function() {
     molmil.quickModelColor("lines-chainc", {do_styling: true}, UI.soup);
+    molmil.checkRebuild();
   };
   
   contentBox.pushNode("br");

@@ -1739,6 +1739,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       this.atomRef[atom.AID] = atom;
     }
     
+    struc.meta.pdbid = entryId.toLowerCase();
     if (pdb.meta_pdbjplus) {
       currentChain.name = pdb.meta_pdbjplus.auth_asym_id;
       currentChain.authName = pdb.meta_pdbjplus.label_asym_id;
@@ -5163,10 +5164,10 @@ molmil.prepare2DRepr = function (chain, mdl) {
     
     if (currentBlock.molecules[0].xna) currentBlock.sndStruc = molmil.displayMode_XNA;
     currentBlock.isFirst = currentBlock.molecules[0].previous == null ||
-                           currentBlock.molecules[0].previous.name == "ACE" ||
+                           //currentBlock.molecules[0].previous.name == "ACE" ||
                            ! currentBlock.molecules[0].previous.CA || b == 0;
     currentBlock.isLast = currentBlock.molecules[currentBlock.molecules.length-1].next == null || 
-                          currentBlock.molecules[currentBlock.molecules.length-1].next.name == "NME" ||
+                          //currentBlock.molecules[currentBlock.molecules.length-1].next.name == "NME" ||
                           ! currentBlock.molecules[currentBlock.molecules.length-1].next.CA || b == twoDcache.length-1; 
     if (currentBlock.sndStruc == 3) { // helix or turn...
       if (currentBlock.molecules.length > 2 && chain.displayMode == 4) {
@@ -7432,12 +7433,7 @@ molmil.quickModelColor = function(type, options, soup) {
     molmil.colorEntry(soup.structures, molmil.colorEntry_Custom+0.5, {rgba:[255, 255, 255, 255], carbonOnly: true}, false, soup);
   }
   
-  if (molmil.cli_soup) molmil.cli_soup.renderer.rebuildRequired = true;
-  else {
-    soup.renderer.initBuffers();
-    soup.renderer.canvas.update = true;  
-  }
-  
+  molmil.cli_soup.renderer.rebuildRequired = true;
 };
 
 // ** change color mode of a system/chain/molecule/atom **
@@ -7526,6 +7522,7 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
       }
     }
     else if (cm == molmil.colorEntry_ChainAlt) {
+      if (! molmil_dep.isObject(setting)) setting = {};
       list = molmil.configBox.bu_colors;
       var j = 0;
       for (c=0; c<obj.chains.length; c++) {
