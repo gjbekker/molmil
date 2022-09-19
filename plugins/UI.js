@@ -899,9 +899,9 @@ molmil.UI.prototype.openID=function(dbid) {
   popup.load.onclick = function() {
     if (! popup.inp.value) return;
     this.canvas.molmilViewer.loadStructure(this.url.replace("__ID__", popup.inp.value), 1, function(soup, struc) {
-      molmil.displayEntry(struc, soup.AID > 1e5 ? 5 : 1);
-      molmil.colorEntry(struc, 1, [], true, soup);
-      if (dbid == 1) UI.styleif("structure");
+      molmil.commandLines.pyMol.repr("au", "");
+      UI.styleif("structure");
+      molmil.checkRebuild();
       UI.resetRM();
     });
     popup.cancel.onclick();

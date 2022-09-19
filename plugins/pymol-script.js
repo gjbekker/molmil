@@ -960,7 +960,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
   options.split(",").map(function(x) {return x.split("=").map(function(y) {return y.trim();})}).filter(function(x){return x[0];}).forEach(function (x) {optionsObj[x[0]] = x[1];});
   // some kind of options parser...
 
-  var soup = this.cli_soup;
+  var soup = this.cli_soup || molmil.cli_soup;
   
   if (mode == "au") {
     molmil.orient(null, soup);
