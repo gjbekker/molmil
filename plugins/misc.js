@@ -1596,7 +1596,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         
       }
       else if (displayMode == 5) { // lowres surface...
-        var surf;
+        var surf, c2;
         for (c=0; c<struct.chains.length; c++) {
           if (struct.chains[c].molecules.length < 1 || struct.chains[c].isHet || struct.chains[c].molecules[0].water) continue;
           if (struct.chains[c].name != asym_ids[i]) continue;
@@ -1612,23 +1612,23 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
           A[0] = A[1] = A[2] = 1e99; // xyzMin
           B[0] = B[1] = B[2] = -1e99; // xyzMax
           
-          for (c=0, m=0, m8=0; c<surf.vertices.length; c++, m8 += 32) {
-            vertices[m++] = surf.vertices[c][0];
-            vertices[m++] = surf.vertices[c][1];
-            vertices[m++] = surf.vertices[c][2];
+          for (c2=0, m=0, m8=0; c2<surf.vertices.length; c2++, m8 += 32) {
+            vertices[m++] = surf.vertices[c2][0];
+            vertices[m++] = surf.vertices[c2][1];
+            vertices[m++] = surf.vertices[c2][2];
             
-            COM[0] += surf.vertices[c][0]; COM[1] += surf.vertices[c][1]; COM[2] += surf.vertices[c][2]; COM[3] += 1;
+            COM[0] += surf.vertices[c2][0]; COM[1] += surf.vertices[c2][1]; COM[2] += surf.vertices[c2][2]; COM[3] += 1;
             
-            if (surf.vertices[c][0] < A[0]) A[0] = surf.vertices[c][0];
-            if (surf.vertices[c][1] < A[1]) A[1] = surf.vertices[c][1];
-            if (surf.vertices[c][2] < A[2]) A[2] = surf.vertices[c][2];
-            if (surf.vertices[c][0] > B[0]) B[0] = surf.vertices[c][0];
-            if (surf.vertices[c][1] > B[1]) B[1] = surf.vertices[c][1];
-            if (surf.vertices[c][2] > B[2]) B[2] = surf.vertices[c][2];
+            if (surf.vertices[c2][0] < A[0]) A[0] = surf.vertices[c2][0];
+            if (surf.vertices[c2][1] < A[1]) A[1] = surf.vertices[c2][1];
+            if (surf.vertices[c2][2] < A[2]) A[2] = surf.vertices[c2][2];
+            if (surf.vertices[c2][0] > B[0]) B[0] = surf.vertices[c2][0];
+            if (surf.vertices[c2][1] > B[1]) B[1] = surf.vertices[c2][1];
+            if (surf.vertices[c2][2] > B[2]) B[2] = surf.vertices[c2][2];
             
-            vertices[m++] = surf.normals[c][0];
-            vertices[m++] = surf.normals[c][1];
-            vertices[m++] = surf.normals[c][2];
+            vertices[m++] = surf.normals[c2][0];
+            vertices[m++] = surf.normals[c2][1];
+            vertices[m++] = surf.normals[c2][2];
             
             m++; // color
             m++; // AID
@@ -1636,7 +1636,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
           
           COM[0] /= COM[3]; COM[1] /= COM[3]; COM[2] /= COM[3];
           
-          for (c=0, m=0; c<surf.faces.length; c++) {indices[m++] = surf.faces[c][0]; indices[m++] = surf.faces[c][1]; indices[m++] = surf.faces[c][2];}
+          for (c2=0, m=0; c2<surf.faces.length; c2++) {indices[m++] = surf.faces[c2][0]; indices[m++] = surf.faces[c2][1]; indices[m++] = surf.faces[c2][2];}
           
           vbuffer = gl.createBuffer();
           gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
