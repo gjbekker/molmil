@@ -6793,9 +6793,10 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
   if (soup && ((soup.SCstuff && dm%1 == 0) || (! soup.SCstuff && dm%1 != 0))) molmil.geometry.reInitChains = true;
 
   var m, a, c, chain, mol, backboneAtoms = molmil.configBox.backboneAtoms4Display;
-  
+
   //xna
   if (obj instanceof molmil.entryObject) {
+    
     if (dm == molmil.displayMode_None) { // new none function...
       obj.display = false;
     }
@@ -6831,8 +6832,20 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
           }
           else if (! mol.SNFG && (chain.displayMode == 1)) {for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = atmDM;}
           else for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
+          
+          if (mol.SNFG) {
+            mol.showSC = false;
+            mol.chain.displayMode = 3;
+            if (mol.res_con) {
+              mol.res_con.showSC = true;
+              for (var a=0; a<mol.res_con.selection.length; a++) {
+                if (! backboneAtoms.hasOwnProperty(mol.res_con.selection[a].atomName)) mol.res_con.selection[a].displayMode = 0;
+              }
+            }
+          }
+          else mol.showSC = mol.weirdAA;
+          
           mol.displayMode = 3;
-          mol.showSC = mol.weirdAA;
         }
       }
       
@@ -7432,8 +7445,8 @@ molmil.quickModelColor = function(type, options, soup) {
     molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
     molmil.colorEntry(soup.structures, molmil.colorEntry_Custom+0.5, {rgba:[255, 255, 255, 255], carbonOnly: true}, false, soup);
   }
-  
-  molmil.cli_soup.renderer.rebuildRequired = true;
+
+  soup.renderer.rebuildRequired = true;
 };
 
 // ** change color mode of a system/chain/molecule/atom **
@@ -9110,6 +9123,7 @@ molmil.addLabel = function(text, settings, soup) {
           console.log(settings.atomSelection[nearest[1]]);
         }
       }
+      if (molmil.defaultSettings_label.alwaysFront) size = 0;
       settings.xyz = pos;
       if (settings.hasOwnProperty("_dx")) settings.dx = settings._dx + size;
       else if (settings.hasOwnProperty("_dy"))  settings.dy = settings._dy + size;
