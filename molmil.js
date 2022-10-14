@@ -6838,7 +6838,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
             mol.chain.displayMode = 3;
             if (mol.res_con) {
               mol.res_con.showSC = true;
-              for (var a=0; a<mol.res_con.selection.length; a++) {
+              for (var a=0; a<(mol.res_con.selection || []).length; a++) {
                 if (! backboneAtoms.hasOwnProperty(mol.res_con.selection[a].atomName)) mol.res_con.selection[a].displayMode = 0;
               }
             }

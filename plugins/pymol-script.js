@@ -1831,7 +1831,7 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
       }
       for (var i in resshow) {
         resshow[i].showSC = true;
-        for (var a=0; a<resshow[i].selection.length; a++) {
+        for (var a=0; a<(resshow[i].selection)||[].length; a++) {
           if (! backboneAtoms.hasOwnProperty(resshow[i].selection[a].atomName)) resshow[i].selection[a].displayMode = 0;
         }
       }
