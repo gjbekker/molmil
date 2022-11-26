@@ -36,7 +36,7 @@ molmil.settings_default = {
  
  
   /* change the implementation to force usage of molmil-app */
-  molmil_video_url: "http://127.0.0.1:8080/app/",
+  molmil_video_url: undefined,
   dependencies: ["lib/gl-matrix-min.js"],
 };
 
@@ -54,6 +54,7 @@ molmil.configBox = {
   cullFace: true,
   loadModelsSeparately: false,
   wheelZoomRequiresCtrl: false,
+  recordingMode: false,
   
   // Co, Mo, D, Ru, W, Q, YB, gd, ir, os, Y, sm, pr, tb, re, eu, ta, rh, lu, ho
   
@@ -536,6 +537,8 @@ molmil.entryObject = function (meta) { // this should become a structure object 
   this.meta = meta || {};
   this.display = true;
   this.programs = [];
+  this.BUmatrices = {};
+  this.BUassemblies = {};
 };
 
 molmil.simpleEntry = function() {
@@ -636,8 +639,6 @@ molmil.viewer.prototype.clear = function() {
   this.infoBag = {};
 
   this.bumats = [];
-  this.BUmatrices = {};
-  this.BUassemblies = {};
   this.poly_asym_ids = [];
   this.BUcache = {};
   this.BUmode = false;
@@ -1981,10 +1982,10 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         if ( mat[ 0] == 1 && mat[ 1] == 0 && mat[ 2] == 0 && mat[ 3] == 0 && 
              mat[ 4] == 0 && mat[ 5] == 1 && mat[ 6] == 0 && mat[ 7] == 0 &&
              mat[ 8] == 0 && mat[ 9] == 0 && mat[10] == 1 && mat[11] == 0 && 
-             mat[12] == 0 && mat[13] == 0 && mat[14] == 0 && mat[15] == 1    ) this.BUmatrices[pdbx_struct_oper_list.id[i]] = ["identity operation", mat];
-        else this.BUmatrices[pdbx_struct_oper_list.id[i]] = [pdbx_struct_oper_list.type[i], mat];
+             mat[12] == 0 && mat[13] == 0 && mat[14] == 0 && mat[15] == 1    ) struc.BUmatrices[pdbx_struct_oper_list.id[i]] = ["identity operation", mat];
+        else struc.BUmatrices[pdbx_struct_oper_list.id[i]] = [pdbx_struct_oper_list.type[i], mat];
       
-        //this.BUmatrices[pdbx_struct_oper_list.id[i]] = [pdbx_struct_oper_list.type[i], mat];
+        //struc.BUmatrices[pdbx_struct_oper_list.id[i]] = [pdbx_struct_oper_list.type[i], mat];
       }
       
       this.AisB = (! pdbx_struct_oper_list || ! pdb.pdbx_struct_assembly || (pdbx_struct_oper_list.id.length == 1 && pdb.pdbx_struct_assembly.id == 1));
@@ -2009,9 +2010,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       //sum (number of residues in each pdbx_struct_assembly_gen.asym_id_list)
       // A*B
 
-
       for (i=0; i<length; i++) {
-        if (! this.BUassemblies.hasOwnProperty(pdbx_struct_assembly_gen.assembly_id[i])) this.BUassemblies[pdbx_struct_assembly_gen.assembly_id[i]] = [];
+        if (! struc.BUassemblies.hasOwnProperty(pdbx_struct_assembly_gen.assembly_id[i])) struc.BUassemblies[pdbx_struct_assembly_gen.assembly_id[i]] = [];
         mats = [];
         if (pdbx_struct_assembly_gen.oper_expression[i].indexOf(")(") != -1) {
           tmp1 = pdbx_struct_assembly_gen.oper_expression[i].split(")(");
@@ -2021,13 +2021,13 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           for (j=0; j<tmp1[0].length; j++) {
             for (k=0; k<tmp1[1].length; k++) {
               poly = tmp1[0][j]+"-"+tmp1[1][k];
-              if (! this.BUmatrices.hasOwnProperty(poly)) {
-                mat4.multiply(tmp3, this.BUmatrices[tmp1[0][j]][1], this.BUmatrices[tmp1[1][k]][1]);
+              if (! struc.BUmatrices.hasOwnProperty(poly)) {
+                mat4.multiply(tmp3, struc.BUmatrices[tmp1[0][j]][1], struc.BUmatrices[tmp1[1][k]][1]);
                 if ( tmp3[ 0] == 1 && tmp3[ 1] == 0 && tmp3[ 2] == 0 && tmp3[ 3] == 0 && 
                      tmp3[ 4] == 0 && tmp3[ 5] == 1 && tmp3[ 6] == 0 && tmp3[ 7] == 0 &&
                      tmp3[ 8] == 0 && tmp3[ 9] == 0 && tmp3[10] == 1 && tmp3[11] == 0 && 
-                     tmp3[12] == 0 && tmp3[13] == 0 && tmp3[14] == 0 && tmp3[15] == 1    ) this.BUmatrices[poly] = ["identity operation", tmp3];
-                else this.BUmatrices[poly] = ["combined", mat4.clone(tmp3)];
+                     tmp3[12] == 0 && tmp3[13] == 0 && tmp3[14] == 0 && tmp3[15] == 1    ) struc.BUmatrices[poly] = ["identity operation", tmp3];
+                else struc.BUmatrices[poly] = ["combined", mat4.clone(tmp3)];
               }
               mats.push(poly);
             }
@@ -2036,7 +2036,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         else {
           mats = xpnd(pdbx_struct_assembly_gen.oper_expression[i]);
         }
-        this.BUassemblies[pdbx_struct_assembly_gen.assembly_id[i]].push([mats, pdbx_struct_assembly_gen.asym_id_list[i].split(",")]);
+        struc.BUassemblies[pdbx_struct_assembly_gen.assembly_id[i]].push([mats, pdbx_struct_assembly_gen.asym_id_list[i].split(",")]);
       }
     }
     
@@ -6544,6 +6544,7 @@ molmil.glCamera.prototype.positionCamera = function() {
 // ** mouse/touch interface helper fucntions **
 
 molmil.handle_molmilViewer_mouseDown = function (event) {
+  if (molmil.settings.recordingMode) return;
   molmil.activeCanvas = this;
   molmil.mouseDown = 1;
   molmil.mouseDownS[event.which] = 1;
@@ -6582,6 +6583,7 @@ molmil.getOffset = function (evt) {
 }
 
 molmil.handle_molmilViewer_mouseUp = function (event) {
+  if (molmil.settings.recordingMode) return;
   var activeCanvas = molmil.activeCanvas;
   if (! molmil.mouseMoved && activeCanvas) {
     if (event.srcElement != activeCanvas) return;
@@ -6616,6 +6618,7 @@ molmil.handle_molmilViewer_mouseUp = function (event) {
 }
 
 molmil.handle_molmilViewer_mouseMove = function (event) {
+  if (molmil.settings.recordingMode) return;
   var movementX = event.movementX, movementY = event.movementY;
   if (movementX === undefined) movementX = event.clientX-molmil.Xcoord;
   if (movementY === undefined) movementY = event.clientY-molmil.Ycoord;
@@ -6653,6 +6656,7 @@ molmil.handle_molmilViewer_mouseMove = function (event) {
 }
 
 molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing in vr mode...
+  if (molmil.settings.recordingMode) return;
   if (molmil.configBox.wheelZoomRequiresCtrl && ! event.ctrlKey) return;
   event.target.renderer.TransZ -= (event.wheelDelta || -event.detail*40 || event.deltaY*40 || event.deltaX*40);
   if (molmil_dep.dBT.MSIE) event.target.renderer.TransZ /= 50;
@@ -6663,6 +6667,7 @@ molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing
 }
 
 molmil.onDocumentMouseMove = function (event) { // maybe deprecated
+  if (molmil.settings.recordingMode) return;
   if (molmil.mouseXstart == null) {molmil.mouseXstart = event.clientX; molmil.mouseYstart = event.clientY;}
   mouseX = event.clientX-molmil.mouseXstart;
   mouseY = event.clientY-molmil.mouseYstart;
@@ -6670,6 +6675,7 @@ molmil.onDocumentMouseMove = function (event) { // maybe deprecated
 }
 
 molmil.handle_molmilViewer_touchStart = function (event) {
+  if (molmil.settings.recordingMode) return;
   if (document.body.onmousedown) {
     document.body.onmousedown();
     document.body.onmousedown = null;
@@ -6693,6 +6699,7 @@ molmil.handle_molmilViewer_touchStart = function (event) {
 }
 
 molmil.handle_molmilViewer_touchHold = function () {
+  if (molmil.settings.recordingMode) return;
   if (! molmil.longTouchTID) return;
   if (molmil.previousTouchEvent) {
     if (Math.sqrt((Math.pow(molmil.previousTouchEvent.touches[0].clientX - molmil.touchList[0][0], 2)) + (Math.pow(molmil.previousTouchEvent.touches[0].clientY - molmil.touchList[0][1], 2))) < 1) {
@@ -6708,6 +6715,7 @@ molmil.handle_molmilViewer_touchHold = function () {
 }
 
 molmil.handle_molmilViewer_touchMove = function (event) {
+  if (molmil.settings.recordingMode) return;
   if (! molmil.touchList.length || ! molmil.activeCanvas) {return;}
   if (molmil.longTouchTID) {
     clearTimeout(molmil.longTouchTID);
@@ -6740,6 +6748,7 @@ molmil.handle_molmilViewer_touchMove = function (event) {
 }
 
 molmil.handle_molmilViewer_touchEnd = function () {
+  if (molmil.settings.recordingMode) return;
   if (molmil.previousTouchEvent && molmil.touchMode == 1) {
     if (Math.sqrt((Math.pow(molmil.previousTouchEvent.touches[0].clientX - molmil.touchList[0][0], 2)) + (Math.pow(molmil.previousTouchEvent.touches[0].clientY - molmil.touchList[0][1], 2))) < 1) {
       if (document.fullscreenElement) var offset = {x: molmil.previousTouchEvent.touches[0].screenX, y: molmil.previousTouchEvent.touches[0].screenY};
@@ -7835,8 +7844,10 @@ molmil.safeStartViewer = function (canvas) {
 molmil.animate_molmilViewers = function () {
   if (molmil.vrDisplay) molmil.settings.animationFrameID = molmil.vrDisplay.requestAnimationFrame(molmil.animate_molmilViewers);
   else molmil.settings.animationFrameID = requestAnimationFrame(molmil.animate_molmilViewers);
-  for (var i=0; i<molmil.preRenderFuncs.length; i++) molmil.preRenderFuncs[i]();
-  for (var c=0; c<molmil.canvasList.length; c++) molmil.canvasList[c].renderer.render();
+  if (! molmil.settings.recordingMode) {
+    for (var i=0; i<molmil.preRenderFuncs.length; i++) molmil.preRenderFuncs[i]();
+    for (var c=0; c<molmil.canvasList.length; c++) molmil.canvasList[c].renderer.render();
+  }
 }
 
 

@@ -433,10 +433,14 @@ molmil.UI.prototype.showLM=function(icon) {
     e = this.menu.sub.pushNode("div", "PNG image", "molmil_UI_ME");
     e.UI = this.UI;
     e.onclick = function() {this.UI.savePNG();};
+
     
-    e = this.menu.sub.pushNode("div", "MP4 video", "molmil_UI_ME");
-    e.UI = this.UI;
-    e.onclick = function() {molmil.initVideo(this.UI);};
+
+    if ((this.UI.soup.structures.length ? this.UI.soup.structures[0].number_of_frames : 0) > 1 && (window.initVideo !== undefined || molmil.settings.molmil_video_url !== undefined || window.SharedArrayBuffer !== undefined)) {
+      e = this.menu.sub.pushNode("div", "MP4 video", "molmil_UI_ME");
+      e.UI = this.UI;
+      e.onclick = function() {molmil.initVideo(this.UI);};
+    }
 
     e = this.menu.sub.pushNode("div", "PLY polygon file", "molmil_UI_ME");
     e.UI = this.UI;
@@ -709,6 +713,7 @@ molmil.UI.prototype.clear=function() {
     if (this.canvas) molmil.clear(this.canvas);
     this.UI.resetRM();
     popup.cancel.onclick();
+    if (this.onLMhide) this.onLMhide();
   };
   popup.cancel = popup.pushNode("button", "Cancel");
   popup.cancel.onclick = function() {this.popup.parentNode.removeChild(this.popup);};
@@ -977,24 +982,20 @@ molmil.UI.prototype.savePNG=function() {
 
 molmil.UI.prototype.videoRenderer=function(justStart) {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
+  if (this.onLMshow) this.onLMshow();
   
   var videoID = null;
-  var pixels = null;
   
   this.canvas.renderer.onRenderFinish = function() {
     if (! videoID) return;
-    if (pixels == null) pixels = new Uint8Array(this.canvas.width * this.canvas.width * 4);
-    
-    if (window.addFrame) addFrame(this.canvas.toDataURL());
+    if (window.addFrameCanvas) addFrameCanvas(this.canvas);
+    else if (window.addFrame) addFrame(this.canvas.toDataURL());
     else {
       var req = new molmil_dep.CallRemote("POST");
       req.AddParameter("id", videoID);
       req.AddParameter("data", this.canvas.toDataURL());
       req.Send(molmil.settings.molmil_video_url+"addFrame");
     }
-          
-    this.canvas.renderer.gl.readPixels(0, 0, this.canvas.width, this.canvas.height, this.canvas.renderer.gl.RGBA, this.canvas.renderer.gl.UNSIGNED_BYTE, pixels);
-
   };
   
   var popup = molmil_dep.dcE("div");
@@ -1012,7 +1013,7 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
   
   popup.preview.onclick = function() {
     videoID = null;
-    //canvas.renderer.selectDefaultContext();
+    this.canvas.molmilViewer.animation.pause();
     this.canvas.molmilViewer.animation.beginning();
     this.canvas.molmilViewer.animation.play();
   }
@@ -1021,13 +1022,15 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
   popup.endVideo = function() {
     if (this.canvas.molmilViewer.animation.playing) molmil_dep.asyncStart(this.endVideo, [], this, 250);
     else {
+      this.canvas.renderer.selectDefaultContext();
+      molmil.settings.recordingMode = false;
       if (window.finalizeVideo) finalizeVideo();
       else {
         var req = new molmil_dep.CallRemote("GET");
         req.AddParameter("id", videoID);
         req.Send(molmil.settings.molmil_video_url+"deInitVideo");
-        console.log(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
         window.open(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
+        popup.cancel.onclick();
       }
       videoID = null;
     }
@@ -1035,10 +1038,13 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
 
 
   popup.record.onclick = function() {
+    popup.wasplaying = this.canvas.molmilViewer.animation.TID != null;
     // make sure that both the width & height are divisible by 2 (ffmpeg issue)
     var w = this.canvas.width, h = this.canvas.height;
     if (w%2 == 1) w--;
     if (h%2 == 1) h--;
+    molmil.settings.recordingMode = true;
+    this.canvas.renderer.selectDataContext();
     if (w != this.canvas.width || h != this.canvas.height) {this.canvas.width = w; this.canvas.height = h; this.canvas.renderer.resizeViewPort();}
     if (window.initVideo) {videoID = 1; initVideo(molmil.configBox.video_path, this.canvas.width, this.canvas.height, molmil.configBox.video_framerate);}
     else {
@@ -1049,6 +1055,7 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
       videoID = req.request.responseText;
       //canvas.renderer.selectDataContext();
     }
+    this.canvas.molmilViewer.animation.pause();
     this.canvas.molmilViewer.animation.beginning();
     this.canvas.molmilViewer.animation.play();
     this.popup.endVideo();
@@ -1058,7 +1065,10 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
   popup.cancel.canvas = this.canvas;
   popup.cancel.onclick = function() {
     this.canvas.molmilViewer.animation.end();
-    this.popup.endVideo();
+    if (popup.wasplaying) {
+      this.canvas.molmilViewer.animation.beginning();
+      this.canvas.molmilViewer.animation.play();
+    }
     this.popup.parentNode.removeChild(this.popup);
   };
   popup.cancel.popup = popup;
@@ -1479,6 +1489,17 @@ molmil.initVideo = function(UI) {
     molmil_dep.asyncStart(UI.videoRenderer, [], UI, 0);
     return;
   }
+  if (molmil.settings.molmil_video_url === undefined && window.SharedArrayBuffer !== undefined) {
+    var head = document.getElementsByTagName("head")[0];
+    var obj = molmil_dep.dcE("script"); obj.src = molmil.settings.src+"lib/ffmpeg_handler.js"; 
+    obj.onload = function() {UI.videoRenderer();};
+    head.appendChild(obj);
+    return;
+  }
+  if (molmil.settings.molmil_video_url === undefined) {
+    console.error("Current configuration is not compatible with video output...");
+    return;
+  }
   var request = new molmil_dep.CallRemote("POST");request.ASYNC = true; request.UI = UI;
   request.OnDone = function() {
     var jso = JSON.parse(this.request.responseText);
@@ -1591,7 +1612,6 @@ molmil.animationObj.prototype.end = function() {
 molmil.animationObj.prototype.forwardRenderer = function() {
   if (this.number_of_frames < 2) return;
   this.frameNo += 1;
-  //if (this.frameNo >= this.renderer.framesBuffer.length) {
   if (this.frameNo >= this.number_of_frames) {
     if (this.motionMode == 3 || this.motionMode == 3.5) {this.frameNo -= 1; return this.backwardRenderer();}
     else this.playing = false;
@@ -1602,6 +1622,7 @@ molmil.animationObj.prototype.forwardRenderer = function() {
     this.TID = molmil_dep.asyncStart(this.forwardRenderer, [], this, this.delay);
     this.frameAction();
     this.updateInfoBox();
+    if (molmil.settings.recordingMode) this.renderer.render();
   }
 };
 
@@ -1609,7 +1630,7 @@ molmil.animationObj.prototype.backwardRenderer = function() {
   if (this.number_of_frames < 2) return;
   this.frameNo -= 1;
   if (this.frameNo < 0) {
-    if (this.motionMode == 3) {this.frameNo += 1; return this.forwardRenderer();}
+    if (this.motionMode == 3 && ! molmil.settings.recordingMode) {this.frameNo += 1; return this.forwardRenderer();}
     else this.playing = false;
   }
   else {
@@ -1618,6 +1639,7 @@ molmil.animationObj.prototype.backwardRenderer = function() {
     this.TID = molmil_dep.asyncStart(this.backwardRenderer, [], this, this.delay);
     this.frameAction();
     this.updateInfoBox();
+    if (molmil.settings.recordingMode) this.renderer.render();
   }
 };
 
@@ -2304,7 +2326,7 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
   }
 
   if (! this.soup.sceneBU) {
-    var sceneBU = molmil.buCheck(molmil.figureOutAssemblyId(this.soup.pdbxData, this.soup.BUassemblies), 3, 2, null, this.soup);
+    var sceneBU = molmil.buCheck(molmil.figureOutAssemblyId(this.soup.pdbxData, this.soup.structures[0].BUassemblies), 3, 2, null, this.soup);
     if (sceneBU.NOC > 1 && sceneBU.isBU && (sceneBU.type == 2 || sceneBU.size > 30000)) sceneBU.displayMode = 5;
     else sceneBU.displayMode = 3;
     sceneBU.colorMode = 2;
@@ -2329,22 +2351,24 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
 
   td = US.pushNode("option", "Asymmetric unit (%NOC)".replace("%NOC", noc)); td.value = -1;
   
+  var struct = soup.structures[0];
+  
   var assembly_id = -1;
-  if (Object.keys(soup.BUmatrices).length > 1 || Object.keys(soup.BUassemblies).length > 1) {
-    for (var e in soup.BUassemblies) {
+  if (Object.keys(struct.BUmatrices).length > 1 || Object.keys(struct.BUassemblies).length > 1) {
+    for (var e in struct.BUassemblies) {
       noc = 0;
-      for (i=0; i<soup.BUassemblies[e].length; i++) {
+      for (i=0; i<struct.BUassemblies[e].length; i++) {
         tmp = 0;
-        for (c=0; c<soup.BUassemblies[e][i][1].length; c++) {if (soup.poly_asym_ids.indexOf(soup.BUassemblies[e][i][1][c]) != -1) tmp++;}
-        noc += tmp*soup.BUassemblies[e][i][0].length;
+        for (c=0; c<struct.BUassemblies[e][i][1].length; c++) {if (soup.poly_asym_ids.indexOf(struct.BUassemblies[e][i][1][c]) != -1) tmp++;}
+        noc += tmp*struct.BUassemblies[e][i][0].length;
       }
 
       td = US.pushNode("option", "Biological unit %N (%NOC)".replace("%NOC", noc).replace("%N", e)); td.value = e;
     }
-    if (assembly && (assembly == -1 || soup.BUassemblies.hasOwnProperty(assembly))) assembly_id = assembly;
+    if (assembly && (assembly == -1 || struct.BUassemblies.hasOwnProperty(assembly))) assembly_id = assembly;
     else {
-      assembly = figureOutAssemblyId(soup.pdbxData, soup.BUassemblies);
-      if (soup.BUassemblies.hasOwnProperty(assembly)) assembly_id = assembly;
+      assembly = figureOutAssemblyId(soup.pdbxData, struct.BUassemblies);
+      if (struct.BUassemblies.hasOwnProperty(assembly)) assembly_id = assembly;
     }
   }
   

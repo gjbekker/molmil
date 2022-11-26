@@ -1174,7 +1174,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
     if (struct.chains[c].display) sceneBU.displayedChains[struct.chains[c].name] = true;
   }
 
-  var BU = soup.BUassemblies[assembly_id];
+  var BU = struct.BUassemblies[assembly_id];
   
   var selectionAtoms, chain;
   var selectionAtoms = JSON.parse(JSON.stringify(molmil.configBox.backboneAtoms4Display)); selectionAtoms.CA = 1;
@@ -1192,7 +1192,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
     asym_ids_list.push(asym_ids);
     
     for (i=0, b=0; i<BU[p][0].length; i++) {
-      m = soup.BUmatrices[BU[p][0][i]];
+      m = struct.BUmatrices[BU[p][0][i]];
       if (m[0] == "identity operation") continue;
       b++;
     }
@@ -1212,7 +1212,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
       no_identity = true;
       if (! chainInfo.hasOwnProperty(asym_ids[i])) chainInfo[asym_ids[i]] = [];
       for (c=0; c<BU[p][0].length; c++) {
-        m = soup.BUmatrices[BU[p][0][c]];
+        m = struct.BUmatrices[BU[p][0][c]];
         if (m[0] == "identity operation") {no_identity = false; continue;}
         chainInfo[asym_ids[i]].push(m[1]);
       }
@@ -1222,7 +1222,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
       // bb cpk, ca cpk, ca structure
       if ((displayMode == 1 && colorMode == 1) || (displayMode == 2 && colorMode == 1) || (displayMode == 2 && colorMode == 4)) {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
         }
@@ -1230,7 +1230,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
       }
       else if ((displayMode == 3 || displayMode == 4) && colorMode == 4) {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
         }
@@ -1239,14 +1239,14 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
       }
       else if ((displayMode == 3 || displayMode == 4 || displayMode == 5) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
         }
       }
       else {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);          
         }
@@ -1289,10 +1289,10 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
 
   var nor, sz = 0;
   if (assembly_id != -1) {
-    for (var i=0,j; i<soup.BUassemblies[assembly_id].length; i++) {
+    for (var i=0,j; i<struct.BUassemblies[assembly_id].length; i++) {
       nor = 0;
-      for (j=0; j<soup.BUassemblies[assembly_id][i][1].length; j++) nor += norInfo[soup.BUassemblies[assembly_id][i][1][j]] || 0;
-      sz += soup.BUassemblies[assembly_id][i][0].length * nor;
+      for (j=0; j<struct.BUassemblies[assembly_id][i][1].length; j++) nor += norInfo[struct.BUassemblies[assembly_id][i][1][j]] || 0;
+      sz += struct.BUassemblies[assembly_id][i][0].length * nor;
     }
   }
   sceneBU.isBU = OK;
@@ -1442,7 +1442,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
   
   var xyzs = [];
   
-  var BU = soup.BUassemblies[assembly_id];
+  var BU = struct.BUassemblies[assembly_id];
 
   var selectionAtoms, chain;
   var selectionAtoms = JSON.parse(JSON.stringify(molmil.configBox.backboneAtoms4Display)); selectionAtoms.CA = 1;
@@ -1462,7 +1462,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
     asym_ids_list.push(asym_ids);
     
     for (i=0, b=0; i<BU[p][0].length; i++) {
-      m = soup.BUmatrices[BU[p][0][i]];
+      m = struct.BUmatrices[BU[p][0][i]];
       if (m[0] == "identity operation") continue;
       b++;
     }
@@ -1777,7 +1777,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       }
 
       for (c=0; c<BU[p][0].length; c++) {
-        m = soup.BUmatrices[BU[p][0][c]];
+        m = struct.BUmatrices[BU[p][0][c]];
         if (m[0] == "identity operation") {no_identity = false; continue;}
         chainInfo[asym_ids[i]].push(m[1]);
       }
@@ -1787,7 +1787,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       // bb cpk, ca cpk, ca structure
       if ((displayMode == 1 && colorMode == 1) || (displayMode == 2 && colorMode == 1) || (displayMode == 2 && colorMode == 4)) {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
         }
@@ -1797,7 +1797,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       }
       else if ((displayMode == 3 || displayMode == 4 || displayMode == 6) && colorMode == 4) {
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
         }
@@ -1808,7 +1808,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       else if ((displayMode == 3 || displayMode == 4 || displayMode == 5 || displayMode == 6) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
         uniform_color = [];
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);
           if (colorMode == 2) uniform_color.push(uniform_colors[i] || [255, 255, 255]); // asym chain
@@ -1829,7 +1829,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
       else {
         uniform_color = [];
         for (c=0; c<BU[p][0].length; c++) {
-          m = soup.BUmatrices[BU[p][0][c]];
+          m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
           matrices.push(m[1]);          
           if (colorMode == 2) uniform_color.push(uniform_colors[i]); // asym chain
@@ -2018,7 +2018,7 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
   if (options.modelMode) atom_site.pdbx_PDB_model_num = [];
   
   if (assembly_id == -1) var BU = [[[null], undefined]];
-  else var BU = soup.BUassemblies[assembly_id];
+  else var BU = struct.BUassemblies[assembly_id];
   
   var p=0, i, c, asym_ids, id = 1;
   var m, matrix, buid;
@@ -2026,13 +2026,13 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
   var xyzin = vec3.create(), xyzout = vec3.create(), cp, bucounter = 1;
   
   var buid_identity = null;
-  for (p in soup.BUmatrices) if (soup.BUmatrices[p][0] == "identity operation") {buid_identity = p; break;}
+  for (p in struct.BUmatrices) if (struct.BUmatrices[p][0] == "identity operation") {buid_identity = p; break;}
 
   for (p=0; p<BU.length; p++) {
     asym_ids = BU[p][1] ? new Set(BU[p][1]) : BU[p][1];
     
     for (cp=0; cp<BU[p][0].length; cp++) {
-      m = BU[p][0][cp] == null ? ["identity operation", mat4.create()] : soup.BUmatrices[BU[p][0][cp]];
+      m = BU[p][0][cp] == null ? ["identity operation", mat4.create()] : struct.BUmatrices[BU[p][0][cp]];
       if (options.modelMode) buid = null;
       if (m[0] == "identity operation") buid = "";
       else {buid = "-"+BU[p][0][cp]; bucounter++;}
@@ -2100,7 +2100,7 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
   var gl = renderer.gl;
   var models = soup.models;
   
-  var BU = soup.BUassemblies[assembly_id];
+  var BU = struct.BUassemblies[assembly_id];
   
   var p=0, i, c, asym_ids;
   
@@ -2117,23 +2117,30 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
     asym_ids = BU[p][1];
     
     for (cp=0; cp<BU[p][0].length; cp++) {
-      m = soup.BUmatrices[BU[p][0][cp]];
+      m = struct.BUmatrices[BU[p][0][cp]];
       matrix = m[1];
       
       if (m[0] == "identity operation") {
-        keep_chains = keep_chains.concat(asym_ids)
+        keep_chains = keep_chains.concat(asym_ids);
         continue;
       }
       
-      newStruc = new molmil.entryObject({id: "bu_"+cpID, "idnr": struct.meta.idnr+"."+cpID});
-      newStruc.soup = soup;
+      if (options.mergeAll) {
+        newStruc = struct;
+        newStruc.temp_chains = [];
+      }
+      else {
+        newStruc = new molmil.entryObject({id: "bu_"+cpID, "idnr": struct.meta.idnr+"."+cpID});
+        newStruc.soup = soup;
+      }
 
       for (i=0; i<asym_ids.length; i++) {
         for (c=0; c<struct.chains.length; c++) {
           oldChain = struct.chains[c];
           if (oldChain.name != asym_ids[i]) continue;
 
-          newStruc.chains.push(newChain = new molmil.chainObject(oldChain.name, newStruc));
+          if (options.mergeAll) newStruc.temp_chains.push(newChain = new molmil.chainObject(oldChain.name, newStruc));
+          else newStruc.chains.push(newChain = new molmil.chainObject(oldChain.name, newStruc));
           newChain.modelsXYZ[0] = oldChain.modelsXYZ[0].slice();
           
           for (m=0; m<oldChain.molecules.length; m++) {
@@ -2180,6 +2187,7 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
           }
         
           newChain.authName = oldChain.authName;
+          newChain.entity_id = oldChain.entity_id;
           newChain.CID = oldChain.CID;
           newChain.display = oldChain.display;
           newChain.displayMode = oldChain.displayMode;
@@ -2190,8 +2198,12 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
           soup.buildAminoChain(newChain);
         }
       }
-    
-      if (newStruc.chains.length) {newStrucs.push(newStruc); soup.structures.push(newStruc); cpID++;}
+      
+      if (options.mergeAll) {
+        newStruc.temp_chains.forEach(function(x, i){newStruc.chains.push(x); x.name += "_"+i; keep_chains.push(x.name);});
+        newStruc.temp_chains = undefined;
+      }
+      else if (newStruc.chains.length) {newStrucs.push(newStruc); soup.structures.push(newStruc); cpID++;}
     }
   }
 

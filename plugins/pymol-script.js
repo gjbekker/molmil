@@ -976,7 +976,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
     
     molmil.quickModelColor("newweb-au", {do_styling: true}, soup);
     
-    optionsObj.assembly_id = optionsObj.assembly_id || molmil.figureOutAssemblyId(soup.pdbxData, soup.BUassemblies);
+    optionsObj.assembly_id = optionsObj.assembly_id || molmil.figureOutAssemblyId(soup.pdbxData, soup.structures[0].BUassemblies);
     if (! optionsObj.displayMode) {
       var sceneBU = molmil.buCheck(optionsObj.assembly_id, 3, 2, null, soup);
       if (sceneBU.NOC > 1 && sceneBU.isBU && (sceneBU.type == 2 || sceneBU.size > 30000)) optionsObj.displayMode = optionsObj.displayMode || 5;
