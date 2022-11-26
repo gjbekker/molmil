@@ -1029,7 +1029,8 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
         var req = new molmil_dep.CallRemote("GET");
         req.AddParameter("id", videoID);
         req.Send(molmil.settings.molmil_video_url+"deInitVideo");
-        window.open(molmil.settings.molmil_video_url+"getVideo?id="+videoID);
+        if (molmil.settings.systemName) window.location = molmil.settings.molmil_video_url+"getVideo?id="+videoID+"&filename="+molmil.settings.systemName+".mp4";
+        else window.location = molmil.settings.molmil_video_url+"getVideo?id="+videoID;
         popup.cancel.onclick();
       }
       videoID = null;
@@ -1038,6 +1039,7 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
 
 
   popup.record.onclick = function() {
+    popup.innerHTML = "Rendering & encoding MP4 file...";
     popup.wasplaying = this.canvas.molmilViewer.animation.TID != null;
     // make sure that both the width & height are divisible by 2 (ffmpeg issue)
     var w = this.canvas.width, h = this.canvas.height;
