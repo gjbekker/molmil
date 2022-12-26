@@ -1255,7 +1255,7 @@ molmil.bindCanvasInputs = function(canvas) {
   // .zip file
   canvas.inputFunctions.push(function(canvas, fr) {
     if (fr.filename.endsWith(".zip")) {
-      if (! window.hasOwnProperty("unzip")) {var obj = molmil_dep.dcE("script"); obj.src = "https://unpkg.com/unzipit@1.4.0/dist/unzipit.min.js"; document.getElementsByTagName("head")[0].appendChild(obj);}
+      if (! window.hasOwnProperty("unzip")) {var obj = molmil_dep.dcE("script"); obj.src = molmil.settings.src+"lib/unzipit.min.js"; document.getElementsByTagName("head")[0].appendChild(obj);}
       fr.onload = function(e) {
         if (! window.hasOwnProperty("unzipit")) return molmil_dep.asyncStart(this.onload, [e], this, 50);
         unzipit.unzip(e.target.result).then(function(zipfile) {

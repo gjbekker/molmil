@@ -15,9 +15,10 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
         for (a=0; a<soup.structures[s].chains[c].atoms.length; a++) {
           atom = soup.structures[s].chains[c].atoms[a];
           if (! info.has(atom)) continue;
-          if (prevChain && atom.chain != prevChain) {
-            out += "TER\n"
+          if (molmil.configBox.save_pdb_chain_only_change) {
+            if (prevChain && (prevChain.authName || prevChain.name || "") != (atom.chain.authName || atom.chain.name || "")) out += "TER\n"
           }
+          else if (prevChain && atom.chain != prevChain) out += "TER\n"
           prevChain = atom.chain;
           aid = aid%99999;
         
