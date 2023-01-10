@@ -860,7 +860,6 @@ molmil.commandLines.pyMol.delete = function(atoms) {
   }
   for (var c=0; c<soup.chains.length; c++) {
     var chain = soup.chains[c];
-    console.log(chain.CID, CIDs.has(chain.CID))
     if (! CIDs.has(chain.CID)) continue;
     var bonds = [];
     for (var b=0; b<chain.bonds.length; b++) {
