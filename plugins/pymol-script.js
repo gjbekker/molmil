@@ -830,7 +830,7 @@ molmil.commandLines.pyMol.delete = function(atoms) {
     }
   }
   
-  var idx, a;
+  var idx, a, CIDs = new Set();
   for (a=0; a<atoms.length; a++) {
     idx = atoms[a].molecule.atoms.indexOf(atoms[a]);
     if (idx != -1) {
@@ -845,6 +845,8 @@ molmil.commandLines.pyMol.delete = function(atoms) {
       idx = atoms[a].molecule.chain.molecules.indexOf(atoms[a].molecule);
       atoms[a].molecule.chain.molecules.splice(idx, 1);
     }
+    CIDs.add(atoms[a].chain.CID)
+    
     
     delete soup.atomRef[atoms[a].AID];
     idx = atoms[a].chain.atoms.indexOf(atoms[a]);
@@ -855,6 +857,16 @@ molmil.commandLines.pyMol.delete = function(atoms) {
       if (idx != -1) atoms[a].chain.entry.chains.splice(idx, 1);
     }
     
+  }
+  for (var c=0; c<soup.chains.length; c++) {
+    var chain = soup.chains[c];
+    console.log(chain.CID, CIDs.has(chain.CID))
+    if (! CIDs.has(chain.CID)) continue;
+    var bonds = [];
+    for (var b=0; b<chain.bonds.length; b++) {
+      if (chain.bonds[b][0].AID in soup.atomRef && chain.bonds[b][1].AID in soup.atomRef) bonds.push(chain.bonds[b]);
+    }
+    chain.bonds = bonds;
   }
   
   if (deleted) {
