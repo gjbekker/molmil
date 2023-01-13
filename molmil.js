@@ -8931,7 +8931,7 @@ molmil.calcCenter = function(input) {
   var coords = [], tmp, j, c, names = [];
   for (var i=0; i<input.length; i++) {
     if (input[i] instanceof molmil.atomObject) {
-      if (input[i].element == "H") continue;
+      //if (input[i].element == "H") continue;
       coords.push([input[i].chain.modelsXYZ[modelId][input[i].xyz], input[i].chain.modelsXYZ[modelId][input[i].xyz+1], input[i].chain.modelsXYZ[modelId][input[i].xyz+2]]);
       names.push(input[i].atomName);
     }
