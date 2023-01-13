@@ -2307,7 +2307,7 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   
   contentBox.pushNode("br");
   
-  contentBox.pushNode("span", "For more advanced styling, please use the command line (bottom of the page), the structure menu (right-side of the page) or right-click on an atom/cartoon to show a context menu with styling options. Also, see <a href=\""+molmil.settings.src+"manual.html#style-interface\" target=\"_blank\">our manual</a> or <a href=\"https://doi.org/10.1002/pro.4211\" target=\"blank\">our recent paper</a> for more information.")
+  contentBox.pushNode("span", "For more advanced styling, please use the command line (bottom of the page), the structure menu (right-side of the page) or right-click on an atom/cartoon to show a context menu with styling options. Also, see <a href=\""+molmil.settings.src+"manual.html#style-interface\" target=\"_blank\">our manual</a> or <a href=\"https://doi.org/10.1002/pro.4211\" target=\"blank\">our recent paper</a> for more information.");
 };
 
 molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
@@ -2433,6 +2433,55 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
   
 };
 
+molmil.UI.prototype.styleif_cc = function(contentBox, afterDL) {
+  var UI = this;
+  
+  contentBox.pushNode("h1", "Chemical component styling options");
+  contentBox.pushNode("hr");
+  
+  var ul = contentBox.pushNode("div"), opt;
+  var showHbtn = opt = ul.pushNode("button", "Show hydrogens");
+  opt.onclick = function() {
+    if (! UI.soup.showHydrogens) {
+      UI.soup.hydrogenToggle(true);
+      this.innerHTML = "Hide hydrogens";
+    }
+    else {
+      UI.soup.hydrogenToggle(false);
+      this.innerHTML = "Show hydrogens";
+    }
+
+    UI.soup.renderer.initBuffers();
+    UI.soup.canvas.update = true;
+  };
+  
+  ul.pushNode("br");
+  
+  var labels;
+  opt = ul.pushNode("button", "Show atom labels");
+  opt.onclick = function() {
+    if (labels === undefined) {
+      labels = molmil.commandLines.pyMol.label.apply(UI.canvas.commandLine.environment, ["all", '"%s"%(name)']);
+      for (var i=0; i<labels.length; i++) {labels[i].display = true; labels[i].status = false;}
+    }
+    if (this.innerHTML == "Show atom labels") {
+      for (var i=0; i<labels.length; i++) {
+        if (labels[i].settings.atomSelection[0].element == "H" && ! UI.soup.showHydrogens) labels[i].display = false;
+        else labels[i].display = true;
+        labels[i].status = false;
+      }
+      this.innerHTML = "Hide atom labels";
+    }
+    else {
+      for (var i=0; i<labels.length; i++) labels[i].display = labels[i].status = false;
+      this.innerHTML = "Show atom labels";
+    }
+    
+    UI.soup.renderer.canvas.update = true;
+  };
+  
+  contentBox.pushNode("br");
+};
 
 molmil.UI.prototype.drag_panel = function(title, top, left) {
   var div = molmil_dep.dcE("div");
@@ -3394,8 +3443,7 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     nwif.button = nwif.pushNode("div", "Style menu"); // see if we can also make this button dragable, so that it can be used to resize the menu...
     nwif.options = nwif.pushNode("div");
     
-    // see if we can also hide the sites option, if none are available...
-    var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["EDMap", "edmap", function() {return UI.showEDMap;}], ["Sites", "sites", function() {return UI.showSites;}], ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}], ["Settings", "settings"], ["Hide", "hide"]];
+    var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["Chemical compontent", "cc", function() {return UI.soup.pdbxData && UI.soup.pdbxData.chem_comp_atom}], ["EDMap", "edmap", function() {return UI.showEDMap;}], ["Sites", "sites", function() {return UI.showSites;}], ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}], ["Settings", "settings"], ["Hide", "hide"]];
     
     var doHandler = function(ev, callOptions) {
       if (this.value == "structure") {
@@ -3406,6 +3454,11 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
       else if (this.value == "bu") {
         molmil_dep.Clear(nwif.contentBox);
         UI.styleif_bu(nwif.contentBox);
+        nwif.contentBox.classList.add("visible");
+      }
+      else if (this.value == "cc") {
+        molmil_dep.Clear(nwif.contentBox);
+        UI.styleif_cc(nwif.contentBox);
         nwif.contentBox.classList.add("visible");
       }
       else if (this.value == "edmap") {

@@ -654,6 +654,7 @@ molmil.viewer.prototype.clear = function() {
   this.COR = [0, 0, 0];
   this.geomRanges = [0, 0, 0, 0, 0, 0];
   this.maxRange = 0;
+  this.AisB = true;
 
   this.texturedBillBoards = [];
  

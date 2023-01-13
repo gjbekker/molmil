@@ -972,7 +972,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
   // some kind of options parser...
 
   var soup = this.cli_soup || molmil.cli_soup;
-  
+
   if (mode == "au") {
     molmil.orient(null, soup);
     return molmil.quickModelColor("newweb-au", {do_styling: true}, soup);
@@ -995,6 +995,10 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
     }
     optionsObj.colorMode = optionsObj.colorMode || 2;
     molmil.selectBU(optionsObj.assembly_id, optionsObj.displayMode, optionsObj.colorMode, {orient: true}, soup.structures.slice(-1)[0], soup);
+    return;
+  }
+  else if (mode == "cc") {
+    molmil.orient(null, soup);
     return;
   }
   else if (mode == "objects") {
@@ -1133,7 +1137,7 @@ molmil.commandLines.pyMol.label = function(atoms, lbl) {
   var regex = new RegExp('"[\s]*%[\s]*\\(');
   if (regex.test(text)) { // dynamic mode
     var tmp = text.split(regex);
-    var content = tmp[0].substr(1), vars = tmp[1].slice(0,-1).split(",").map(function(x) {return x.trim();});
+    var content = tmp[0].substr(1), vars = tmp[1].slice(0,-1).split(",").map(function(x) {return x.trim();}), labels = [];
     for (var a=0; a<atoms.length; a++) {
       var data = [];
       for (var i=0; i<vars.length; i++) {
@@ -1145,10 +1149,11 @@ molmil.commandLines.pyMol.label = function(atoms, lbl) {
         else data.push("??");
       }
       var dtext = content.replace(/%s/g, function () {return data.shift();});
-      molmil.addLabel(dtext, {atomSelection: [atoms[a]], dz_: 2}, this.cli_soup);
+      labels.push(molmil.addLabel(dtext, {atomSelection: [atoms[a]], dz_: 2}, this.cli_soup));
     }
+    return labels;
   }
-  else molmil.addLabel(text, {atomSelection: atoms, dz_: 2}, this.cli_soup);
+  else return molmil.addLabel(text, {atomSelection: atoms, dz_: 2}, this.cli_soup);
 }
     
 molmil.commandLines.pyMol.cartoon_color = function(clr, atoms, quiet) {
