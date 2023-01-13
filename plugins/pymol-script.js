@@ -1405,6 +1405,7 @@ molmil.commandLines.pyMol.hide = function(repr, key, quiet) {
     for (var i=0; i<soup.texturedBillBoards.length; i++) {
       if (soup.texturedBillBoards[i].text == key) {
         soup.texturedBillBoards[i].display = false;
+        soup.texturedBillBoards[i].status = false;
         this.cli_soup.renderer.canvas.update = true;
         return;
       }
