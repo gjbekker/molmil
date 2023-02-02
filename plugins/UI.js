@@ -2348,24 +2348,53 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
   
   
   var soup = this.soup;
-  var noc = 0, i, c, tmp;
-  for (c=0; c<soup.chains.length; c++) {if (soup.poly_asym_ids.indexOf(soup.chains[c].name) != -1) noc++;}
-
-  td = US.pushNode("option", "Asymmetric unit (%NOC)".replace("%NOC", noc)); td.value = -1;
-  
   var struct = soup.structures[0];
+  var noc = 0, i, c, tmp, MW = 0;
   
-  var assembly_id = -1;
+
+  var asym2mw = {};
+  if (struct.meta.pdbxData.struct_asym && struct.meta.pdbxData.struct_asym && struct.meta.pdbxData.entity) {
+    for (c=0; c<struct.meta.pdbxData.struct_asym.entity_id.length; c++) asym2mw[struct.meta.pdbxData.struct_asym.id[c]] = struct.meta.pdbxData.entity.formula_weight[struct.meta.pdbxData.entity.id.indexOf(struct.meta.pdbxData.struct_asym.entity_id[c])];
+  }
+
+  for (c=0; c<soup.chains.length; c++) {
+    if (soup.poly_asym_ids.indexOf(soup.chains[c].name) != -1) noc++;
+    MW += asym2mw[soup.chains[c].name] || 0;
+  }
+  
+  
+
+  td = US.pushNode("option", "Asymmetric unit (%NOC chains, %D D)".replace("%NOC", noc).replace("%D", molmil_dep.Rounding(MW, 2))); td.value = -1;
+  
+  
+  // calculate molecular weight of each unit....
+  
+  var assembly_id = -1, tmp2;
   if (Object.keys(struct.BUmatrices).length > 1 || Object.keys(struct.BUassemblies).length > 1) {
     for (var e in struct.BUassemblies) {
       noc = 0;
+      MW = 0;
       for (i=0; i<struct.BUassemblies[e].length; i++) {
         tmp = 0;
-        for (c=0; c<struct.BUassemblies[e][i][1].length; c++) {if (soup.poly_asym_ids.indexOf(struct.BUassemblies[e][i][1][c]) != -1) tmp++;}
+        tmp2 = 0;
+        for (c=0; c<struct.BUassemblies[e][i][1].length; c++) {
+          if (soup.poly_asym_ids.indexOf(struct.BUassemblies[e][i][1][c]) != -1) tmp++;
+          tmp2 += asym2mw[struct.BUassemblies[e][i][1][c]] || 0;
+        }
         noc += tmp*struct.BUassemblies[e][i][0].length;
+        MW += tmp2*struct.BUassemblies[e][i][0].length;
       }
-
-      td = US.pushNode("option", "Biological unit %N (%NOC)".replace("%NOC", noc).replace("%N", e)); td.value = e;
+      var idx = struct.meta.pdbxData && struct.meta.pdbxData.pdbx_struct_assembly && struct.meta.pdbxData.pdbx_struct_assembly.id ? struct.meta.pdbxData.pdbx_struct_assembly.id.indexOf(e) : -1;
+      var txt = "";
+      if (idx != -1) {
+        txt = struct.meta.pdbxData.pdbx_struct_assembly.details[idx];
+        txt = txt.charAt(0).toUpperCase() + txt.slice(1);
+        txt += " (%NOC chains, %D D)".replace("%NOC", noc).replace("%D", molmil_dep.Rounding(MW, 2));
+      }
+      else {
+        txt = "Biological unit %N (%NOC chains, %D D)".replace("%NOC", noc).replace("%D", molmil_dep.Rounding(MW, 2));
+      }
+      td = US.pushNode("option", txt); td.value = e;
     }
     if (assembly && (assembly == -1 || struct.BUassemblies.hasOwnProperty(assembly))) assembly_id = assembly;
     else {
