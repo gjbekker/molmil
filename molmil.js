@@ -56,6 +56,7 @@ molmil.configBox = {
   wheelZoomRequiresCtrl: false,
   recordingMode: false,
   save_pdb_chain_only_change: false,
+  xna_force_C1p: undefined,
   
   // Co, Mo, D, Ru, W, Q, YB, gd, ir, os, Y, sm, pr, tb, re, eu, ta, rh, lu, ho
   
@@ -916,13 +917,14 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     return;
   }
 
-  var request = molmil.xhr(loc); loc = request.URL;
+  var request = molmil.xhr(loc); //loc = request.URL;
   
   var async = molmil_dep.getKeyFromObject(settings || {}, "async", true); request.ASYNC = async; request.target = this;
   request.gz = gz;
   if (request.gz) request.responseType = "arraybuffer";
   if (this.onloaderror) request.OnError = this.onloaderror;
   request.filename = settings.object || loc.substr(loc.lastIndexOf("/")+1);
+
   if (format == 1 || (format+"").toLowerCase() == "mmjson") {
     preloadLoadersJS = [];
     var loc_ = loc;
@@ -1721,7 +1723,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         else if (atom.atomName == "C") {currentMol.C = atom; currentMol.ligand = isLigand;}
         else if (atom.atomName == "O") {currentMol.O = atom; currentMol.ligand = isLigand; currentMol.xna = false; }
         //do special stuff for dna/rna
-        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA)) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA) && !molmil.configBox.xna_force_C1p) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "C1'" && ! (currentMol.N || currentMol.CA) && molmil.configBox.xna_force_C1p) {currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
         else if (! isHet && atom.atomName == "O3'" && ! (currentMol.C)) {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
       }
       else {
@@ -1731,7 +1734,8 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         else if (atom.atomName == "C") {currentMol.C = currentMol.C || atom; currentMol.ligand = isLigand;}
         else if (atom.atomName == "O") {currentMol.O = currentMol.O || atom; currentMol.ligand = isLigand; currentMol.xna = false; }
         //do special stuff for dna/rna
-        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA)) {currentMol.N = currentMol.N || atom; currentMol.CA = currentMol.CA || atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "P" && ! (currentMol.N || currentMol.CA) && !molmil.configBox.xna_force_C1p) {currentMol.N = currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
+        else if (! isHet && atom.atomName == "C1'" && ! (currentMol.N || currentMol.CA) && molmil.configBox.xna_force_C1p) {currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = isLigand;}
         else if (! isHet && atom.atomName == "O3'" && ! (currentMol.C)) {currentMol.C = currentMol.C || atom; currentMol.xna = true; currentMol.ligand = isLigand;}
       }
       
@@ -2707,6 +2711,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
       this.alphaPre(modelViewMatrix, COR);
     }
+    else if (this.settings.disableCulling) this.renderer.gl.disable(this.renderer.gl.CULL_FACE);
     i = i || 0;
     var normalMatrix = mat3.create();
     mat3.normalFromMat4(normalMatrix, modelViewMatrix);
@@ -2778,7 +2783,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       if (molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
       this.renderer.gl.disable(this.renderer.gl.BLEND);
     }
-    
+    else if (this.settings.disableCulling) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
   };
 
   if (! settings.multiMatrix) {

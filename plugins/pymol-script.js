@@ -614,6 +614,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
   // need to upgrade this parser in the future to something more flexible...
 
   var backboneAtoms = molmil.configBox.backboneAtoms4Display;
+  var baseAtoms = {"O4'": 1, "C4'": 1, "C3'": 1, "C2'": 1, "O2'": 1, "O3'": 1, "P": 1, "OP1": 1, "OP2": 1, "O5'": 1, "C5'": 1};
   var TEMPLIST = [];
 
   for (i=0; i<expr.length; i++) {
@@ -681,6 +682,9 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       else if (word == "sidechain") {
         new_expr.push("(! this.soupObject.atomRef[a].molecule.ligand && ! this.soupObject.atomRef[a].molecule.water && ! this.soupObject.atomRef[a].molecule.xna && ((this.soupObject.atomRef[a].molecule.name == 'PRO' && this.soupObject.atomRef[a].atomName == 'N') || ! backboneAtoms.hasOwnProperty(this.soupObject.atomRef[a].atomName)))");
       }
+      else if (word == "base") {
+        new_expr.push("(! this.soupObject.atomRef[a].molecule.ligand && ! this.soupObject.atomRef[a].molecule.water && this.soupObject.atomRef[a].molecule.xna && ! baseAtoms.hasOwnProperty(this.soupObject.atomRef[a].atomName))");
+      }
       else if (word == "xna") {
         new_expr.push("(this.soupObject.atomRef[a].molecule.xna)");
       }
@@ -691,7 +695,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         if (ss) word = ss_conv[word];
         if (word == "=") word = "==";
         if (word == "''") word = "";
-        key = key.replace("%s", word)
+        key = key.replace("%s", word.replace(/'/g, "\\'"));
         if (key.indexOf("%s") == -1) {
           new_expr.push(key);
           toUpper = ss = toLower = false;
@@ -729,6 +733,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     else if (expr[i] == "!") new_expr.push("!");
     else word += expr[i];
   }
+  
   return executeExpr.apply(this, [new_expr.join(" ")]);
 }
 
