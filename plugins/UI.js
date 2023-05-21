@@ -988,6 +988,7 @@ molmil.UI.prototype.videoRenderer=function(justStart) {
   
   this.canvas.renderer.onRenderFinish = function() {
     if (! videoID) return;
+    
     if (window.addFrameCanvas) addFrameCanvas(this.canvas);
     else if (window.addFrame) addFrame(this.canvas.toDataURL());
     else {
@@ -1554,6 +1555,7 @@ molmil.animationObj.prototype.beginning = function() {
   this.soup.canvas.update = true;
   this.frameAction();
   this.updateInfoBox();
+  if (molmil.settings.recordingMode) this.renderer.render();
 };
 
 molmil.animationObj.prototype.go2Frame = function(fid) {
@@ -1609,6 +1611,7 @@ molmil.animationObj.prototype.end = function() {
   this.soup.canvas.update = true;
   this.frameAction();
   this.updateInfoBox();
+  if (molmil.settings.recordingMode) this.renderer.render();
 };
 
 molmil.animationObj.prototype.forwardRenderer = function() {

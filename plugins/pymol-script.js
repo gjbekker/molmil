@@ -1054,6 +1054,9 @@ molmil.commandLines.pyMol.alter = function(atoms, options) {
   if (options.chain) {
     for (var a=0; a<atoms.length; a++) atoms[a].chain.authName = atoms[a].chain.labelName = options.chain;
   }
+  if (options.ss) {
+    for (var a=0; a<atoms.length; a++) atoms[a].molecule.sndStruc = {"loop": 1, "sheet": 2, "helix": 3, "turn": 4}[options.ss] || 1;
+  }
   
   return true;
 }
@@ -1616,7 +1619,8 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
       rgba = JSON.parse(value);
       if (rgba[0] > 1 || rgba[1] > 1 || rgba[2] > 1 || rgba[3] > 1) rgba = [rgba[0], rgba[1], rgba[2], rgba[3]];
     }
-    molmil.defaultSettings_label.bg_color = [rgba[0], rgba[1], rgba[2]];
+    if (value == -1) molmil.defaultSettings_label.bg_color = undefined;
+    else molmil.defaultSettings_label.bg_color = [rgba[0], rgba[1], rgba[2]];
   }  
   else if (key == "label_outline_color") {
     var rgba = molmil.color2rgba(value);
@@ -1703,6 +1707,14 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
   }
   else if (key == "connect_cutoff") {
     molmil.configBox.connect_cutoff = parseFloat(value);
+  }
+  else if (key == "transparency") {
+    for (var i=0; i<selection.length; i++) selection[i].molecule.rgba = [selection[i].molecule.rgba[0], selection[i].molecule.rgba[2], selection[i].molecule.rgba[1], (1-value)*255];
+    this.cli_soup.renderer.rebuildRequired = true;
+  }
+  else if (key == "transparency_sticks") {
+    for (var i=0; i<selection.length; i++) selection[i].rgba = [selection[i].rgba[0], selection[i].rgba[2], selection[i].rgba[1], (1-value)*255];
+    this.cli_soup.renderer.rebuildRequired = true;
   }
 
   else if (key == "backface_cull") {

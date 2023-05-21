@@ -298,7 +298,8 @@ molmil.configBox = {
   orientMODELs: false,
   chainHideCutoff: 300, 
   video_framerate: 15,
-  video_path: "video.mp4"
+  video_path: "video.mp4",
+  skipChainSplitting: false
 };
 
 molmil.AATypes = {"ALA": 1, "CYS": 1, "ASP": 1, "GLU": 1, "PHE": 1, "GLY": 1, "HIS": 1, "ILE": 1, "LYS": 1, "LEU": 1, "MET": 1, "ASN": 1, "PRO": 1, "GLN": 1, "ARG": 1, 
@@ -1389,7 +1390,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
         }
       }
     }
-    else if (chain.molecules[m1].ligand && ! chain.molecules[m1].water) {
+    else if (chain.molecules[m1].ligand && ! chain.molecules[m1].water && chain.molecules[m1].atoms.length > 1) {
       var altchain, altxyzRef;
       for (c=0; c<chain.entry.chains.length; c++) { // for every chain
         altchain = chain.entry.chains[c];
@@ -1400,13 +1401,16 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
           x1 = xyzRef[xyz1]; y1 = xyzRef[xyz1+1]; z1 = xyzRef[xyz1+2];
           
           for (m2=0; m2<altchain.molecules.length; m2++) { // for every residue in OTHER chains
-            if (! altchain.molecules[m2].CA) continue;
-            xyz2 = altchain.molecules[m2].CA.xyz;
-            dx = x1-altxyzRef[xyz2]; dx *= dx;
-            dy = y1-altxyzRef[xyz2+1]; dy *= dy;
-            dz = z1-altxyzRef[xyz2+2]; dz *= dz;
-            r = dx+dy+dz;
-            if (r > 40) continue; // very unlikely that this residue is close enough to make a covalent bond...
+            if (! altchain.molecules[m2].ligand && ! altchain.molecules[m2].CA) continue;
+            if (altchain.molecules[m2].water || altchain.molecules[m2].atoms.length == 1) continue;
+            if (altchain.molecules[m2].CA) {
+              xyz2 = altchain.molecules[m2].CA.xyz;
+              dx = x1-altxyzRef[xyz2]; dx *= dx;
+              dy = y1-altxyzRef[xyz2+1]; dy *= dy;
+              dz = z1-altxyzRef[xyz2+2]; dz *= dz;
+              r = dx+dy+dz;
+              if (r > 40) continue; // very unlikely that this residue is close enough to make a covalent bond...
+            }
             for (a2=0; a2<altchain.molecules[m2].atoms.length; a2++) { // for every atom in OTHER chains
               xyz2 = altchain.molecules[m2].atoms[a2].xyz;
               dx = x1-altxyzRef[xyz2]; dx *= dx;
@@ -2866,9 +2870,10 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
 // ** creates and registers the programs within the renderer object **
 molmil.geometry.registerPrograms = function(renderer, initOnly) {
   if (! renderer.program1 || ! renderer.gl.programInit) {
-    renderer.program1 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true});
+    renderer.program1 = this.build_simple_render_program(null, null, renderer, {has_ID: true, solid: true, alphaMode: this.buffer1 ? this.buffer1.alphaMode : false});
     renderer.addProgram(renderer.program1);
   }
+  else renderer.program1.settings.alphaMode = this.buffer1 ? this.buffer1.alphaMode : false;
   if (! renderer.program2 || ! renderer.gl.programInit) {
     renderer.program2 = this.build_simple_render_program(null, null, renderer, {has_ID: true, lines_render: true});
     renderer.addProgram(renderer.program2);
@@ -2917,7 +2922,7 @@ molmil.geometry.reset = function() {
   this.lines2draw = [];
   this.bondRef = {};
   
-  this.buffer1 = {vP: 0, iP: 0}; // atoms & bonds
+  this.buffer1 = {vP: 0, iP: 0, alphaMode: false}; // atoms & bonds
   this.buffer2 = {vP: 0, iP: 0}; // wireframe
   this.buffer3 = {vP: 0, iP: 0}; // cartoon
   this.buffer4 = {vP: 0, iP: 0}; // surfaces
@@ -3049,7 +3054,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     }
 
     if (stat && ! chain.bondsOK) render.soup.buildBondList(chain, false);
-    
+
     for (var b=0; b<chain.bonds.length; b++) {
       if (chain.bonds[b][0].displayMode < 2 || chain.bonds[b][1].displayMode < 2 || ! chain.bonds[b][0].display || ! chain.bonds[b][1].display) continue;
       if (chain.bonds[b][0].displayMode == 4 || chain.bonds[b][1].displayMode == 4) {
@@ -3230,12 +3235,14 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
 
         if (chain.branches[m][1].SNFG) {
           uvsi = upvec_scan[chain.branches[m][1].SNFG_obj.id];
-          if (uvsi[4] == 0) vec3.add(uvsi, uvsi, obj.backvec);
-          else {
-            if (vec3.dot(obj.backvec, uvsi) < 0) vec3.subtract(uvsi, uvsi, obj.backvec);
-            else vec3.add(uvsi, uvsi, obj.backvec);
+          if (uvsi) {
+            if (uvsi[4] == 0) vec3.add(uvsi, uvsi, obj.backvec);
+            else {
+              if (vec3.dot(obj.backvec, uvsi) < 0) vec3.subtract(uvsi, uvsi, obj.backvec);
+              else vec3.add(uvsi, uvsi, obj.backvec);
+            }
+            uvsi[3]++;
           }
-          uvsi[3]++;
         }
       }
       
@@ -3495,7 +3502,6 @@ molmil.geometry.generateAtomsImposters = function() {
   var x, y, z, n;
   
   var ssOffset = [[-1, +1], [+1, +1], [+1, -1], [-1, -1]];
-
   
   var p = vP/7;
   
@@ -3620,6 +3626,7 @@ molmil.geometry.generateAtoms = function() {
     y = atoms2draw[a].chain.modelsXYZ[mdl][atoms2draw[a].xyz+1];
     z = atoms2draw[a].chain.modelsXYZ[mdl][atoms2draw[a].xyz+2];
     rgba = atoms2draw[a].rgba;
+    if (rgba[3] != 255) this.buffer1.alphaMode = true;
     
     for (v=0; v<sphere.vertices.length; v+=3, vP8+=32) {
       vBuffer[vP++] = sphere.vertices[v]+x;
@@ -5148,11 +5155,12 @@ molmil.prepare2DRepr = function (chain, mdl) {
     if (chain.SNFG) return;
     return chain.displayMode = 0;
   }
-  var twoDcache = chain.twoDcache = [], m, previous_sndStruc, currentBlock, b, nor = chain.molecules.length, m0, m1, m2, m3, BN, temp = [], n, smooth, maxR;
+  var twoDcache = chain.twoDcache = [], m, previous_sndStruc, current_sndStruc, currentBlock, b, nor = chain.molecules.length, m0, m1, m2, m3, BN, temp = [], n, smooth, maxR;
   
   for (m=0; m<nor; m++) {
     if (! chain.molecules[m].CA) continue;
-    if (chain.molecules[m].sndStruc != previous_sndStruc || chain.molecules[m].previous == null) {
+    current_sndStruc = chain.molecules[m].sndStruc;
+    if (current_sndStruc != previous_sndStruc || chain.molecules[m].previous == null) {
       previous_sndStruc = chain.molecules[m].sndStruc;
       twoDcache.push(currentBlock = {molecules: [], xyz: [], sndStruc: previous_sndStruc});
     }
@@ -5163,6 +5171,7 @@ molmil.prepare2DRepr = function (chain, mdl) {
     currentBlock.xyz.push(m1);
     temp.push(m1);
   }
+
   nor = temp.length;
   
 
@@ -9059,7 +9068,7 @@ molmil.addLabel = function(text, settings, soup) {
     
     if (settings.outline_color) textCtx.strokeStyle = molmil.rgb2hex(settings.outline_color[0], settings.outline_color[1], settings.outline_color[2]);
     else textCtx.strokeStyle = "#000000";
-    textCtx.lineWidth = Math.max(Math.round(settings.fontSize / 30), 1);
+    textCtx.lineWidth = Math.max(Math.round(settings.fontSize / 50), 1.0);
 
     if (settings.textAlign == "left") {
       for (var i=0; i<tmp.length; i++) {
@@ -9357,7 +9366,7 @@ molmil.formatList[".cor"] = molmil.formatList[".cod"] = "psygene-traj";
 molmil.formatList[".mnt"] = "presto-mnt";
 molmil.formatList[".mpbf"] = "mpbf";
 molmil.formatList[".ccp4"] = "ccp4";
-molmil.formatList[".mdl"] = molmil.formatList[".mol"] = molmil.formatList[".sdl"] = "mdl";
+molmil.formatList[".mdl"] = molmil.formatList[".mol"] = molmil.formatList[".sdl"] = molmil.formatList[".sdf"] = "mdl";
 molmil.formatList[".mol2"] = "mol2";
 molmil.formatList[".xyz"] = "xyz";
 molmil.formatList[".obj"] = "obj";

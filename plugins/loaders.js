@@ -611,117 +611,129 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
   data = data.split("\n");
   var i, name="", atomMode=false, atomData=[], bondMode=false, bondData=[], ssMode=false, subStructs={}, tmp, struc;
   
+  var molecules = [], curmol;
+  
   for (i=0; i<data.length; i++) {
+    if (data[i].startsWith("#")) continue;
     if (data[i].substr(0,9).toUpperCase() == "@<TRIPOS>") {
       atomMode = false;
       bondMode = false;
       ssMode = false;
     }
     
-    if (atomMode) atomData.push(data[i].trim());
-    if (bondMode) bondData.push(data[i].trim());
-    if (ssMode) {
-      tmp = data[i].trim().split(/[ ,]+/);
-      subStructs[parseInt(tmp[0])] = tmp[1];
+    if (curmol) {
+      if (atomMode) curmol.atomData.push(data[i].trim());
+      if (bondMode) curmol.bondData.push(data[i].trim());
+      if (ssMode) {
+        tmp = data[i].trim().split(/[ ,]+/);
+        curmol.subStructs[parseInt(tmp[0])] = tmp[1];
+      }
     }
     
-    if (data[i].substr(0,17).toUpperCase() == "@<TRIPOS>MOLECULE") name = data[i+1].trim();
+    if (data[i].substr(0,17).toUpperCase() == "@<TRIPOS>MOLECULE") {
+      curmol = {name: data[i+1].trim(), atomData: [], bondData: [], subStructs: []};
+      molecules.push(curmol);
+    }
     else if (data[i].substr(0,13).toUpperCase() == "@<TRIPOS>ATOM") atomMode = true;
     else if (data[i].substr(0,13).toUpperCase() == "@<TRIPOS>BOND") bondMode = true;
     else if (data[i].substr(0,21).toUpperCase() == "@<TRIPOS>SUBSTRUCTURE") ssMode = true;
   }
+  
+  var x, y, z, atomName, atomType, resID, prev_resid, currentChain, currentMol, strucs = [];
+  for (var m=0; m<molecules.length; m++) {
+    name = molecules[m].name;
+    atomData = molecules[m].atomData;
+    bondData = molecules[m].bondData;
+    subStructs = molecules[m].subStructs;
 
-  
-  var x, y, z, atomName, atomType, resID, prev_resid, currentChain, currentMol;
-  
-  this.structures.push(struc = new molmil.entryObject({id: filename}));
-  struc.chains.push(currentChain = new molmil.chainObject("", struc));
-  currentChain.CID = this.CID++;
-  
-  var refmap = {};
-  for (i=0; i<atomData.length; i++) {
-    if (! atomData[i]) continue;
-    tmp = atomData[i].split(/\s+/g) || [];
+    this.structures.push(struc = new molmil.entryObject({id: filename}));
+    strucs.push(struc)
+    struc.chains.push(currentChain = new molmil.chainObject("", struc));
+    currentChain.CID = this.CID++;
+    prev_resid = null;
     
-    //atomName = atomData[i].substring(7, 12).trim();
-    //x = parseFloat(atomData[i].substring(12, 22).trim());
-    //y = parseFloat(atomData[i].substring(22, 31).trim());
-    //z = parseFloat(atomData[i].substring(31, 40).trim());
-    
-    //atomType = atomData[i].substring(40, 49).trim();
-    //resID = atomData[i].substring(49, 54).trim();
-    atomName = tmp[1];
-    x = parseFloat(tmp[2]);
-    y = parseFloat(tmp[3]);
-    z = parseFloat(tmp[4]);
-    
-    atomType = tmp.length > 5 ? tmp[5] : "";
-    resID = tmp.length > 5 ? tmp[6] : "";
-    
-    if (resID != prev_resid) {
-      currentChain.molecules.push(currentMol = new molmil.molObject(molmil_dep.getKeyFromObject(subStructs, resID, resID), resID, currentChain));
-      currentMol.MID = this.MID++;
-      prev_resid = resID;
-    }
-    
-    Xpos = currentChain.modelsXYZ[0].length;
-    currentChain.modelsXYZ[0].push(x, y, z);
-    
-    if (atomType.indexOf(".") == -1) {
-      if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
-        for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
-        if (atomName.length > 1 && ! molmil_dep.isNumber(atomName[1]) && atomName[1] == atomName[1].toLowerCase()) atomType = atomName.substring(offset, offset+2);
-        else atomType = atomName.substring(offset, offset+1);
+    var refmap = {};
+    for (i=0; i<atomData.length; i++) {
+      if (! atomData[i]) continue;
+      tmp = atomData[i].split(/\s+/g) || [];
+      
+      //atomName = atomData[i].substring(7, 12).trim();
+      //x = parseFloat(atomData[i].substring(12, 22).trim());
+      //y = parseFloat(atomData[i].substring(22, 31).trim());
+      //z = parseFloat(atomData[i].substring(31, 40).trim());
+      
+      //atomType = atomData[i].substring(40, 49).trim();
+      //resID = atomData[i].substring(49, 54).trim();
+      atomName = tmp[1];
+      x = parseFloat(tmp[2]);
+      y = parseFloat(tmp[3]);
+      z = parseFloat(tmp[4]);
+      
+      atomType = tmp.length > 5 ? tmp[5] : "";
+      resID = tmp.length > 5 ? tmp[6] : "";
+      
+      if (resID != prev_resid) {
+        currentChain.molecules.push(currentMol = new molmil.molObject(molmil_dep.getKeyFromObject(subStructs, resID, resID), resID, currentChain));
+        currentMol.MID = this.MID++;
+        prev_resid = resID;
       }
-      else {
-        atomType = "";
-        for (offset=0; offset<atomName.length; offset++) {
-          if (molmil_dep.isNumber(atomName[offset])) {
-            if (atomType.length) break;
-            else continue;
+      
+      Xpos = currentChain.modelsXYZ[0].length;
+      currentChain.modelsXYZ[0].push(x, y, z);
+      
+      if (atomType.indexOf(".") == -1) {
+        if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
+          for (offset=0; offset<atomName.length; offset++) if (! molmil_dep.isNumber(atomName[offset])) break;
+          if (atomName.length > 1 && ! molmil_dep.isNumber(atomName[1]) && atomName[1] == atomName[1].toLowerCase()) atomType = atomName.substring(offset, offset+2);
+          else atomType = atomName.substring(offset, offset+1);
+        }
+        else {
+          atomType = "";
+          for (offset=0; offset<atomName.length; offset++) {
+            if (molmil_dep.isNumber(atomName[offset])) {
+              if (atomType.length) break;
+              else continue;
+            }
+            atomType += atomName[offset];
           }
-          atomType += atomName[offset];
+          if (atomType.length == 2) {
+            atomType = atomType[0].toUpperCase() + atomType[1].toLowerCase();
+            if (! molmil.configBox.vdwR.hasOwnProperty(atomType)) atomType = atomType[0];
+            if (["C", "N", "O", "H", "S"].includes(atomType.substr(0,1)) && ["a", "b", "g", "d", "e", "z"].includes(atomType.substr(1,1))) atomType = atomType.substr(0,1);
+          }
+          else atomType = atomType[0].toUpperCase();
         }
-        if (atomType.length == 2) {
-          atomType = atomType[0].toUpperCase() + atomType[1].toLowerCase();
-          if (! molmil.configBox.vdwR.hasOwnProperty(atomType)) atomType = atomType[0];
-          if (["C", "N", "O", "H", "S"].includes(atomType.substr(0,1)) && ["a", "b", "g", "d", "e", "z"].includes(atomType.substr(1,1))) atomType = atomType.substr(0,1);
-        }
-        else atomType = atomType[0].toUpperCase();
       }
+      else atomType = atomType.split(".")[0];
+      
+      currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType, currentMol, currentChain));
+      currentChain.atoms.push(atom);
+      refmap[tmp[0]] = atom;
+      if (atom.element == "H") atom.display = this.showHydrogens;
+      else atom.display = true;
+      atom.Bfactor = parseFloat(tmp[8]);
+      
+      atom.AID = this.AID++;
+      this.atomRef[atom.AID] = atom;
     }
-    else atomType = atomType.split(".")[0];
-    
-    currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomType, currentMol, currentChain));
-    currentChain.atoms.push(atom);
-    refmap[tmp[0]] = atom;
-    if (atom.element == "H") atom.display = this.showHydrogens;
-    else atom.display = true;
-    atom.Bfactor = parseFloat(tmp[8]);
-    
-    atom.AID = this.AID++;
-    this.atomRef[atom.AID] = atom;
+
+    for (i=0; i<bondData.length; i++) {
+      if (! bondData[i]) continue;
+      tmp = bondData[i].split(/[ ,\t]+/);
+      if (tmp[3] == "ar") tmp[3] = 2;
+      if (tmp[3] == "am") tmp[3] = 1;
+      bt = parseInt(tmp[3]);
+      currentChain.bonds.push([refmap[tmp[1]], refmap[tmp[2]], bt]);
+    }
+    currentChain.bondsOK = true;
+  
+    this.chains.push(currentChain);
+    molmil.resetColors(struc, this);
   }
   
   this.calculateCOG();
 
-  for (i=0; i<bondData.length; i++) {
-    if (! bondData[i]) continue;
-    tmp = bondData[i].split(/[ ,\t]+/);
-    if (tmp[3] == "ar") tmp[3] = 2;
-    if (tmp[3] == "am") tmp[3] = 1;
-    bt = parseInt(tmp[3]);
-    currentChain.bonds.push([refmap[tmp[1]], refmap[tmp[2]], bt]);
-  }
-  currentChain.bondsOK = true;
-  
-  this.chains.push(currentChain);
-  
-  molmil.resetColors(struc, this);
-  
-  return struc;
-  
-  
+  return strucs;
 };
 
 // ** loads MDL MOL data **
@@ -783,12 +795,11 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
   if (data[3].trim().endsWith("V3000")) return this.load_mdl3000(data, filename)
   var name = data[0].trim() || filename, offset = 0, struc;
   this.structures.push(struc = new molmil.entryObject({id: filename}));
-  
+
   while (true) {
     if (offset+3 >= data.length) break;
 
-    var nfo = data[offset+3].match(/\S+/g);
-    var noa = parseInt(nfo[0]), nob = parseInt(nfo[1]), i, struc, currentChain, currentMol, x, y, z, Xpos, element, a1, a2, bt;
+    var noa = parseInt(data[offset+3].substr(0,3).trim()), nob = parseInt(data[offset+3].substr(3,5).trim()), i, struc, currentChain, currentMol, x, y, z, Xpos, element, a1, a2, bt;
   
     struc.chains.push(currentChain = new molmil.chainObject("", struc));
     currentChain.CID = this.CID++;
@@ -819,10 +830,9 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
     }
   
     for (i=noa+4; i<noa+4+nob; i++) {
-      nfo = data[offset+i].trim().split(/[ ,]+/);
-      a1 = parseInt(nfo[0])-1;
-      a2 = parseInt(nfo[1])-1;
-      bt = parseInt(nfo[2]);
+      a1 = parseInt(data[offset+i].substr(0,3).trim())-1;
+      a2 = parseInt(data[offset+i].substr(3,3).trim())-1;
+      bt = parseInt(data[offset+i].substr(8,1).trim());
       currentChain.bonds.push([currentMol.atoms[a1], currentMol.atoms[a2], bt]);
     }
     currentChain.bondsOK = true;
@@ -830,12 +840,23 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
     this.chains.push(currentChain);
 
     offset += 3+noa+nob;
-    while (true) {
-      offset++;
-      try {if (data[offset].trim() == "M  END") break;}
-      catch (e) {break;}
+    
+    if (filename.endsWith(".sdf") || filename.endsWith(".sdf.gz")) {
+      while (true) {
+        offset++;
+        try {if (data[offset].trim() == "$$$$") break;}
+        catch (e) {break;}
+      }
+      offset+=1;
     }
-    offset+=2;
+    else {
+      while (true) {
+        offset++;
+        try {if (data[offset].trim() == "M  END") break;}
+        catch (e) {break;}
+      }
+      offset+=2;
+    }
   }
   
   this.calculateCOG();
@@ -1021,6 +1042,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         currentChain.molecules.push(currentMol);
         currentMol.MID = this.MID++;
         cmid = molID;
+        if (currentMol.name in molmil.SNFG) currentMol.SNFG = true;
       }
       
       if (data[i].length >= 76) element = data[i].substr(76).trim().split(" ")[0];
@@ -1150,7 +1172,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
     for (m1=0; m1<rC; m1++) {
       currentChain.molecules[m1].chain_alt = currentChain.molecules[m1].chain;
       currentChain.molecules[m1].chain = chainRef;
-      if ( ((! currentChain.molecules[m1].next && m1 < rC-1) || (! currentChain.molecules[m1].previous && m1 != 0)) && 
+      if (!molmil.configBox.skipChainSplitting && ((! currentChain.molecules[m1].next && m1 < rC-1) || (! currentChain.molecules[m1].previous && m1 != 0)) && 
            (! (currentChain.molecules[m1].water || currentChain.molecules[m1].ligand) || (m1 && currentChain.molecules[m1-1].name != currentChain.molecules[m1].name) )
          ) {
             chainRef = new molmil.chainObject(molmil_dep.Strip(chainRef.name), chainRef.entry); chainRef.isHet = false;
