@@ -283,7 +283,8 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var g = new Float32Array(buffer, 1024, e[1]/4); // crystallographic symmetry table
   var h = new Float32Array(buffer, 0, 256); // crystallographic symmetry table
   
-  if (! settings.hasOwnProperty("solid")) settings.solid = true;
+  if (! settings.hasOwnProperty("solid") || settings.solid == 1) settings.solid = true;
+  else settings.solid = false;
   
   // the data should be normalized so that mean = 0.0 and std = 1.0
   // but instead of normalizing the data, denormalize sigma ==> faster
@@ -292,6 +293,9 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   if (settings.denormalize) {
     var dev = new Float32Array(buffer, 54*4, 1)[0];
     sigma = (sigma+d[2])*dev;
+  }
+  else if (settings.minmax == 1) {
+    sigma = (d[1]-d[0])*sigma;
   }
   else if (! settings.skipNormalization) {
     var dev = new Float32Array(buffer, 54*4, 1)[0];
