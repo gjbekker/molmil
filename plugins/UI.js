@@ -3475,47 +3475,28 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     nwif.button = nwif.pushNode("div", "Style menu"); // see if we can also make this button dragable, so that it can be used to resize the menu...
     nwif.options = nwif.pushNode("div");
     
-    var options = [["Structure", "structure"], ["BU", "bu", function() {return ! UI.soup.AisB;}], ["Chemical compontent", "cc", function() {return UI.soup.pdbxData && UI.soup.pdbxData.chem_comp_atom}], ["EDMap", "edmap", function() {return UI.showEDMap;}], ["Sites", "sites", function() {return UI.showSites;}], ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}], ["Settings", "settings"], ["Hide", "hide"]];
+    var options = [
+      ["Structure", "structure", null, function() {UI.styleif_au(nwif.contentBox);}], 
+      ["BU", "bu", function() {return ! UI.soup.AisB;}, function() {UI.styleif_bu(nwif.contentBox);}], 
+      ["Chemical compontent", "cc", function() {return UI.soup.pdbxData && UI.soup.pdbxData.chem_comp_atom}, function() {UI.styleif_cc(nwif.contentBox);}], 
+      ["EDMap", "edmap", function() {return UI.showEDMap;}, function() {UI.styleif_edmap(nwif.contentBox, callOptions);}], 
+      ["Sites", "sites", function() {return UI.showSites;}, function() {UI.styleif_sites(nwif.contentBox);}], 
+      ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}, function() {UI.styleif_align(nwif.contentBox);}], 
+      ["Settings", "settings", null, function() {UI.styleif_settings(nwif.contentBox);}], 
+      ["Hide", "hide"]
+    ];
+    if (molmil.configBox.menuOptions && molmil.configBox.menuOptions.length) options = options.concat(molmil.configBox.menuOptions);
     
     var doHandler = function(ev, callOptions) {
-      if (this.value == "structure") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_au(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
+      for (var i=0; i<options.length; i++) {
+        if (this.value == options[i][1] && options[i][3]) {
+          molmil_dep.Clear(nwif.contentBox);
+          options[i][3](nwif.contentBox, callOptions);
+        }
       }
-      else if (this.value == "bu") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_bu(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "cc") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_cc(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "edmap") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_edmap(nwif.contentBox, callOptions);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "sites") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_sites(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "align") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_align(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "settings") {
-        molmil_dep.Clear(nwif.contentBox);
-        UI.styleif_settings(nwif.contentBox);
-        nwif.contentBox.classList.add("visible");
-      }
-      else if (this.value == "hide") {
-        nwif.contentBox.classList.remove("visible");
-      }
+      
+      if (this.value == "hide") nwif.contentBox.classList.remove("visible");
+      else nwif.contentBox.classList.add("visible");
 
       if (! nwif.contentBox.classList.contains("visible")) {
         if (nwif.firstChild.style.height) nwif.heightSet = nwif.firstChild.style.height;
