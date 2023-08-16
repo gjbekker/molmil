@@ -1875,32 +1875,24 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           if (a2.molecule.ligand || ! backboneAtoms.hasOwnProperty(a2.atomName)) a2.molecule.weirdAA = true;
         }
       }
-    
-      var cb = pdb.chem_comp_bond || pdb.pdbx_chem_comp_model_bond;
-      if (cb) {
-        var atomRef = {};
-        for (var i=0; i<struc.chains[0].atoms.length; i++) atomRef[struc.chains[0].atoms[i].atomName] = struc.chains[0].atoms[i];
-        var a1, a2;
-        for (var i=0; i<cb.atom_id_1.length; i++) {
-          a1 = atomRef[cb.atom_id_1[i]];
-          a2 = atomRef[cb.atom_id_2[i]];
-          if (! a1 || ! a2) continue;
-          struc.chains[0].bonds.push([a1, a2, cb.value_order[i] == "DOUB" ? 2 : 1]);
-        }
-        struc.chains[0].bondsOK = true;
+
+      var cb = pdb.chem_comp_bond || pdb.pdbx_chem_comp_model_bond || {comp_id: []}, cbMat = {};
+      for (var i=0; i<cb.comp_id.length; i++) {
+        if (! (cb.comp_id[i] in cbMat)) cbMat[cb.comp_id[i]] = {};
+        cbMat[cb.comp_id[i]][cb.atom_id_1[i]+"_"+cb.atom_id_2[i]] = cbMat[cb.atom_id_2[i]+"_"+cb.atom_id_1[i]] = cb.value_order[i].toLowerCase() == "doub" ? 2 : 1;
       }
-      else {
-        for (var i=0; i<struc.chains.length; i++ ) {
-          if (! struc.chains[i].isHet && struc.chains[i].molecules.length == 1) {
-            struc.chains[i].isHet = true;
-            struc.chains[i].molecules[0].ligand = true;
-          }
-          if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
-          else this.buildAminoChain(struc.chains[i]);
-          var chain = struc.chains[i];
-          chain.molWeight = 0.0;
-          for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
+      struc.cbMat = cbMat;
+      
+      for (var i=0; i<struc.chains.length; i++ ) {
+        if (! struc.chains[i].isHet && struc.chains[i].molecules.length == 1) {
+          struc.chains[i].isHet = true;
+          struc.chains[i].molecules[0].ligand = true;
         }
+        if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
+        else this.buildAminoChain(struc.chains[i]);
+        var chain = struc.chains[i];
+        chain.molWeight = 0.0;
+        for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
       }
   
       //var conf_type_id, beg_auth_asym_id, beg_auth_seq_id, end_auth_asym_id, end_auth_seq_id, start, end;
@@ -7970,22 +7962,34 @@ molmil.buildOctaDome = function (t, side) {
 
 // ** buils a list of bonds for a molecule/residue **
 molmil.buildBondsList4Molecule = function (bonds, molecule, xyzRef) {
-  var dx, dy, dz, r, a1, a2, xyz1, xyz2, vdwR = molmil.configBox.vdwR, maxDistance;
-  for (a1=0; a1<molecule.atoms.length; a1++) {
-    for (a2=a1+1; a2<molecule.atoms.length; a2++) {
-      if (molecule.atoms[a1].label_alt_id != molecule.atoms[a2].label_alt_id && molecule.atoms[a1].label_alt_id != null && molecule.atoms[a2].label_alt_id != null) continue;
-      xyz1 = molecule.atoms[a1].xyz;
-      xyz2 = molecule.atoms[a2].xyz;
-      dx = xyzRef[xyz1]-xyzRef[xyz2]; dx *= dx;
-      dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
-      dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
-      r = dx+dy+dz;
+  var cbMat = (molecule.chain.entry.cbMat || {})[molecule.name] || null;
+  if (cbMat == null) {
+    var dx, dy, dz, r, a1, a2, xyz1, xyz2, vdwR = molmil.configBox.vdwR, maxDistance;
+    for (a1=0; a1<molecule.atoms.length; a1++) {
+      for (a2=a1+1; a2<molecule.atoms.length; a2++) {
+        if (molecule.atoms[a1].label_alt_id != molecule.atoms[a2].label_alt_id && molecule.atoms[a1].label_alt_id != null && molecule.atoms[a2].label_alt_id != null) continue;
+        xyz1 = molecule.atoms[a1].xyz;
+        xyz2 = molecule.atoms[a2].xyz;
+        dx = xyzRef[xyz1]-xyzRef[xyz2]; dx *= dx;
+        dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
+        dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
+        r = dx+dy+dz;
 
-      maxDistance = molmil.configBox.connect_cutoff;
-      maxDistance += ((vdwR[molecule.atoms[a1].element] || 1.8) + (vdwR[molecule.atoms[a2].element] || 1.8))*.5;
-      if (molecule.atoms[a1].element == "H" || molecule.atoms[a2].element == "H") maxDistance -= .2;
-      maxDistance *= maxDistance;
-      if (r <= maxDistance) bonds.push([molecule.atoms[a1], molecule.atoms[a2], 1]);
+        maxDistance = molmil.configBox.connect_cutoff;
+        maxDistance += ((vdwR[molecule.atoms[a1].element] || 1.8) + (vdwR[molecule.atoms[a2].element] || 1.8))*.5;
+        if (molecule.atoms[a1].element == "H" || molecule.atoms[a2].element == "H") maxDistance -= .2;
+        maxDistance *= maxDistance;
+        if (r <= maxDistance) bonds.push([molecule.atoms[a1], molecule.atoms[a2], 1]);
+      }
+    }
+  }
+  else {
+    var order;
+    for (a1=0; a1<molecule.atoms.length; a1++) {
+      for (a2=a1+1; a2<molecule.atoms.length; a2++) {
+        order = cbMat[molecule.atoms[a1].atomName+"_"+molecule.atoms[a2].atomName];
+        if (order !== undefined) bonds.push([molecule.atoms[a1], molecule.atoms[a2], order]);
+      }
     }
   }
 }
