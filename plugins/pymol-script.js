@@ -491,6 +491,7 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
       options[kv[0].trim()] = kv[1].trim();
     }
   }
+  options.rgba = env.mesh_color;
   
   var canvas = molmil.fetchCanvas();
   var mjs_fileBin = canvas.mjs_fileBin || {};
@@ -1897,7 +1898,7 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
           selection[i].molecule.displayMode = 31;
           selection[i].molecule.chain.displayMode = 4;
           selection[i].displayMode = 3;
-          if (selection[i].molecule.res_con) resshow[selection[i].molecule.res_con.MID] = selection[i].molecule.res_con;
+          if (selection[i].molecule.res_con && selection[i].molecule.res_con.selection) resshow[selection[i].molecule.res_con.MID] = selection[i].molecule.res_con;
         }
       }
       for (var i in resshow) {

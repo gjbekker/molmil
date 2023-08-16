@@ -39,8 +39,7 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
           y = atom.chain.modelsXYZ[modelId_][atom.xyz+1].toFixed(3);
           z = atom.chain.modelsXYZ[modelId_][atom.xyz+2].toFixed(3);
     
-          out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + "\n";
-        
+          out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + ('1.00').padStart(6) + ('0.0').padStart(6) + "\n";
           aid++;
         }
       }
