@@ -1879,7 +1879,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
       var cb = pdb.chem_comp_bond || pdb.pdbx_chem_comp_model_bond || {comp_id: []}, cbMat = {};
       for (var i=0; i<cb.comp_id.length; i++) {
         if (! (cb.comp_id[i] in cbMat)) cbMat[cb.comp_id[i]] = {};
-        cbMat[cb.comp_id[i]][cb.atom_id_1[i]+"_"+cb.atom_id_2[i]] = cbMat[cb.atom_id_2[i]+"_"+cb.atom_id_1[i]] = cb.value_order[i].toLowerCase() == "doub" ? 2 : 1;
+        cbMat[cb.comp_id[i]][cb.atom_id_1[i]+"_"+cb.atom_id_2[i]] = cbMat[cb.comp_id[i]][cb.atom_id_2[i]+"_"+cb.atom_id_1[i]] = cb.value_order[i].toLowerCase() == "doub" ? 2 : 1;
       }
       struc.cbMat = cbMat;
       
