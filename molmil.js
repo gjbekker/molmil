@@ -1547,6 +1547,11 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
   return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", molmil.savePDB, null, [soup, atomSelection, modelId, file]);
 };
 
+// ** save mmJSON data **
+molmil.saveJSO = function(soup, atomSelection, modelId, file) {
+  return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", molmil.saveJSO, null, [soup, atomSelection, modelId, file]);
+};
+
 molmil.saveBU = function(assembly_id, options, struct, soup) {
   return molmil.loadPlugin(molmil.settings.src+"plugins/savers.js", molmil.saveBU, null, [assembly_id, options, struct, soup]);
 };

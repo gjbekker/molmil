@@ -1129,6 +1129,7 @@ molmil.commandLines.pyMol.save = function(file, command) {
 
   if (format == "pdb") molmil.savePDB(soup, selection, state, file);
   else if (format == "ply") molmil.exportPLY(soup, file);
+  else if (format == "mmcif" || format == "mmjson") molmil.saveJSO(soup, selection, state, file);
   
   soup.renderer.modelId = prevState;
 }
@@ -1300,6 +1301,7 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
       else var min = Math.min.apply(null, values);
       if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
       else var max = Math.max.apply(null, values); 
+      if (molmil.configBox.inverseBfacClr) {var tmp = min; min = max; max = tmp;}
       var diffInv = 1./(max-min), tmp;
       for (var i=0; i<selection.length; i++) {
         tmp = 1-((values[i]-min)*diffInv); ///TODO

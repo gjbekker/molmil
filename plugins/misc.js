@@ -1,5 +1,5 @@
 var Zmatinfo = {};
-Zmatinfo["ACE"] = [["C", "N(+1)", "CA(+1)", "C(+1)", 1.34, 120, -73], ["O", "C", "N(+1)", "CA(+1)", 1.23, 120, 0], ["CH3", "O", "C", "N(+1)", 1.5, 120, 180]];
+Zmatinfo["ACE"] = [["C", "N(+1)", "CA(+1)", "C(+1)", 1.34, 120, -73], ["O", "C", "N(+1)", "CA(+1)", 1.23, 120, 0], ["CH3", "C", "N(+1)", "CA(+1)", 1.5, 120, 180]];
 Zmatinfo["NME"] = [["N", "C(-1)", "O(-1)", "CA(-1)", 1.34, 120, -180], ["CH3", "N", "C(-1)", "O(-1)", 1.45, 120, 0]];
 
 molmil.setAngle = function(a1, a2, a3, angle) {
@@ -2314,7 +2314,7 @@ molmil.calcHbonds = function(group1, group2, settings, soup) { // find H-bonds b
     if (group1[c] instanceof molmil.chainObject) tmp = group1[c];
     else if (group1[c] instanceof molmil.molObject) tmp = group1[c].chain;
     else {console.log("Cannot process object #1..."); return;}
-    if (! tmp.bondsOK) soup.buildBondList(group1[c], false);
+    if (! tmp.bondsOK) soup.buildBondList(tmp, false);
     for (a=0; a<tmp.bonds.length; a++) {
       if (tmp.bonds[a][0].element == "H") {
         if (! hcon[tmp.bonds[a][1].AID]) hcon[tmp.bonds[a][1].AID] = [];

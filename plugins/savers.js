@@ -4,6 +4,69 @@ function isNumber(n) {
 
 // loop over it normally; soup->structs->chains->molecules->atoms, then check if aid is in atomSelection; if not --> skip
 
+molmil.saveJSO = function(soup, atomSelection, modelId, file) {
+  if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.saveJSO, molmil, [soup, atomSelection, modelId, file]); 
+  
+  var format = file ? molmil.guess_format(file) : null;
+  
+  if (! window.CIFparser && format == "mmcif") return molmil.loadPlugin(molmil.settings.src+"lib/cif.js", molmil.saveJSO, molmil, [soup, atomSelection, modelId, file]);
+  
+  soup = soup || molmil.cli_soup;
+  var struct;
+  for (var i=0; i<soup.structures.length; i++) if (soup.structures[i] instanceof molmil.entryObject) {struct = soup.structures[i]; break;}
+  
+  var atom_site = {group_PDB: [], type_symbol: [], label_atom_id: [], label_alt_id: [], label_comp_id: [], label_asym_id: [], label_entity_id: [], label_seq_id: [], Cartn_x: [], Cartn_y: [], Cartn_z: [], auth_asym_id: [], id: []};
+  
+  var info = new Set(atomSelection);
+  
+  var c, id = 1;
+  var m, matrix, buid;
+  var chain, residue, atom;
+  var xyzin = vec3.create(), xyzout = vec3.create(), cp, bucounter = 1;
+
+  for (c=0; c<struct.chains.length; c++) {
+    chain = struct.chains[c];
+
+    for (m=0; m<chain.molecules.length; m++) {
+      residue = chain.molecules[m];
+    
+      for (a=0; a<residue.atoms.length; a++) {
+        atom = residue.atoms[a];
+        if (! info.has(atom)) continue;
+        atom_site.group_PDB.push(residue.ligand ? "HETATM" : "ATOM");
+        atom_site.Cartn_x.push(chain.modelsXYZ[0][atom.xyz]);
+        atom_site.Cartn_y.push(chain.modelsXYZ[0][atom.xyz+1]);
+        atom_site.Cartn_z.push(chain.modelsXYZ[0][atom.xyz+2]);
+        atom_site.auth_asym_id.push(chain.authName);
+        atom_site.label_asym_id.push(chain.name);
+        atom_site.label_alt_id.push(atom.label_alt_id||".");
+        atom_site.label_atom_id.push(atom.atomName);
+        atom_site.label_comp_id.push(residue.name);
+        atom_site.label_entity_id.push(chain.entity_id||".");
+        atom_site.label_seq_id.push(residue.RSID);
+        atom_site.type_symbol.push(atom.element);
+        atom_site.id.push(id++);
+      }
+    }
+  }
+  
+  var obj = {atom_site: atom_site};
+  
+  if (file === undefined) return obj;
+
+  var pdbid = (struct.meta.pdbid || "").toUpperCase();
+  var jso_out = {}; jso_out["data"+(pdbid ? "_"+pdbid : "")] = obj;
+  
+  if (format == "mmcif") jso_out = dumpCIF(jso_out);
+  else jso_out = JSON.stringify(jso_out);
+
+  if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(file, jso_out, "utf8");
+  else {
+    var blob = new Blob([jso_out], {type: "text/plain;charset=utf-8"});
+    saveAs(blob, file);
+  }
+}
+
 molmil.savePDB = function(soup, atomSelection, modelId, file) {
   if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
   var info = new Set(atomSelection);
@@ -26,10 +89,9 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
           if (atom.molecule.ligand) gname = "HETATM";
 
           aname = atom.atomName.substr(0,4);
-    
-          if (! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
-    
           rname = atom.molecule.name;
+          
+          if (aname != rname && ! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
     
           rid = molmil.configBox.save_pdb_label ? (atom.molecule.id||"") : (atom.molecule.RSID||"").substr(0,4);
 
@@ -39,7 +101,7 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
           y = atom.chain.modelsXYZ[modelId_][atom.xyz+1].toFixed(3);
           z = atom.chain.modelsXYZ[modelId_][atom.xyz+2].toFixed(3);
     
-          out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + ('1.00').padStart(6) + ('0.0').padStart(6) + "\n";
+          out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + ('1.00').padStart(6) + ('0.00').padStart(6) + "           " + atom.element + "\n";
           aid++;
         }
       }
