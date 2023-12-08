@@ -1336,7 +1336,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   var x1, x2, y1, y2, z1, z2;
   
   var extensive = false;
-  
+  if (!chain.bonds) console.log(chain);
   if ((rebuild || chain.bonds.length == 0) && ! chain.SNFG) this.buildAminoChain(chain);
   
   // bonds
