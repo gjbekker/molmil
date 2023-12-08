@@ -2336,7 +2336,7 @@ molmil.calcHbonds = function(group1, group2, settings, soup) { // find H-bonds b
     if (group2[c] instanceof molmil.chainObject) tmp = group2[c];
     else if (group2[c] instanceof molmil.molObject) tmp = group2[c].chain;
     else {console.log("Cannot process object #2..."); return;}
-    if (! tmp.bondsOK) soup.buildBondList(group2[c], false);
+    if (! tmp.bondsOK) soup.buildBondList(tmp, false);
     for (a=0; a<tmp.bonds.length; a++) {
       if (tmp.bonds[a][0].element == "H") {
         if (! hcon[tmp.bonds[a][1].AID]) hcon[tmp.bonds[a][1].AID] = [];
