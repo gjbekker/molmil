@@ -1005,6 +1005,7 @@ molmil.commandLines.pyMol.repr = function(mode, options, afterDL) {
   }
   else if (mode == "cc") {
     molmil.orient(null, soup);
+    molmil.quickModelColor("sticks", {do_styling: true}, soup);
     return;
   }
   else if (mode == "objects") {

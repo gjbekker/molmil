@@ -1336,7 +1336,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   var x1, x2, y1, y2, z1, z2;
   
   var extensive = false;
-  if (!chain.bonds) console.log(chain);
+  
   if ((rebuild || chain.bonds.length == 0) && ! chain.SNFG) this.buildAminoChain(chain);
   
   // bonds
@@ -9521,6 +9521,15 @@ molmil.autoSetup = function(options, canvas) {
           lastPress = now;
         }
       }
+    }
+  }
+  else if (options.enable.includes("cli-hash") && ! canvas.commandLine) {
+    var hash = window.location.hash ? window.location.hash.substr(1) : "";
+    if (hash) {
+      var cli = new molmil.commandLine(canvas);
+      if (options.environment) {for (var e in options.environment) cli.environment[e] = options.environment[e];}
+      cli.environment.console.runCommand(decodeURIComponent(hash));
+      cli.consoleBox.style.display = "none";
     }
   }
   
