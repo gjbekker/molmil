@@ -6840,7 +6840,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
       var atmDM = settings.newweb ? 2 : 3;
       for (c=0; c<obj.chains.length; c++) {
         chain = obj.chains[c];
-        if (chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic) || chain.molecules.length < 4) chain.displayMode = 1;
+        if (settings.newweb && (chain.molWeight < 550 || (chain.molWeight < 2000 && chain.isCyclic) || chain.molecules.length < 4)) chain.displayMode = 1;
         else chain.displayMode = 3;
         for (m=0; m<chain.molecules.length; m++) {
           mol = chain.molecules[m];
@@ -6848,7 +6848,7 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
           else if (mol.xna) for (a=0; a<mol.atoms.length; a++) mol.atoms[a].displayMode = 0;
           else if (mol.weirdAA && ! mol.SNFG) {
             for (a=0; a<mol.atoms.length; a++) {
-              if (backboneAtoms.hasOwnProperty(mol.atoms[a].atomName)) mol.atoms[a].displayMode = 0;
+              if (chain.displayMode != 1 && backboneAtoms.hasOwnProperty(mol.atoms[a].atomName)) mol.atoms[a].displayMode = 0;
               else mol.atoms[a].displayMode = atmDM;
             }
           }
