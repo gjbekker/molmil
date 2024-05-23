@@ -1390,7 +1390,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
         }
       }
     }
-    else if (chain.molecules[m1].ligand && ! chain.molecules[m1].water && chain.molecules[m1].atoms.length > 1) {
+    else if (chain.molecules[m1].ligand && ! chain.molecules[m1].water && chain.molecules[m1].atoms.length > 1 && chain.molecules.length < 10) {
       var altchain, altxyzRef;
       for (c=0; c<chain.entry.chains.length; c++) { // for every chain
         altchain = chain.entry.chains[c];

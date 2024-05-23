@@ -1806,7 +1806,8 @@ molmil.UI.prototype.labelFunction = function(payload, lv) {
     return this.editLabel(payload[0]);
   }
   if (lv == -1) {
-    // delete
+    payload[0].remove();
+    this.soup.canvas.update = true;
     return;
   }
   
