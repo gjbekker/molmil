@@ -644,6 +644,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
       }
       else if (word == "b") key = "this.soupObject.atomRef[a].Bfactor %s %s";
       else if (word == "hydro") new_expr.push("this.soupObject.atomRef[a].molecule.water "+operator+" true");
+      else if (word == "disulf") new_expr.push("(this.soupObject.atomRef[a].molecule.name "+operator+" 'CYS' && this.soupObject.atomRef[a].molecule.weirdAA)");
       else if (word == "hetatm") new_expr.push("this.soupObject.atomRef[a].molecule.ligand "+operator+" true");
       else if (word == "snfg") new_expr.push("this.soupObject.atomRef[a].molecule.SNFG "+operator+" true");
       else if (word == "altloc") {key = "this.soupObject.atomRef[a].label_alt_id "+operator+" '%s'";}

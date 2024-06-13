@@ -1164,7 +1164,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
   var newChains = {}, chainRef, rC, m1;
   
   // add some functionality to better deal with weird amino acids (i.e. build some way to detect and show a continuous chain...)
-  for (c=0; c<struc.chains.length; c++) this.buildAminoChain(struc.chains[c]);
+  for (c=0; c<struc.chains.length; c++) this.buildMolBondList(struc.chains[c]);
   
   for (c=0; c<struc.chains.length; c++) {
     currentChain = struc.chains[c];

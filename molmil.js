@@ -1328,20 +1328,16 @@ molmil.viewer.prototype.buildSNFG = function(chain) {
   }
 };
 
-// ** builds list of bonds within a chain object **
-molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
+molmil.viewer.prototype.buildMolBondList = function(chain, rebuild) {
   var m1, m2, SG1, SG2;
   var dx, dy, dz, r, a1, a2, xyz1, xyz2, vdwR = molmil.configBox.vdwR;
 
   var x1, x2, y1, y2, z1, z2;
-  
-  var extensive = false;
-  
+
   if ((rebuild || chain.bonds.length == 0) && ! chain.SNFG) this.buildAminoChain(chain);
   
   // bonds
   var xyzRef = chain.modelsXYZ[0], ligand = false;
-  chain.bondsOK = true;
   
   if (chain.struct_conn && chain.struct_conn.length) {
     var a1, a2, snfg = true;
@@ -1370,7 +1366,6 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   for (m1=0; m1<chain.molecules.length; m1++) {
     if (! chain.molecules[m1].SNFG) snfg = false;
     SG1 = chain.bonds.length;
-    molmil.buildBondsList4Molecule(chain.bonds, chain.molecules[m1], xyzRef);
 
     if (chain.molecules[m1].CA) {
       // cysteine bonds
@@ -1386,6 +1381,7 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
           dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
           dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
           r = dx+dy+dz;
+          SG1.molecule.weirdAA = SG2.molecule.weirdAA = true;
           if (r <= 5) {chain.bonds.push([SG1, SG2, 1]); break;}
         }
       }
@@ -1454,6 +1450,24 @@ molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
   }
   
   if (snfg) this.buildSNFG(chain);
+}
+
+
+// ** builds list of bonds within a chain object **
+molmil.viewer.prototype.buildBondList = function(chain, rebuild) {
+  var m1;
+  
+  if ((rebuild || chain.bonds.length == 0) && ! chain.SNFG) this.buildAminoChain(chain);
+  
+  // bonds
+  var xyzRef = chain.modelsXYZ[0], ligand = false;
+  chain.bondsOK = true;
+  
+  if (chain.struct_conn && chain.struct_conn.length) return;
+
+  for (m1=0; m1<chain.molecules.length; m1++) {
+    molmil.buildBondsList4Molecule(chain.bonds, chain.molecules[m1], xyzRef);
+  }
 };
 
 molmil.viewer.prototype.getChain = function(struc, cid) {
@@ -1894,7 +1908,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           struc.chains[i].molecules[0].ligand = true;
         }
         if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
-        else this.buildAminoChain(struc.chains[i]);
+        else this.buildMolBondList(struc.chains[i]);
         var chain = struc.chains[i];
         chain.molWeight = 0.0;
         for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;

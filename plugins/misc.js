@@ -2195,7 +2195,7 @@ molmil.duplicateBU = function(assembly_id, options, struct, soup) {
           newChain.rgba = oldChain.rgba.slice();
           newChain.CID = oldChain.CID;
         
-          soup.buildAminoChain(newChain);
+          soup.buildMolBondList(newChain);
         }
       }
       
