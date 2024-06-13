@@ -1907,8 +1907,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
           struc.chains[i].isHet = true;
           struc.chains[i].molecules[0].ligand = true;
         }
-        if (struc.chains[i].struct_conn) this.buildBondList(struc.chains[i], false);
-        else this.buildMolBondList(struc.chains[i]);
+        this.buildMolBondList(struc.chains[i]);
         var chain = struc.chains[i];
         chain.molWeight = 0.0;
         for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
