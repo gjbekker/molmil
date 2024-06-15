@@ -1381,8 +1381,7 @@ molmil.viewer.prototype.buildMolBondList = function(chain, rebuild) {
           dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
           dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
           r = dx+dy+dz;
-          SG1.molecule.weirdAA = SG2.molecule.weirdAA = true;
-          if (r <= 5) {chain.bonds.push([SG1, SG2, 1]); break;}
+          if (r <= 5) {chain.bonds.push([SG1, SG2, 1]); SG1.molecule.weirdAA = SG2.molecule.weirdAA = true; break;}
         }
       }
     }
