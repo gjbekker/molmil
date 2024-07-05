@@ -1361,6 +1361,8 @@ molmil.viewer.prototype.buildMolBondList = function(chain, rebuild) {
     if (snfg) this.buildSNFG(chain);
     return;
   }
+  
+  if (molmil.skipComplexBondSearch) return;
 
   var snfg = true;
   for (m1=0; m1<chain.molecules.length; m1++) {
