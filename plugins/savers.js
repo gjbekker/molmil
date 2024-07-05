@@ -200,15 +200,12 @@ molmil.exportPLY = function(soup, file) {
   if (molmil.geometry.buffer3) meshes.push(molmil.geometry.buffer3);
   if (molmil.geometry.buffer4) meshes.push(molmil.geometry.buffer4);
   for (var i=0; i<soup.structures.length; i++) {
-    if (soup.structures[i] instanceof molmil.polygonObject) {
-      for (var p=0; p<soup.structures[i].programs.length; p++) {
-        if (soup.structures[i].programs[p].data) {
-          var tmp = soup.structures[i].programs[p].data;
-          meshes.push({vertexSize: tmp.vertexSize, vertexBuffer: tmp.vertices, indexBuffer: tmp.indices});
-        }
-      }
+    if (soup.structures[i] instanceof molmil.polygonObject && soup.structures[i].data) meshes.push(soup.structures[i].data);
+    if (soup.structures[i].structures) {
+      for (var j=0; j<soup.structures[i].structures.length; j++) if (soup.structures[i].structures[j] instanceof molmil.polygonObject && soup.structures[i].structures[j].data) meshes.push(soup.structures[i].structures[j].data);
     }
   }
+
   // output
   
   var m, nov=0, nof=0, vs, edgeMode = false;
@@ -454,6 +451,9 @@ molmil.exportSTL = function(soup) {
   if (molmil.geometry.buffer4) meshes.push(molmil.geometry.buffer4);
   for (var i=0; i<soup.structures.length; i++) {
     if (soup.structures[i] instanceof molmil.polygonObject && soup.structures[i].data) meshes.push(soup.structures[i].data);
+    if (soup.structures[i].structures) {
+      for (var j=0; j<soup.structures[i].structures.length; j++) if (soup.structures[i].structures[j] instanceof molmil.polygonObject && soup.structures[i].structures[j].data) meshes.push(soup.structures[i].structures[j].data);
+    }
   }
   
   // output
