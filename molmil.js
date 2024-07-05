@@ -1362,7 +1362,7 @@ molmil.viewer.prototype.buildMolBondList = function(chain, rebuild) {
     return;
   }
   
-  if (molmil.skipComplexBondSearch) return;
+  if (molmil.configBox.skipComplexBondSearch) return;
 
   var snfg = true;
   for (m1=0; m1<chain.molecules.length; m1++) {
@@ -8182,12 +8182,15 @@ molmil.loadPDBlite = function(pdbid, cb, async, soup) {
 };
 
 molmil.loadPDB = function(pdbid, cb, async, soup) {
+  var tmp = molmil.configBox.skipComplexBondSearch;
+  molmil.configBox.skipComplexBondSearch = true;
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
   soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid.toLowerCase()), 1, cb || function(target, struc) {
     struc.meta.pdbid = pdbid;
     if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);
     molmil.colorEntry(struc, 1, null, true, soup);
+    molmil.configBox.skipComplexBondSearch = tmp;
   }, {async: async ? true : false});
 };
 
