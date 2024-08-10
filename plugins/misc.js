@@ -2068,10 +2068,10 @@ molmil.BU2JSO = function(assembly_id, options, struct, soup) {
             atom_site.Cartn_z.push(xyzout[2]);
             atom_site.auth_asym_id.push(oldChain.authName+buid);
             atom_site.label_asym_id.push(oldChain.name+buid);
-            atom_site.label_alt_id.push(oldAtom.label_alt_id);
+            atom_site.label_alt_id.push(oldAtom.label_alt_id||".");
             atom_site.label_atom_id.push(oldAtom.atomName);
             atom_site.label_comp_id.push(oldResidue.name);
-            atom_site.label_entity_id.push(oldChain.entity_id);
+            atom_site.label_entity_id.push(oldChain.entity_id||".");
             atom_site.label_seq_id.push(oldResidue.RSID);
             atom_site.type_symbol.push(oldAtom.element);
             atom_site.id.push(id++);

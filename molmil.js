@@ -5647,7 +5647,6 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   if (molmil.vrDisplay && molmil.vrDisplay.capabilities.hasExternalDisplay) glAttribs.preserveDrawingBuffer = true;
   
   if (molmil.configBox.webGL2) {
-    console.log('test');
     if (window.WebGL2RenderingContext) {
       this.defaultContext = canvas.getContext("webgl2", glAttribs);
       if (! this.defaultContext) molmil.configBox.webGL2 = false;
