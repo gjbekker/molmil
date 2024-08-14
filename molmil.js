@@ -1101,9 +1101,15 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
     this.target.downloadInProgress--;
 
     var structures = this.parse();
-    if (! structures) return;
+    if (! structures) {
+      if (settings.alwaysCallONDONE) ondone();
+      return;
+    }
     if (! (structures instanceof Array)) structures = [structures];
-    if (structures.length == 0) return;
+    if (structures.length == 0) {
+      if (settings.alwaysCallONDONE) ondone();
+      return;
+    }
     
     var id = this.target.SID++;
     if (structures.length == 1) structures[0].meta.idnr = "#"+id;
