@@ -516,9 +516,7 @@ molmil.commandLines.pyMol.loadCommand = function(env, command) {
     
     return true;
   }
-  
-  // load cmd[1]
-  var formats = [];
+
   if (cmd != null) {
     try {
       molmil.cli_soup.loadStructure(cmd[1], options.format, function(soup, structures) {molmil.displayEntry(structures, 1); molmil.colorEntry(structures, 1); soup.renderer.rebuildRequired = true;}, options);

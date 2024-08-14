@@ -1628,7 +1628,9 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
     var entryId = entries[e].substr(5).split("-")[0];
     var pdb = mmjso[entries[e]];
 
-    var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || null;
+    var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || pdb.
+ihm_starting_model_coord
+ || null;
     
     if (! atom_site) continue;
     
