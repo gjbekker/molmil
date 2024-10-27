@@ -273,6 +273,8 @@ molmil.configBox = {
     ["shaders/standard.glsl", "standard_alpha", "#define ALPHA_MODE 1\n"],
     ["shaders/standard.glsl", "standard_alphaSet", "#define ALPHA_SET 1\n"],
     ["shaders/standard.glsl", "standard_uniform_color", "#define UNIFORM_COLOR 1\n"],
+    ["shaders/standard.glsl", "standard_shader_opaque", "#define ALPHA_SET 1\n#define OPAQUE_ONLY 1"],
+    ["shaders/standard.glsl", "standard_shader_transparent", "#define ALPHA_SET 1\n#define TRANSPARENT_ONLY 1"],
     ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alphaSet_uniform_color", "#define ALPHA_SET 1\n#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_slab", "#define ENABLE_SLAB 1\n"], // standard_slab
@@ -475,6 +477,7 @@ molmil.colorEntry_Chain = 5;
 molmil.colorEntry_Custom = 6;
 molmil.colorEntry_ChainAlt = 7;
 molmil.colorEntry_ABEGO = 8;
+molmil.colorEntry_Entity = 9;
 
 // ** data objects **
 
@@ -2119,6 +2122,7 @@ molmil.viewer.prototype.calculateCOG = function(atomList) {
         for (c=0; c<struct.chains.length; c++) {
           chain = struct.chains[c];
           xyzRef = chain.modelsXYZ[modelId];
+          if (xyzRef === undefined) continue;
           if (chain.molecules.length && chain.molecules[0].water) continue;
       
           for (m=0; m<chain.molecules.length; m++) {
@@ -2548,6 +2552,8 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     if ("alphaMode" in settings) {
       program.pre_shader = renderer.shaders.alpha_dummy;
       program.standard_shader = renderer.shaders.standard_alpha;
+      program.standard_shader_opaque = renderer.shaders.standard_shader_opaque;
+      program.standard_shader_transparent = renderer.shaders.standard_shader_transparent;
     }
     else if ("alphaSet" in settings) {
       program.pre_shader = renderer.shaders.alpha_dummy;
@@ -2709,9 +2715,11 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     
     if (this.settings.has_ID) {
       molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 32, 0);
+      if (! this.settings.uniform_color) molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 32, 24);
     }
     else {
       molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Position, 3, this.renderer.gl.FLOAT, false, 28, 0);
+      if (! this.settings.uniform_color && ! this.settings.rgba) molmil.bindAttribute(this.renderer.gl, this.standard_attributes.in_Colour, 4, this.renderer.gl.UNSIGNED_BYTE, true, 28, 24);
     }
     molmil.clearAttributes(this.renderer.gl);
     
@@ -2728,18 +2736,16 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     this.renderer.gl.colorMask(true, true, true, true);
   }
   
-  program.standard_render = function(modelViewMatrix, COR, i, preMode) {
-    if (! this.status) return;
-    if ((this.settings.alphaSet || this.settings.alphaMode) && preMode === undefined) {
-      if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
-      this.alphaPre(modelViewMatrix, COR);
-    }
-    else if (this.settings.disableCulling) this.renderer.gl.disable(this.renderer.gl.CULL_FACE);
+  program.standard_render_core = function(modelViewMatrix, COR, i, preMode, opaqueMode) {
     i = i || 0;
     var normalMatrix = mat3.create();
     mat3.normalFromMat4(normalMatrix, modelViewMatrix);
     if (preMode) this.renderer.gl.useProgram(this.pre_shader.program);
-    else this.renderer.gl.useProgram(this.standard_shader.program);
+    else {
+      if (opaqueMode == 0) this.renderer.gl.useProgram(this.standard_shader.program);
+      else if (opaqueMode == 1) this.renderer.gl.useProgram(this.standard_shader.program); // opaque ONLY
+      else if (opaqueMode == 2) this.renderer.gl.useProgram(this.standard_shader.program); // transparent ONLY
+    }
     this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
     this.renderer.gl.uniformMatrix3fv(this.standard_shader.uniforms.normalMatrix, false, normalMatrix);
     this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
@@ -2770,8 +2776,7 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     if ("alphaSet" in this.settings) {
       this.renderer.gl.uniform1f(this.standard_shader.uniforms.alpha, this.settings.alphaSet);
     }
-  
-        
+
     this.renderer.gl.bindBuffer(this.renderer.gl.ARRAY_BUFFER, this.vertexBuffer); 
     
     molmil.resetAttributes(this.renderer.gl);
@@ -2801,6 +2806,19 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
       while ((vtd = Math.min(this.nElements-dv, 3000000)) > 0) {this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, vtd, this.renderer.gl.INDEXINT, dv*4); dv += vtd;}
     }
     else this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, this.nElements, this.renderer.gl.INDEXINT, 0);
+  }
+  
+  program.standard_render = function(modelViewMatrix, COR, i, preMode) {
+    if (! this.status) return;
+    if ((this.settings.alphaSet || this.settings.alphaMode) && preMode === undefined) {
+      program.standard_render_core(modelViewMatrix, COR, i, preMode, 1);
+      if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
+      this.alphaPre(modelViewMatrix, COR);
+      program.standard_render_core(modelViewMatrix, COR, i, preMode, 2);
+    }
+    else if (this.settings.disableCulling) this.renderer.gl.disable(this.renderer.gl.CULL_FACE);
+    
+    program.standard_render_core(modelViewMatrix, COR, i, preMode, 0);
     
     if (this.settings.alphaMode || "alphaSet" in this.settings) {
       if (molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
@@ -6689,9 +6707,32 @@ molmil.handle_molmilViewer_mouseMove = function (event) {
   event.preventDefault();
 }
 
+molmil.infoPopUp = function(text) {
+  var popup = document.getElementById("molmil_info_popup");
+  if (popup == null) {
+    popup = molmil_dep.dcE("div")
+    popup.id = "molmil_info_popup";
+    document.body.pushNode(popup);
+  }
+  if (text === undefined) {
+    if (popup.timeout) clearTimeout(popup.timeout);
+    popup.classList.remove("visible");
+    return;
+  }
+  popup.innerHTML = text;
+  popup.classList.add("visible")
+  if (popup.timeout) clearTimeout(popup.timeout);
+  popup.timeout = setTimeout(function() {
+    popup.classList.remove("visible");
+  }, 5000);
+}
+
 molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing in vr mode...
   if (molmil.settings.recordingMode) return;
-  if (molmil.configBox.wheelZoomRequiresCtrl && ! event.ctrlKey) return;
+  if (molmil.configBox.wheelZoomRequiresCtrl && ! document.fullscreenElement) {
+    if (! event.ctrlKey) return molmil.infoPopUp("Press Ctrl button while scrolling to enable zoom");
+    else molmil.infoPopUp();
+  }
   event.target.renderer.TransZ -= (event.wheelDelta || -event.detail*40 || event.deltaY*40 || event.deltaX*40);
   if (molmil_dep.dBT.MSIE) event.target.renderer.TransZ /= 50;
   event.target.update = true;
@@ -7463,18 +7504,7 @@ molmil.quickModelColor = function(type, options, soup) {
           for (a=0; a<chain.atoms.length; a++) selection.push(chain.atoms[a]);
         }
       }
-      var values = []
-      for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
-      if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
-      else var min = Math.min.apply(null, values);
-      if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
-      else var max = Math.max.apply(null, values); 
-      var diffInv = 1./(max-min), tmp;
-      for (var i=0; i<selection.length; i++) {
-        tmp = 1-((values[i]-min)*diffInv); ///TODO
-        selection[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); selection[i].rgba[0] *= 255; selection[i].rgba[1] *= 255; selection[i].rgba[2] *= 255; selection[i].rgba.push(255);
-        if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
-      }
+      molmil.colorBfactor(selection, soup);
     }
     else molmil.colorEntry(soup.structures, molmil.colorEntry_CPK, null, false, soup);
   }
@@ -7590,6 +7620,25 @@ molmil.colorEntry = function (obj, cm, setting, rebuildGeometry, soup) {
           for (a=0; a<mol.atoms.length; a++) if (! setting.carbonOnly || mol.atoms[a].element == "C") mol.atoms[a].rgba = obj.chains[c].rgba;
         }
         if (j >= list.length) j = 0;
+      }
+    }
+    else if (cm == molmil.colorEntry_Entity) {
+      if (! molmil_dep.isObject(setting)) setting = {};
+      
+      var tmp = new Set();
+      for (c=0; c<obj.chains.length; c++) tmp.add(obj.chains[c].entity_id);
+      var entity2colors = molmil.interpolateHsl(tmp.size+1, 0, 360);
+      var emap = {};
+
+      for (c=0; c<obj.chains.length; c++) {
+        chain = obj.chains[c];
+        if (emap[chain.entity_id] === undefined) emap[chain.entity_id] = entity2colors.shift(0);
+        chain.rgba = [emap[chain.entity_id][0], emap[chain.entity_id][1], emap[chain.entity_id][2], 255];
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          mol.rgba = obj.chains[c].rgba;
+          for (a=0; a<mol.atoms.length; a++) if (! setting.carbonOnly || mol.atoms[a].element == "C") mol.atoms[a].rgba = obj.chains[c].rgba;
+        }
       }
     }
     else if (cm == molmil.colorEntry_ABEGO) {
@@ -9353,39 +9402,27 @@ molmil.loadPlugin = function(URL, callBack, self, argList, async) {
   }
 }
 
-molmil.colorBfactor = function(color1, color3, color2, settings, soup) {
-  soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  settings = settings || {};
-  
-
-  var c, chain, a, sf, tmp = [0, 0, 0];
-  var mn = 1e99;
-  var mx = -1e99;
-  
-  for (c=0; c<soup.chains.length; c++) {
-    chain = soup.chains[c];
-    for (a=0; a<chain.atoms.length; a++) {
-      if (chain.atoms[a].Bfactor < mn) mn = chain.atoms[a].Bfactor;
-      if (chain.atoms[a].Bfactor > mx) mx = chain.atoms[a].Bfactor;
-    }
+molmil.colorBfactor = function(selection, soup, colorFunc) {
+  if (colorFunc === undefined) {
+    colorFunc = function(inp) {
+      var rgba = molmil.hslToRgb123(inp*(2/3), 1.0, 0.5); rgba[0] *= 255; rgba[1] *= 255; rgba[2] *= 255; rgba.push(255);
+      return rgba;
+    };
   }
-  
-  for (c=0; c<soup.chains.length; c++) {
-    chain = soup.chains[c];
-    for (a=0; a<chain.atoms.length; a++) {
-      if (! settings.skipMinMax) sf = (chain.atoms[a].Bfactor-mn)/(mx-mn);
-      else sf = chain.atoms[a].Bfactor;
-      if (sf >= 0.5) vec3.lerp(tmp, color3, color2, (sf-.5)*2);
-      else vec3.lerp(tmp, color1, color3, sf*2);
-      chain.atoms[a].rgba = [tmp[0], tmp[1], tmp[2], 255];
-      if (chain.atoms[a].molecule.CA == chain.atoms[a]) chain.atoms[a].molecule.rgba = [tmp[0], tmp[1], tmp[2], 255];
-    }
+  var values = []
+  for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
+  if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
+  else var min = Math.min.apply(null, values);
+  if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
+  else var max = Math.max.apply(null, values); 
+  if (molmil.configBox.inverseBfacClr) {var tmp = min; min = max; max = tmp;}
+  var diffInv = 1./(max-min), tmp;
+  for (var i=0; i<selection.length; i++) {
+    tmp = 1-((values[i]-min)*diffInv); ///TODO
+    selection[i].rgba = colorFunc(tmp);
+    if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
   }
-  
-  soup.renderer.initBuffers();
-  soup.renderer.canvas.update = true;
-  
-  // molmil.colorBfactor([0, 0, 255], [255, 255, 255], [255, 0, 0], {skipMinMax:true})
+  soup.renderer.rebuildRequired = true;
 }
 
 molmil.formatList = {}
@@ -9940,9 +9977,10 @@ molmil.superpose = function(A, B, C, modelId, iterate) {
 
 molmil.alignInfo = {};
 
-molmil.align = function(A, B) {
+molmil.align = function(A, B, options) {
   // https://github.com/CDCgov/bioseq-js/blob/master/dist/bioseq.js
-  if (! window.bioseq) return molmil.loadPlugin("https://raw.githubusercontent.com/CDCgov/bioseq-js/master/dist/bioseq.js", molmil.align, molmil, [A, B]); 
+  if (! window.bioseq) return molmil.loadPlugin("https://raw.githubusercontent.com/CDCgov/bioseq-js/master/dist/bioseq.js", molmil.align, molmil, [A, B, options]); 
+  options = options || {};
   if (! bioseq.amino_acids) {
     var blosum62 = {"*":{"*":1,"A":-4,"C":-4,"B":-4,"E":-4,"D":-4,"G":-4,"F":-4,"I":-4,"H":-4,"K":-4,"M":-4,"L":-4,"N":-4,"Q":-4,"P":-4,"S":-4,"R":-4,"T":-4,"W":-4,"V":-4,"Y":-4,"X":-4,"Z":-4},"A":{"*":-4,"A":4,"C":0,"B":-2,"E":-1,"D":-2,"G":0,"F":-2,"I":-1,"H":-2,"K":-1,"M":-1,"L":-1,"N":-2,"Q":-1,"P":-1,"S":1,"R":-1,"T":0,"W":-3,"V":0,"Y":-2,"X":0,"Z":-1},"C":{"*":-4,"A":0,"C":9,"B":-3,"E":-4,"D":-3,"G":-3,"F":-2,"I":-1,"H":-3,"K":-3,"M":-1,"L":-1,"N":-3,"Q":-3,"P":-3,"S":-1,"R":-3,"T":-1,"W":-2,"V":-1,"Y":-2,"X":-2,"Z":-3},"B":{"*":-4,"A":-2,"C":-3,"B":4,"E":1,"D":4,"G":-1,"F":-3,"I":-3,"H":0,"K":0,"M":-3,"L":-4,"N":3,"Q":0,"P":-2,"S":0,"R":-1,"T":-1,"W":-4,"V":-3,"Y":-3,"X":-1,"Z":1},"E":{"*":-4,"A":-1,"C":-4,"B":1,"E":5,"D":2,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":-2,"L":-3,"N":0,"Q":2,"P":-1,"S":0,"R":0,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":4},"D":{"*":-4,"A":-2,"C":-3,"B":4,"E":2,"D":6,"G":-1,"F":-3,"I":-3,"H":-1,"K":-1,"M":-3,"L":-4,"N":1,"Q":0,"P":-1,"S":0,"R":-2,"T":-1,"W":-4,"V":-3,"Y":-3,"X":-1,"Z":1},"G":{"*":-4,"A":0,"C":-3,"B":-1,"E":-2,"D":-1,"G":6,"F":-3,"I":-4,"H":-2,"K":-2,"M":-3,"L":-4,"N":0,"Q":-2,"P":-2,"S":0,"R":-2,"T":-2,"W":-2,"V":-3,"Y":-3,"X":-1,"Z":-2},"F":{"*":-4,"A":-2,"C":-2,"B":-3,"E":-3,"D":-3,"G":-3,"F":6,"I":0,"H":-1,"K":-3,"M":0,"L":0,"N":-3,"Q":-3,"P":-4,"S":-2,"R":-3,"T":-2,"W":1,"V":-1,"Y":3,"X":-1,"Z":-3},"I":{"*":-4,"A":-1,"C":-1,"B":-3,"E":-3,"D":-3,"G":-4,"F":0,"I":4,"H":-3,"K":-3,"M":1,"L":2,"N":-3,"Q":-3,"P":-3,"S":-2,"R":-3,"T":-1,"W":-3,"V":3,"Y":-1,"X":-1,"Z":-3},"H":{"*":-4,"A":-2,"C":-3,"B":0,"E":0,"D":-1,"G":-2,"F":-1,"I":-3,"H":8,"K":-1,"M":-2,"L":-3,"N":1,"Q":0,"P":-2,"S":-1,"R":0,"T":-2,"W":-2,"V":-3,"Y":2,"X":-1,"Z":0},"K":{"*":-4,"A":-1,"C":-3,"B":0,"E":1,"D":-1,"G":-2,"F":-3,"I":-3,"H":-1,"K":5,"M":-1,"L":-2,"N":0,"Q":1,"P":-1,"S":0,"R":2,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":1},"M":{"*":-4,"A":-1,"C":-1,"B":-3,"E":-2,"D":-3,"G":-3,"F":0,"I":1,"H":-2,"K":-1,"M":5,"L":2,"N":-2,"Q":0,"P":-2,"S":-1,"R":-1,"T":-1,"W":-1,"V":1,"Y":-1,"X":-1,"Z":-1},"L":{"*":-4,"A":-1,"C":-1,"B":-4,"E":-3,"D":-4,"G":-4,"F":0,"I":2,"H":-3,"K":-2,"M":2,"L":4,"N":-3,"Q":-2,"P":-3,"S":-2,"R":-2,"T":-1,"W":-2,"V":1,"Y":-1,"X":-1,"Z":-3},"N":{"*":-4,"A":-2,"C":-3,"B":3,"E":0,"D":1,"G":0,"F":-3,"I":-3,"H":1,"K":0,"M":-2,"L":-3,"N":6,"Q":0,"P":-2,"S":1,"R":0,"T":0,"W":-4,"V":-3,"Y":-2,"X":-1,"Z":0},"Q":{"*":-4,"A":-1,"C":-3,"B":0,"E":2,"D":0,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":0,"L":-2,"N":0,"Q":5,"P":-1,"S":0,"R":1,"T":-1,"W":-2,"V":-2,"Y":-1,"X":-1,"Z":3},"P":{"*":-4,"A":-1,"C":-3,"B":-2,"E":-1,"D":-1,"G":-2,"F":-4,"I":-3,"H":-2,"K":-1,"M":-2,"L":-3,"N":-2,"Q":-1,"P":7,"S":-1,"R":-2,"T":-1,"W":-4,"V":-2,"Y":-3,"X":-2,"Z":-1},"S":{"*":-4,"A":1,"C":-1,"B":0,"E":0,"D":0,"G":0,"F":-2,"I":-2,"H":-1,"K":0,"M":-1,"L":-2,"N":1,"Q":0,"P":-1,"S":4,"R":-1,"T":1,"W":-3,"V":-2,"Y":-2,"X":0,"Z":0},"R":{"*":-4,"A":-1,"C":-3,"B":-1,"E":0,"D":-2,"G":-2,"F":-3,"I":-3,"H":0,"K":2,"M":-1,"L":-2,"N":0,"Q":1,"P":-2,"S":-1,"R":5,"T":-1,"W":-3,"V":-3,"Y":-2,"X":-1,"Z":0},"T":{"*":-4,"A":0,"C":-1,"B":-1,"E":-1,"D":-1,"G":-2,"F":-2,"I":-1,"H":-2,"K":-1,"M":-1,"L":-1,"N":0,"Q":-1,"P":-1,"S":1,"R":-1,"T":5,"W":-2,"V":0,"Y":-2,"X":0,"Z":-1},"W":{"*":-4,"A":-3,"C":-2,"B":-4,"E":-3,"D":-4,"G":-2,"F":1,"I":-3,"H":-2,"K":-3,"M":-1,"L":-2,"N":-4,"Q":-2,"P":-4,"S":-3,"R":-3,"T":-2,"W":11,"V":-3,"Y":2,"X":-2,"Z":-3},"V":{"*":-4,"A":0,"C":-1,"B":-3,"E":-2,"D":-3,"G":-3,"F":-1,"I":3,"H":-3,"K":-2,"M":1,"L":1,"N":-3,"Q":-2,"P":-2,"S":-2,"R":-3,"T":0,"W":-3,"V":4,"Y":-1,"X":-1,"Z":-2},"Y":{"*":-4,"A":-2,"C":-2,"B":-3,"E":-2,"D":-3,"G":-3,"F":3,"I":-1,"H":2,"K":-2,"M":-1,"L":-1,"N":-2,"Q":-1,"P":-3,"S":-2,"R":-2,"T":-2,"W":2,"V":-1,"Y":7,"X":-1,"Z":-2},"X":{"*":-4,"A":0,"C":-2,"B":-1,"E":-1,"D":-1,"G":-1,"F":-1,"I":-1,"H":-1,"K":-1,"M":-1,"L":-1,"N":-1,"Q":-1,"P":-2,"S":0,"R":-1,"T":0,"W":-2,"V":-1,"Y":-1,"X":-1,"Z":-1},"Z":{"*":-4,"A":-1,"C":-3,"B":1,"E":4,"D":1,"G":-2,"F":-3,"I":-3,"H":0,"K":1,"M":-1,"L":-3,"N":0,"Q":3,"P":-1,"S":0,"R":0,"T":-1,"W":-3,"V":-2,"Y":-2,"X":-1,"Z":4}};
     var alphabet = Object.keys(blosum62);
@@ -10004,7 +10042,7 @@ molmil.align = function(A, B) {
   
   molmil.alignInfo[ID] = data;
   
-  molmil.orient(Aarr, A.entry.soup);
+  if (! options.skipOrient) molmil.orient(Aarr, A.entry.soup);
   A.entry.soup.renderer.rebuildRequired = true;
   molmil.geometry.reInitChains = true;
 }

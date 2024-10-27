@@ -1294,22 +1294,7 @@ molmil.commandLines.pyMol.color = function(clr, atoms) {
        for (var i=0; i<selection.length; i++) entries[JSON.stringify(selection[i].chain.entry.meta)] = selection[i].chain.entry;
        molmil.colorEntry(Object.values(entries), molmil.colorEntry_ChainAlt, null, true);
     }
-    else if (clr == "bfactor") {
-      var values = []
-      for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
-      if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
-      else var min = Math.min.apply(null, values);
-      if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
-      else var max = Math.max.apply(null, values); 
-      if (molmil.configBox.inverseBfacClr) {var tmp = min; min = max; max = tmp;}
-      var diffInv = 1./(max-min), tmp;
-      for (var i=0; i<selection.length; i++) {
-        tmp = 1-((values[i]-min)*diffInv); ///TODO
-        selection[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); selection[i].rgba[0] *= 255; selection[i].rgba[1] *= 255; selection[i].rgba[2] *= 255; selection[i].rgba.push(255);
-        if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
-      }
-      this.cli_soup.renderer.rebuildRequired = true;
-    }
+    else if (clr == "bfactor") molmil.colorBfactor(selection, this.cli_soup);
     else if (clr == "snfg") {
       for (var i=0; i<selection.length; i++) {
         selection[i].molecule.rgba = selection[i].rgba = (molmil.SNFG[selection[i].molecule.name] || molmil.SNFG.__UNKNOWN__).rgba.slice();

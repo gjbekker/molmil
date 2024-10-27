@@ -432,10 +432,10 @@
 }
 
 
-@media only screen and (max-width: 45em) {
+@media only screen and (max-width: 60em) {
   #styleif {
-    left: 5em !important;
-    width: calc(100% - 6.5em) !important;
+    left: 5.6em !important;
+    width: calc(100% - 7.5em) !important;
   }
 }
 
@@ -449,6 +449,7 @@
   pointer-events: none;
   color: rgb(var(--FOREGROUND_COLOR));
   
+  transition: width,left .2s linear !important;
 }
 
 #styleif > div {
@@ -478,6 +479,10 @@
   font-size: .75em;
 }
 
+h1 {
+  font-size: 1.5em;
+}
+
 #styleif > :nth-child(1).visible {
   border: 1px solid rgb(var(--FOREGROUND_COLOR));
   border-top: none;
@@ -488,10 +493,10 @@
   
   opacity: 1;
   visibility: visible;
-  height: 20em;
+  height: auto;
   overflow: auto;
   resize: vertical;
-  max-height: calc(100% - 10em);
+  max-height: 25em;
 }
 
 #styleif > :nth-child(1) h1 {
@@ -579,21 +584,28 @@ canvas {
 button {
   padding: .33em .67em .33em .67em;
   display: inline-block;
-  border: 1px solid rgb(var(--BACKGROUND_LIGHT_COLOR));
+  border: 1px solid #C0C0C0;
   margin: .25em;
-  border-radius: 1em;
-  background: linear-gradient(rgb(var(--BACKGROUND_LIGHT_COLOR)), rgb(var(--BACKGROUND_COLOR)));
+  border-radius: .25em;
+  background: #DCDCDC;
   font-weight: bold;
   color: rgb(var(--FOREGROUND_COLOR));
+  box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+  transition: all 0.3s cubic-bezier(.25,.8,.25,1);
 }
 
 button:hover {
   cursor: pointer;
-  background: linear-gradient(rgb(var(--BACKGROUND_COLOR)), rgb(var(--BACKGROUND_LIGHT_COLOR)));
+  box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
 }
 
-#nw_edmap_dl {
-  margin-left: 1em;  
+button:disabled {
+  filter: grayscale(100%);
+  color: grey;
+}
+
+button:focus {
+  outline:none;
 }
 
 #nw_edmap_dl a {
@@ -681,4 +693,27 @@ button:hover {
 
 #nw_align table b {
   color: green;
+}
+
+#molmil_info_popup.visible {
+  display: block!important;
+}
+
+#molmil_info_popup {
+  border-radius: .5em;
+  display: none;
+  position: absolute;
+  padding: 0.5em;
+  z-index: 999;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #eeeeeeaa;
+  font-weight: bold;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }

@@ -1670,6 +1670,18 @@ molmil.UI.prototype.meshOptionsFunction = function(payload, lv, mode) {
 molmil.UI.prototype.deleteMeshFunction = function(payload, lv, mode) {
   if (! (payload instanceof Array)) payload = [payload];
   
+  var tmp = [];
+  for (var f=0; f<payload.length; f++) {
+    if (payload[f].structures === undefined) tmp.push(payload[f]);
+    else {
+    for (var s=0; s<payload[f].structures.length; s++) if (payload[f].structures[s] instanceof molmil.polygonObject) {
+      tmp.push(payload[f].structures[s]);
+      payload[f].structures[s].refref = payload[f];
+    }
+    }
+  }
+  payload = tmp;
+  
   var files = this.soup.structures;
   
   for (var f=0; f<payload.length; f++) {
@@ -1677,6 +1689,10 @@ molmil.UI.prototype.deleteMeshFunction = function(payload, lv, mode) {
     for (var p=0; p<pnames.length; p++) this.soup.renderer.removeProgram(payload[f].programs[pnames[p]]);
     var idx = files.indexOf(payload[f]);
     if (idx != -1) this.soup.structures.splice(idx, 1);
+    else {
+      idx = files.indexOf(payload[f].refref);
+      if (idx != -1) this.soup.structures.splice(idx, 1);
+    }
   }
   
   this.soup.renderer.canvas.update = true;
@@ -1685,6 +1701,15 @@ molmil.UI.prototype.deleteMeshFunction = function(payload, lv, mode) {
 
 molmil.UI.prototype.displayFunction = function(payload, lv, mode) {
   if (! (payload instanceof Array)) payload = [payload]
+  
+  var tmp = [];
+  for (var f=0; f<payload.length; f++) {
+    if (payload[f].structures === undefined) tmp.push(payload[f]);
+    else {
+      for (var s=0; s<payload[f].structures.length; s++) if (payload[f].structures[s] instanceof molmil.polygonObject) tmp.push(payload[f].structures[s]);
+    }
+  }
+  payload = tmp;
   
   if (mode == 10001) {
     var tmp1 = [], tmp2 = [];
@@ -1966,7 +1991,8 @@ molmil.UI.prototype.initMenus = function() {
   
   this.contextMenuIsosurfaceEntry = [
     [function(payload, structure) {
-      if (payload[0].display) {structure[3][2] = molmil.displayMode_None; return "Hide";}
+      var obj = payload[0].structures === undefined ? payload[0] : payload[0].structures[0];
+      if (obj.display) {structure[3][2] = molmil.displayMode_None; return "Hide";}
       else {structure[3][2] = molmil.displayMode_Visible; return "Show";}
     }, this.displayFunction, this, [null, 0, 0]],
     ["Options", this.meshOptionsFunction, this, [null, 0, 0]],
@@ -2179,74 +2205,81 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   contentBox.pushNode("h1", "Structure styling options");
   contentBox.pushNode("hr");
   
-  contentBox.pushNode("b", "Quick styling options:");
+  contentBox.pushNode("b", "Quick styling options: ");
   
-  var ul = contentBox.pushNode("div"), opt;
-  opt = ul.pushNode("button", "Group cartoon");
-  opt.onclick = function() {
-    molmil.quickModelColor("newweb-au", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Group cartoon with sidechains");
-  opt.onclick = function() {
-    molmil.quickModelColor("newweb-au-sc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
   
-  opt = ul.pushNode("button", "Cartoon");
-  opt.onclick = function() {
-    molmil.quickModelColor("cartoon", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Cartoon with sidechains");
-  opt.onclick = function() {
-    molmil.quickModelColor("cartoon-sc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
+  contentBox.pushNode("span", "Style:");
+  var styleSelect = contentBox.pushNode("select"), tmp;
   
-  opt = ul.pushNode("button", "Cartoon, colored by chain");
-  opt.onclick = function() {
-    molmil.quickModelColor("cartoon-chainc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Cartoon, color by chain with sidechains");
-  opt.onclick = function() {
-    molmil.quickModelColor("cartoon-chainc-sc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
+  tmp = styleSelect.pushNode("option", "Cartoon"); tmp.value = molmil.displayMode_Default;
+  tmp = styleSelect.pushNode("option", "Cartoon with sidechains"); tmp.value = molmil.displayMode_Stick_SC;
+  tmp = styleSelect.pushNode("option", "Sticks"); tmp.value = molmil.displayMode_Stick;
+  tmp = styleSelect.pushNode("option", "Wireframe"); tmp.value = molmil.displayMode_Wireframe;
+
+  contentBox.pushNode("span", " Color:");
+  var colorSelect = contentBox.pushNode("select");
   
-  opt = ul.pushNode("button", "Sticks (CPK)");
-  opt.onclick = function() {
-    molmil.quickModelColor("sticks", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Sticks (CPK), colored by chain");
-  opt.onclick = function() {
-    molmil.quickModelColor("sticks-chainc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Sticks (CPK), colored by bfactor");
-  opt.onclick = function() {
-    molmil.quickModelColor("sticks-bfactor", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
+  tmp = colorSelect.pushNode("option", "Group"); tmp.value = 0;
+  tmp = colorSelect.pushNode("option", "Structure"); tmp.value = 1;
+  tmp = colorSelect.pushNode("option", "Chain"); tmp.value = 2;
+  tmp = colorSelect.pushNode("option", "Entity"); tmp.value = 3;
+  tmp = colorSelect.pushNode("option", "B-factor"); tmp.value = 4;
+
+  styleSelect.oninput = function() {
+    if (styleSelect.value == molmil.displayMode_Stick_SC) molmil.displayEntry(UI.soup.structures, molmil.displayMode_Default, false, UI.soup, {newweb: true});
+    molmil.displayEntry(UI.soup.structures, styleSelect.value, true, UI.soup, {newweb: true});
+  }
   
-  opt = ul.pushNode("button", "Wireframe (CPK)");
-  opt.onclick = function() {
-    molmil.quickModelColor("lines", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
-  opt = ul.pushNode("button", "Wireframe (CPK), colored by chain");
-  opt.onclick = function() {
-    molmil.quickModelColor("lines-chainc", {do_styling: true}, UI.soup);
-    molmil.checkRebuild();
-  };
+  colorSelect.oninput = function() {
+    if (colorSelect.value == 1) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_Default, null, true, UI.soup);
+    else if (colorSelect.value == 2) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, true, UI.soup);
+    else if (colorSelect.value == 3) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_Entity, {carbonOnly: true}, true, UI.soup);
+    else if (colorSelect.value == 0) {
+      var c, chain, m, mol, a, list;
+      for (c=0; c<UI.soup.chains.length; c++) {
+        chain = UI.soup.chains[c];
+        if (chain.molecules.length > 1) list = molmil.interpolateBR(chain.molecules.length);
+        else list = [[255, 255, 255, 255]];
+        for (m=0; m<chain.molecules.length; m++) {
+          mol = chain.molecules[m];
+          mol.rgba = list[m];
+          for (a=0; a<mol.atoms.length; a++) mol.atoms[a].rgba = molmil_dep.getKeyFromObject(molmil.configBox.elementColors, mol.atoms[a].element, molmil.configBox.elementColors.DUMMY);
+        }
+      }
+      UI.soup.renderer.initBuffers();
+      UI.soup.renderer.canvas.update = true; 
+    }
+    else if (colorSelect.value == 4) {
+      var selection = [];
+      for (var s=0; s<UI.soup.structures.length; s++) {
+        var obj = UI.soup.structures[s];
+        for (c=0; c<obj.chains.length; c++) {
+          chain = obj.chains[c];
+          for (a=0; a<chain.atoms.length; a++) selection.push(chain.atoms[a]);
+        }
+      }
+      var values = []
+      for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
+      if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
+      else var min = Math.min.apply(null, values);
+      if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
+      else var max = Math.max.apply(null, values); 
+      var diffInv = 1./(max-min), tmp;
+      for (var i=0; i<selection.length; i++) {
+        tmp = 1-((values[i]-min)*diffInv); ///TODO
+        selection[i].rgba = molmil.hslToRgb123(tmp*(2/3), 1.0, 0.5); selection[i].rgba[0] *= 255; selection[i].rgba[1] *= 255; selection[i].rgba[2] *= 255; selection[i].rgba.push(255);
+        if (selection[i].molecule.CA == selection[i]) selection[i].molecule.rgba = selection[i].rgba;
+      }
+      UI.soup.renderer.initBuffers();
+      UI.soup.renderer.canvas.update = true; 
+    }
+  }
   
   contentBox.pushNode("br");
   
   contentBox.pushNode("b", "Quick operations:");
   
-  ul = contentBox.pushNode("div");
+  ul = contentBox.pushNode("span");
   opt = ul.pushNode("button", "Reposition camera");
   opt.onclick = function() {
     UI.soup.renderer.camera.reset();
@@ -2731,7 +2764,7 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
   
   var mode = callOptions ? callOptions[0] : "both";
   
-  var flexCont = contentBox.pushNode("div"); flexCont.style.display = "flex";
+  var flexCont = contentBox.pushNode("div");// flexCont.style.display = "flex";
   
   var form = flexCont.pushNode("form");
   form.pdbid = pdbid;
@@ -2770,23 +2803,21 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
   item.innerHTML += "fo-fc";
   item.firstChild.onchange = handleMT;
 
-  cont = form.pushNode("div");
-  item = cont.pushNode("span", "<b>Map size:</b> ");
+  cont = form.pushNode("span");
+  item = cont.pushNode("span", " <b>Map size:</b> ");
   item = cont.pushNode(molmil_dep.createTextBox("25")); item.name = "mapsize"; item.style.width = "4em";
   item = cont.pushNode("span", " <b>\u212B</b>");
-  cont.pushNode("br");
   
-  cont = form.pushNode("div");
-  item = cont.pushNode("span", "<b>Contour level (2fo-fc):</b> ");
+  cont = form.pushNode("span");
+  item = cont.pushNode("span", " <b>Contour level (2fo-fc):</b> ");
   item = cont.pushNode(molmil_dep.createTextBox("1")); item.name = "sigma1"; item.style.width = "4em";
   item = cont.pushNode("span", " <b>\u03c3</b>");
-  cont = form.pushNode("div");
-  item = cont.pushNode("span", "<b>Contour level (fo-fc):</b> ");
+  cont = form.pushNode("span");
+  item = cont.pushNode("span", " <b>Contour level (fo-fc):</b> ");
   item = cont.pushNode(molmil_dep.createTextBox("2")); item.name = "sigma2"; item.style.width = "4em";
   item = cont.pushNode("span", " <b>\u03c3</b>");
-  cont.pushNode("br");
   
-  
+  item.pushNode("span", " ");
   item = form.pushNode("button", "Create map");
   item.onclick = function() {
     var size = parseFloat(form.mapsize.value) || 25;
@@ -3465,8 +3496,9 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     nwif.contentBox = nwif.pushNode("div");
     if (window.MutationObserver !== undefined) {
       var styleif_height = localStorage.getItem("molmil.settings_styleif_height");
-      if (styleif_height != "hidden") nwif.contentBox.style.height = styleif_height;
-      else showOption = "hide";
+      //if (styleif_height != "hidden") nwif.contentBox.style.height = styleif_height;
+      //else showOption = "hide";
+      if (styleif_height == "hidden") showOption = "hide";
       var observer = new MutationObserver(function(mutations) {
         if (nwif.contentBox.classList.contains("visible")) localStorage.setItem("molmil.settings_styleif_height", nwif.contentBox.style.height);
         else localStorage.setItem("molmil.settings_styleif_height", "hidden");

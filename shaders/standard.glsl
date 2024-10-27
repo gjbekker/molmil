@@ -113,6 +113,13 @@ uniform float slabNear, slabFar;
 #endif
 
 void main() {
+#ifdef TRANSPARENT_ONLY
+  if (ex_Colour.a == 1.0) discard;
+#endif
+#ifdef OPAQUE_ONLY
+  if (ex_Colour.a < 1.0) discard;
+#endif
+
 #ifdef ENABLE_SLAB
   if (Pz < slabNear || Pz > slabFar+1.0) discard; // later change the slabFar functionality to a more fog-like function..
 #endif
