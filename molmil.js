@@ -23,7 +23,7 @@ molmil.ignoreBlackList = false;
 molmil.vrDisplay = null;
 molmil.vrPose = [0, 0, 0];
 molmil.vrOrient = [0, 0, 0, 0];
-molmil.pdbj_data = "https://data.pdbjpw1.pdbj.org/";
+molmil.pdbj_data = "https://data.pdbjlc1.pdbj.org/";
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
@@ -273,8 +273,8 @@ molmil.configBox = {
     ["shaders/standard.glsl", "standard_alpha", "#define ALPHA_MODE 1\n"],
     ["shaders/standard.glsl", "standard_alphaSet", "#define ALPHA_SET 1\n"],
     ["shaders/standard.glsl", "standard_uniform_color", "#define UNIFORM_COLOR 1\n"],
-    ["shaders/standard.glsl", "standard_shader_opaque", "#define ALPHA_SET 1\n#define OPAQUE_ONLY 1"],
-    ["shaders/standard.glsl", "standard_shader_transparent", "#define ALPHA_SET 1\n#define TRANSPARENT_ONLY 1"],
+    ["shaders/standard.glsl", "standard_shader_opaque", "#define ALPHA_MODE 1\n#define OPAQUE_ONLY 1"],
+    ["shaders/standard.glsl", "standard_shader_transparent", "#define ALPHA_MODE 1\n#define TRANSPARENT_ONLY 1"],
     ["shaders/standard.glsl", "standard_alpha_uniform_color", "#define ALPHA_MODE 1\n#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_alphaSet_uniform_color", "#define ALPHA_SET 1\n#define UNIFORM_COLOR 1\n"],
     ["shaders/standard.glsl", "standard_slab", "#define ENABLE_SLAB 1\n"], // standard_slab
@@ -2736,45 +2736,46 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     this.renderer.gl.colorMask(true, true, true, true);
   }
   
-  program.standard_render_core = function(modelViewMatrix, COR, i, preMode, opaqueMode) {
+  program.standard_render_core = function(modelViewMatrix, COR, i, opaqueMode) {
     i = i || 0;
+    
     var normalMatrix = mat3.create();
     mat3.normalFromMat4(normalMatrix, modelViewMatrix);
-    if (preMode) this.renderer.gl.useProgram(this.pre_shader.program);
-    else {
-      if (opaqueMode == 0) this.renderer.gl.useProgram(this.standard_shader.program);
-      else if (opaqueMode == 1) this.renderer.gl.useProgram(this.standard_shader.program); // opaque ONLY
-      else if (opaqueMode == 2) this.renderer.gl.useProgram(this.standard_shader.program); // transparent ONLY
-    }
-    this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.modelViewMatrix, false, modelViewMatrix);
-    this.renderer.gl.uniformMatrix3fv(this.standard_shader.uniforms.normalMatrix, false, normalMatrix);
-    this.renderer.gl.uniformMatrix4fv(this.standard_shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
-    this.renderer.gl.uniform3f(this.standard_shader.uniforms.COR, COR[0], COR[1], COR[2]);
-    this.renderer.gl.uniform1f(this.standard_shader.uniforms.focus, this.renderer.fogStart);
-    this.renderer.gl.uniform1f(this.standard_shader.uniforms.fogSpan, this.renderer.fogSpan);
+    
+    var shader = this.standard_shader;
+    if (opaqueMode == 1) shader = this.standard_shader_opaque;
+    else if (opaqueMode == 2) shader = this.standard_shader_transparent;
+
+    this.renderer.gl.useProgram(shader.program);
+    this.renderer.gl.uniformMatrix4fv(shader.uniforms.modelViewMatrix, false, modelViewMatrix);
+    this.renderer.gl.uniformMatrix3fv(shader.uniforms.normalMatrix, false, normalMatrix);
+    this.renderer.gl.uniformMatrix4fv(shader.uniforms.projectionMatrix, false, this.renderer.projectionMatrix);
+    this.renderer.gl.uniform3f(shader.uniforms.COR, COR[0], COR[1], COR[2]);
+    this.renderer.gl.uniform1f(shader.uniforms.focus, this.renderer.fogStart);
+    this.renderer.gl.uniform1f(shader.uniforms.fogSpan, this.renderer.fogSpan);
     if (this.settings.rgba) {
-      if (this.settings.alphaMode) this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255, this.settings.rgba[3]/255);
-      else this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255);
+      if (this.settings.alphaMode) this.renderer.gl.uniform3f(shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255, this.settings.rgba[3]/255);
+      else this.renderer.gl.uniform3f(shader.uniforms.uniform_color, this.settings.rgba[0]/255, this.settings.rgba[1]/255, this.settings.rgba[2]/255);
     }
     else if (this.settings.uniform_color) {
-      if (this.settings.alphaMode) this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255, this.uniform_color[i][3]/255);
-      else this.renderer.gl.uniform3f(this.standard_shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
+      if (this.settings.alphaMode) this.renderer.gl.uniform3f(shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255, this.uniform_color[i][3]/255);
+      else this.renderer.gl.uniform3f(shader.uniforms.uniform_color, this.uniform_color[i][0]/255, this.uniform_color[i][1]/255, this.uniform_color[i][2]/255);
     }
     
-    if (molmil.configBox.fogColor) this.renderer.gl.uniform4f(this.standard_shader.uniforms.backgroundColor, molmil.configBox.fogColor[0], molmil.configBox.fogColor[1], molmil.configBox.fogColor[2], 1.0);
-    else this.renderer.gl.uniform4f(this.standard_shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
+    if (molmil.configBox.fogColor) this.renderer.gl.uniform4f(shader.uniforms.backgroundColor, molmil.configBox.fogColor[0], molmil.configBox.fogColor[1], molmil.configBox.fogColor[2], 1.0);
+    else this.renderer.gl.uniform4f(shader.uniforms.backgroundColor, molmil.configBox.BGCOLOR[0], molmil.configBox.BGCOLOR[1], molmil.configBox.BGCOLOR[2], 1.0);
     if (this.settings.slab) {
-      if (this.settings.slabColor) {this.renderer.gl.uniform4f(this.standard_shader.uniforms.slabColor, this.settings.slabColor[0], this.settings.slabColor[1], this.settings.slabColor[2], this.settings.slabColor[3]);}
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabNear, -modelViewMatrix[14]+this.settings.slabNear-molmil.configBox.zNear);
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabFar, -modelViewMatrix[14]+this.settings.slabFar-molmil.configBox.zNear);
+      if (this.settings.slabColor) {this.renderer.gl.uniform4f(shader.uniforms.slabColor, this.settings.slabColor[0], this.settings.slabColor[1], this.settings.slabColor[2], this.settings.slabColor[3]);}
+      this.renderer.gl.uniform1f(shader.uniforms.slabNear, -modelViewMatrix[14]+this.settings.slabNear-molmil.configBox.zNear);
+      this.renderer.gl.uniform1f(shader.uniforms.slabFar, -modelViewMatrix[14]+this.settings.slabFar-molmil.configBox.zNear);
     }
     else if (this.renderer.settings.slab) {
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
+      this.renderer.gl.uniform1f(shader.uniforms.slabNear, -modelViewMatrix[14]+this.renderer.settings.slabNear-molmil.configBox.zNear);
+      this.renderer.gl.uniform1f(shader.uniforms.slabFar, -modelViewMatrix[14]+this.renderer.settings.slabFar-molmil.configBox.zNear);
     }
     
     if ("alphaSet" in this.settings) {
-      this.renderer.gl.uniform1f(this.standard_shader.uniforms.alpha, this.settings.alphaSet);
+      this.renderer.gl.uniform1f(shader.uniforms.alpha, this.settings.alphaSet);
     }
 
     this.renderer.gl.bindBuffer(this.renderer.gl.ARRAY_BUFFER, this.vertexBuffer); 
@@ -2808,23 +2809,33 @@ molmil.geometry.build_simple_render_program = function(vertices_, indices_, rend
     else this.renderer.gl.drawElements(this.renderer.gl.TRIANGLES, this.nElements, this.renderer.gl.INDEXINT, 0);
   }
   
-  program.standard_render = function(modelViewMatrix, COR, i, preMode) {
+  program.alphaMode_opaque_render = function(modelViewMatrix, COR, i) {
     if (! this.status) return;
-    if ((this.settings.alphaSet || this.settings.alphaMode) && preMode === undefined) {
-      program.standard_render_core(modelViewMatrix, COR, i, preMode, 1);
+    program.standard_render_core(modelViewMatrix, COR, i, 1); // opaque only
+  };
+  
+  program.standard_render = function(modelViewMatrix, COR, i) {
+    if (! this.status) return;
+    if (this.settings.alphaSet) {
       if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
-      this.alphaPre(modelViewMatrix, COR);
-      program.standard_render_core(modelViewMatrix, COR, i, preMode, 2);
-    }
-    else if (this.settings.disableCulling) this.renderer.gl.disable(this.renderer.gl.CULL_FACE);
-    
-    program.standard_render_core(modelViewMatrix, COR, i, preMode, 0);
-    
-    if (this.settings.alphaMode || "alphaSet" in this.settings) {
+      this.alphaPre(modelViewMatrix, COR); // do pre thing
+      program.standard_render_core(modelViewMatrix, COR, i, 0);
       if (molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
       this.renderer.gl.disable(this.renderer.gl.BLEND);
     }
-    else if (this.settings.disableCulling) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
+    else if (this.settings.alphaMode && this.standard_shader_opaque) {
+      //program.standard_render_core(modelViewMatrix, COR, i, 1); // opaque only
+      if (molmil.configBox.cullFace) {this.renderer.gl.disable(this.renderer.gl.CULL_FACE);}
+      this.alphaPre(modelViewMatrix, COR); // do pre thing
+      program.standard_render_core(modelViewMatrix, COR, i, 2); // render transparent only
+      if (molmil.configBox.cullFace) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
+      this.renderer.gl.disable(this.renderer.gl.BLEND);
+    }
+    else {
+      if (this.settings.disableCulling) this.renderer.gl.disable(this.renderer.gl.CULL_FACE);
+      program.standard_render_core(modelViewMatrix, COR, i, 0);
+      if (this.settings.disableCulling) {this.renderer.gl.enable(this.renderer.gl.CULL_FACE); this.renderer.gl.cullFace(this.renderer.gl.BACK);}
+    }
   };
 
   if (! settings.multiMatrix) {
@@ -6073,11 +6084,14 @@ molmil.render.prototype.renderPicking = function() {
 
 molmil.render.prototype.renderPrograms = function(COR) {
   for (var p=0; p<this.programs.length; p++) {
-    if (this.programs[p].nElements && this.programs[p].status && ! (this.programs[p].settings.alphaMode || "alphaSet" in this.programs[p].settings)) this.programs[p].render(this.modelViewMatrix, COR);
+    if (this.programs[p].nElements && this.programs[p].status) {
+      if (this.programs[p].settings.alphaMode) this.programs[p].alphaMode_opaque_render(this.modelViewMatrix, COR);
+      else if (! this.programs[p].settings.alphaSet) this.programs[p].render(this.modelViewMatrix, COR);
+    }
   }
   
   for (var p=0; p<this.programs.length; p++) {
-    if (this.programs[p].nElements && this.programs[p].status && (this.programs[p].settings.alphaMode || "alphaSet" in this.programs[p].settings)) this.programs[p].render(this.modelViewMatrix, COR);
+    if (this.programs[p].nElements && this.programs[p].status && (this.programs[p].settings.alphaMode || this.programs[p].settings.alphaSet)) this.programs[p].render(this.modelViewMatrix, COR);
   }
   
   // pass1: render only opaque meshes (standard)
