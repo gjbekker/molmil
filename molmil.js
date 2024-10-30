@@ -9949,7 +9949,9 @@ molmil.superpose = function(A, B, C, modelId, iterate) {
       
       Rs[i] = Math.pow(xyz[0]-xyz2[0], 2) + Math.pow(xyz[1]-xyz2[1], 2) + Math.pow(xyz[2]-xyz2[2], 2);
     }
-    if (Math.min.apply(null, Rs) > iterate2) iterate2 = iterate2*4; // set the cutoff to double
+    // at least try to get a good alignment for part of the structure (if the structure partially mismatches (domain level, not loop leve), but sequence is the same, we get a bad initial superposition; using this method, we will get a good superposition for the parts that match)
+    var minScore2 = Rs.slice().sort(function(a,b){ return a < b ? -1 : 1;})[parseInt(Rs.length*.25)];
+    if (minScore2 > iterate2)  iterate2 = minScore2;
     for (i=0; i<B.length; i++) {
       if (Rs[i] < iterate2) selIdxs.push(i);
     }

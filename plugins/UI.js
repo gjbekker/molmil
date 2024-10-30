@@ -2208,17 +2208,19 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   contentBox.pushNode("b", "Quick styling options: ");
   
   
-  contentBox.pushNode("span", "Style:");
   var styleSelect = contentBox.pushNode("select"), tmp;
   
+  tmp = styleSelect.pushNode("option", "Style"); tmp.disabled = true; tmp.value = "placeholder"; tmp.style.display = "none";
   tmp = styleSelect.pushNode("option", "Cartoon"); tmp.value = molmil.displayMode_Default;
   tmp = styleSelect.pushNode("option", "Cartoon with sidechains"); tmp.value = molmil.displayMode_Stick_SC;
   tmp = styleSelect.pushNode("option", "Sticks"); tmp.value = molmil.displayMode_Stick;
   tmp = styleSelect.pushNode("option", "Wireframe"); tmp.value = molmil.displayMode_Wireframe;
 
-  contentBox.pushNode("span", " Color:");
+
+  contentBox.pushNode("span", "&nbsp;");
   var colorSelect = contentBox.pushNode("select");
   
+  tmp = colorSelect.pushNode("option", "Color"); tmp.disabled = true; tmp.value = "placeholder"; tmp.style.display = "none";
   tmp = colorSelect.pushNode("option", "Group"); tmp.value = 0;
   tmp = colorSelect.pushNode("option", "Structure"); tmp.value = 1;
   tmp = colorSelect.pushNode("option", "Chain"); tmp.value = 2;
@@ -2226,11 +2228,14 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
   tmp = colorSelect.pushNode("option", "B-factor"); tmp.value = 4;
 
   styleSelect.oninput = function() {
+    if (styleSelect.value == "placeholder") return;
     if (styleSelect.value == molmil.displayMode_Stick_SC) molmil.displayEntry(UI.soup.structures, molmil.displayMode_Default, false, UI.soup, {newweb: true});
     molmil.displayEntry(UI.soup.structures, styleSelect.value, true, UI.soup, {newweb: true});
+    styleSelect.value = "placeholder";
   }
   
   colorSelect.oninput = function() {
+    if (colorSelect.value == "placeholder") return;
     if (colorSelect.value == 1) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_Default, null, true, UI.soup);
     else if (colorSelect.value == 2) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_ChainAlt, {carbonOnly: true}, true, UI.soup);
     else if (colorSelect.value == 3) molmil.colorEntry(UI.soup.structures, molmil.colorEntry_Entity, {carbonOnly: true}, true, UI.soup);
@@ -2273,6 +2278,7 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
       UI.soup.renderer.initBuffers();
       UI.soup.renderer.canvas.update = true; 
     }
+    colorSelect.value = "placeholder";
   }
   
   contentBox.pushNode("br");
@@ -3511,7 +3517,8 @@ molmil.UI.prototype.styleif = function(showOption, callOptions) {
     var options = [
       ["Structure", "structure", null, function() {UI.styleif_au(nwif.contentBox);}], 
       ["BU", "bu", function() {return ! UI.soup.AisB;}, function() {UI.styleif_bu(nwif.contentBox);}], 
-      ["Chemical compontent", "cc", function() {return UI.soup.pdbxData && UI.soup.pdbxData.chem_comp_atom}, function() {UI.styleif_cc(nwif.contentBox);}], 
+      ["Chemical compontent", "cc", function() {return UI.soup.pdbxData && UI.soup.pdbxData.chem_comp_atom && UI.soup.pdbxData.struct
+ === undefined}, function() {UI.styleif_cc(nwif.contentBox);}], 
       ["EDMap", "edmap", function() {return UI.showEDMap;}, function() {UI.styleif_edmap(nwif.contentBox, callOptions);}], 
       ["Sites", "sites", function() {return UI.showSites;}, function() {UI.styleif_sites(nwif.contentBox);}], 
       ["Alignment", "align", function() {return Object.keys(molmil.alignInfo).length;}, function() {UI.styleif_align(nwif.contentBox);}], 
