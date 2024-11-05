@@ -5468,7 +5468,7 @@ molmil.prepare2DRepr = function (chain, mdl) {
           else if (m+n == nor-1) {m1 = temp[m+n-1]; m3 = temp[m+n];}
           else if (m+n < nor-1) {m1 = temp[m+n-1]; m3 = temp[m+n+1];}
           vec1[0] = m3[0] - m1[0]; vec1[1] = m3[1] - m1[1]; vec1[2] = m3[2] - m1[2];
-          if (vec1[0]*vec1[0] + vec1[1]*vec1[1] + vec1[2]*vec1[2] > maxR) {currentBlock.tangents[m] = currentBlock.tangents[m > 0 ? m-1 : m+1];}
+          if (m > 0 && vec1[0]*vec1[0] + vec1[1]*vec1[1] + vec1[2]*vec1[2] > maxR) {currentBlock.tangents[m] = currentBlock.tangents[m-1];}
           else {currentBlock.tangents[m][0] = vec1[0]*ohf; currentBlock.tangents[m][1] = vec1[1]*ohf; currentBlock.tangents[m][2] = vec1[2]*ohf;}
         }
         if (currentBlock.molecules[m-2].next == null && m+n-3 > -1) {currentBlock.tangents[m-1][0] = temp[m+n-2][0]-temp[m+n-3][0]; currentBlock.tangents[m-1][1] = temp[m+n-2][1]-temp[m+n-3][1]; currentBlock.tangents[m-1][2] = temp[m+n-2][2]-temp[m+n-3][2];}
