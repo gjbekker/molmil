@@ -70,8 +70,9 @@ molmil.saveJSO = function(soup, atomSelection, modelId, file) {
 molmil.savePDB = function(soup, atomSelection, modelId, file) {
   if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
   var info = new Set(atomSelection);
+  var saveMapping = {};
   
-  var s, c, a, atom, aid = 1, out = "", gname, aname, rname, cname, rid, x, y, z, prevChain = null;
+  var s, c, a, atom, aid = 1, out = "", gname, aname, rname, cname, rid, x, y, z, prevChain = null, b;
   var saveModel = function(modelId_) {
     for (s=0; s<soup.structures.length; s++) {
       for (c=0; c<soup.structures[s].chains.length; c++) {
@@ -102,6 +103,7 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
           z = atom.chain.modelsXYZ[modelId_][atom.xyz+2].toFixed(3);
     
           out += gname + (aid+'').padStart(5) + " " + aname.padEnd(4) + " " + rname.padStart(3) + cname.padStart(2) + (rid+'').padStart(4) + "    " + (x+'').padStart(8) + (y+'').padStart(8) + (z+'').padStart(8) + ('1.00').padStart(6) + ('0.00').padStart(6) + "          " + atom.element.toUpperCase().padStart(2) + "\n";
+          saveMapping[atom.AID] = aid;
           aid++;
         }
       }
@@ -113,11 +115,47 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
     var nmod = soup.structures[0].chains[0].modelsXYZ.length;
     for (var i=0; i<nmod; i++) {
       out += "MODEL" + ((i+1)+'').padStart(9) + "\n";
+      aid = 1;
       saveModel(i);
       out += "ENDMDL\n";
     }
   }
   else saveModel(modelId);
+
+  for (s=0; s<soup.structures.length; s++) {
+    for (c=0; c<soup.structures[s].chains.length; c++) {
+      if (soup.structures[s].chains[c].isHet && ! soup.structures[s].chains[c].bondsOK) soup.buildBondList(soup.structures[s].chains[c], false);
+    }
+  }
+  
+  var CONECT = {};
+  
+  var a1, a2, aid1, aid2;
+  for (s=0; s<soup.structures.length; s++) {
+    for (c=0; c<soup.structures[s].chains.length; c++) {
+      for (b=0; b<soup.structures[s].chains[c].bonds.length; b++) {
+        a1 = soup.structures[s].chains[c].bonds[b][0];
+        a2 = soup.structures[s].chains[c].bonds[b][1];
+        if (! a1.molecule.ligand && ! a2.molecule.ligand) continue;
+        aid1 = saveMapping[a1.AID]; aid2 = saveMapping[a2.AID];
+        if (aid1 === undefined || aid2 === undefined) continue;
+        if (a1.molecule.ligand) {
+          if (CONECT[aid1] === undefined) CONECT[aid1] = new Set();
+          CONECT[aid1].add(aid2);
+        }
+        if (a2.molecule.ligand) {
+          if (CONECT[aid2] === undefined) CONECT[aid2] = new Set();
+          CONECT[aid2].add(aid1);
+        }
+      }
+    }
+  }
+    
+  for (aid1 in CONECT) {
+    out += "CONECT" + (aid1+'').padStart(5);
+    for (aid2 of CONECT[aid1]) out += (aid2+'').padStart(5);
+    out += "\n";
+  }
 
   if (molmil.configBox.customSaveFunction) molmil.configBox.customSaveFunction(file, out, "utf8");
   else {
