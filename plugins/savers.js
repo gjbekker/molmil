@@ -152,6 +152,7 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
   }
     
   for (aid1 in CONECT) {
+    if (CONECT[aid1].size == 0) continue;
     out += "CONECT" + (aid1+'').padStart(5);
     for (aid2 of CONECT[aid1]) out += (aid2+'').padStart(5);
     out += "\n";
