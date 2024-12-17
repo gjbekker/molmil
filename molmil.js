@@ -10200,4 +10200,16 @@ molmil.initVR = function(soup, callback) {
   }
 }
 
+molmil.arrayMin = function(arr) {
+  return arr.reduce(function (p, v) {
+    return ( p < v ? p : v );
+  });
+}
+
+molmil.arrayMax = function(arr) {
+  return arr.reduce(function (p, v) {
+    return ( p > v ? p : v );
+  });
+}
+
 molmil.initSettings();

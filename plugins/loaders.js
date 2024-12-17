@@ -1205,7 +1205,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
     for (c=0; c<struc.chains.length; c++) if (struc.chains[c].modelsXYZ.length > Nmodels) Nmodels = struc.chains[c].modelsXYZ.length;
     for (c=0; c<struc.chains.length; c++) {
       struc.chains[c].name = (c+1)+"";
-      Array.prototype.push.apply(tmp, struc.chains[c].molecules);
+      for (m1 of struc.chains[c].molecules) tmp.push(m1);
       struc.chains[c].molecules = [];
       struc.chains[c].modelsXYZ_old = struc.chains[c].modelsXYZ; struc.chains[c].modelsXYZ = [];
       for (m1=0; m1<Nmodels; m1++) struc.chains[c].modelsXYZ.push([]);

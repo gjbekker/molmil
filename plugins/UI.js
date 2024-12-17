@@ -1710,7 +1710,6 @@ molmil.UI.prototype.displayFunction = function(payload, lv, mode) {
     }
   }
   payload = tmp;
-  
   if (mode == 10001) {
     var tmp1 = [], tmp2 = [];
     if (lv == 2) {
@@ -1725,7 +1724,15 @@ molmil.UI.prototype.displayFunction = function(payload, lv, mode) {
         for (var j=0; j<payload[i].chain.entry.chains.length; j++) if (tmp2.indexOf(payload[i].chain.entry.chains[j]) == -1) tmp2.push(payload[i].chain.entry.chains[j]);
       }
     }
-    molmil.calcHbonds(tmp1, tmp2, this.soup); var tmp = [];
+    else if (lv == 4) {
+      for (var i=0; i<payload.length; i++) {
+        for (var chain of payload[i].chains) {
+          tmp1.push(chain);
+          for (var j=0; j<chain.entry.chains.length; j++) if (tmp2.indexOf(chain.entry.chains[j]) == -1) tmp2.push(chain.entry.chains[j]);
+        }
+      }
+    }
+    molmil.calcHbonds(tmp1, tmp2, {type: "dotted-cylinder", rgba: [0, 0, 0, 255]}, this.soup); var tmp = [];
   }
   else if (mode == 10002) {
     // display all residues within 3.5 A...
@@ -2266,9 +2273,9 @@ molmil.UI.prototype.styleif_au = function(contentBox) {
       var values = []
       for (var i=0; i<selection.length; i++) values.push(selection[i].Bfactor);
       if (molmil.configBox.bfactor_low != undefined) var min = molmil.configBox.bfactor_low;
-      else var min = Math.min.apply(null, values);
+      else var min = molmil.arrayMin(values);
       if (molmil.configBox.bfactor_high != undefined) var max = molmil.configBox.bfactor_high;
-      else var max = Math.max.apply(null, values); 
+      else var max = molmil.arrayMax(values); 
       var diffInv = 1./(max-min), tmp;
       for (var i=0; i<selection.length; i++) {
         tmp = 1-((values[i]-min)*diffInv); ///TODO

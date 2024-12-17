@@ -42,6 +42,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     repr: molmil.commandLines.pyMol.reprCommand,
     "style-if": molmil.commandLines.pyMol.styleifCommand,
     align: molmil.commandLines.pyMol.alignCommand,
+    hbonds: molmil.commandLines.pyMol.hbondsCommand,
     reinitialize: molmil.commandLines.pyMol.reinitializeCommand,
     quit: molmil.commandLines.pyMol.quitCommand
   };
@@ -193,6 +194,13 @@ molmil.commandLines.pyMol.styleifCommand = function(env, command) {
 molmil.commandLines.pyMol.reinitializeCommand = function(env, command) {
   var canvas = molmil.fetchCanvas();
   molmil.clear(canvas);
+  return true;
+}
+
+molmil.commandLines.pyMol.hbondsCommand = function(env, command) {
+  command = command.match(/hbonds[\s]+(.*)[\s]*(,[\s]*(.*)*)?/);
+  try {molmil.commandLines.pyMol.hbonds.apply(env, [command[1], command[2]]);}
+  catch (e) {console.error(e); return false;}
   return true;
 }
 
@@ -1024,6 +1032,32 @@ molmil.commandLines.pyMol.styleif = function(cmds) {
   this.cli_soup.UI.styleif(cmds[0], cmds.slice(1));
 }
 
+molmil.commandLines.pyMol.hbonds = function(atoms1, atoms2) {
+  if (typeof atoms1 != "object" && atoms1 != null) {
+    if (this.hasOwnProperty(atoms1)) atoms1 = this[atoms1];
+    else atoms1 = molmil.commandLines.pyMol.select.apply(this, [atoms1]);
+    atoms1 = molmil.atoms2residues(atoms1);
+  }
+
+  var soup = this.cli_soup || molmil.cli_soup;
+
+  if (atoms2 === undefined) {
+    atoms2 = [];
+    for (var chain of soup.chains) {
+      for (var mol of chain.molecules) if (!mol.water) atoms2.push(mol);
+    }
+  }
+  else {
+    if (typeof atoms2 != "object" && atoms2 != null) {
+      if (this.hasOwnProperty(atoms2)) atoms2 = this[atoms2];
+      else atoms2 = molmil.commandLines.pyMol.select.apply(this, [atoms2]);
+    }
+    atoms2 = molmil.atoms2residues(atoms2);
+  }
+  
+  molmil.calcHbonds(atoms1, atoms2, {type: "dotted-cylinder", rgba: [0, 0, 0, 255]}, soup);
+}
+
 molmil.commandLines.pyMol.align = function(name1, name2) {
   name1 = name1.split(":"); name2 = name2.split(":");
   var obj1, obj2;
@@ -1481,7 +1515,7 @@ molmil.commandLines.pyMol.turn = function(axis, degrees, interval, frames) {
   this.animObjects = this.animObjects || [];
   this.animObjects.push(obj);
   
-  if (canvas.renderer.onRenderFinish !== undefined) canvas.molmilViewer.downloadInProgress++;
+  canvas.molmilViewer.downloadInProgress++;
   
   var update = function() {
     if (axis == "x") camera.pitchAngle += parseFloat(degrees) || 0;
@@ -1498,7 +1532,7 @@ molmil.commandLines.pyMol.turn = function(axis, degrees, interval, frames) {
       }
       obj[0] = setTimeout(update, interval);
     }
-    else if (canvas.renderer.onRenderFinish !== undefined) canvas.molmilViewer.downloadInProgress--;
+    else canvas.molmilViewer.downloadInProgress--;
   };
   update();
   
@@ -1529,7 +1563,10 @@ molmil.commandLines.pyMol.move = function(axis, amount, interval, frames) {
 }
 
 molmil.commandLines.pyMol.stopAnim = function() {
-  this.animObjects.forEach(function (x) {clearTimeout(x);});
+  this.animObjects.forEach(function (x) {
+    clearTimeout(x);
+    canvas.molmilViewer.downloadInProgress--;
+  });
   return;
 }
 
