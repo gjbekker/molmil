@@ -15,6 +15,7 @@ molmil.commandLine.prototype.bindPymolInterface = function() {
     "stop-anim": molmil.commandLines.pyMol.stopAnimCommand,
     translate: molmil.commandLines.pyMol.translateCommand,
     fetch: molmil.commandLines.pyMol.fetchCommand,
+    afdb: molmil.commandLines.pyMol.afdbCommand,
     "fetch-cc": molmil.commandLines.pyMol.fetchCCCommand,
     "fetch-chain": molmil.commandLines.pyMol.fetchChainCommand,
     efsite: molmil.commandLines.pyMol.efsiteCommand,
@@ -360,6 +361,23 @@ molmil.commandLines.pyMol.translateCommand = function(env, command) {
   if (cmd != null) {
     try {molmil.commandLines.pyMol.translate.apply(env, [[parseFloat(cmd[1]), parseFloat(cmd[2]), parseFloat(cmd[3])], cmd[4]]);}
     catch (e) {console.error(e); return false;}
+  }
+  else return false;
+  return true;
+}
+
+molmil.commandLines.pyMol.afdbCommand = function(env, command) {
+  var cmd = command.match(/afdb[\s]+([a-zA-Z0-9]*)/);
+  if (cmd != null) {
+    var parts = cmd[1].match(/.{1,2}/g);
+    var loc = parts.slice(0,3).join("/")+"/";
+    molmil.configBox.inverseBfacClr=true;
+    molmil.loadFile("https://bsma.pdbj.org/afdb/"+loc+cmd[1]+".json", "mmjson", function(soup, struc) {
+      molmil.displayEntry(struc, 1);
+      molmil.configBox.inverseBfacClr = true;
+      molmil.colorBfactor(struc.chains[0].atoms, soup);
+      molmil.orient(struc.chains[0].atoms, soup);
+    });
   }
   else return false;
   return true;
