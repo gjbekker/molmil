@@ -29,6 +29,7 @@ molmil.pdbj_data = "https://data.pdbjlc1.pdbj.org/";
 molmil.settings_default = {
   src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
   pdb_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson/__ID__.json",
+  mmcif_url: molmil.pdbj_data+"pub/pdb/data/structures/all/mmCIF/__ID__.cif",
   pdb_chain_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
   comp_url: molmil.pdbj_data+"pdbjplus/data/cc/mmjson/__ID__.json",
   data_url: molmil.pdbj_data,
@@ -1660,6 +1661,7 @@ ihm_starting_model_coord
     var auth_asym_id = atom_site.auth_asym_id || label_asym_id; // chain name
   
     var label_alt_id = atom_site.label_alt_id || [];
+    var occupancy = atom_site.occupancy || [];
   
     var auth_atom_id = atom_site.auth_atom_id || atom_site.atom_id || []; // atom name
     var label_atom_id = atom_site.label_atom_id || []; // atom name
@@ -1749,6 +1751,7 @@ ihm_starting_model_coord
       else isHet = false;
 
       atom.label_alt_id = label_alt_id[a] || "";
+      atom.occupancy = occupancy[a] || 1;
       if (currentMol.water) currentChain.display = this.showWaters;
       if (atom.element == "H") atom.display = this.showHydrogens;
       else if (atom.display) {
@@ -8215,47 +8218,13 @@ molmil.loadFile = function(loc, format, cb, async, soup) {
   }, {async: async ? true : false});
 };
 
-molmil.loadPDBlite = function(pdbid, cb, async, soup) {
-  molmil.configBox.liteMode = true;
-  soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  
-  var requestA = new molmil_dep.CallRemote("GET"), async = true; requestA.ASYNC = async;
-  requestA.OnDone = function() {this.atom_data = JSON.parse(this.request.responseText);}
-  requestA.OnError = function() {
-    this.error = true;
-    soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid), 1, cb || function(target, struc) {
-      struc.meta.pdbid = pdbid;
-      delete target.pdbxData;
-      molmil.displayEntry(struc, molmil.displayMode_Default);
-      molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
-      molmil.colorEntry(struc, 1, null, true, soup);
-    }, {async: async ? true : false});
-    
-    
-  };
-  requestA.Send(molmil.settings.pdb_url.replace("format=mmjson-all", "format=mmjson-lite").replace("__ID__", pdbid));
-  var requestB = new molmil_dep.CallRemote("GET"), async = true; requestB.ASYNC = async; requestB.target = this; requestB.requestA = requestA; 
-  requestB.OnDone = function() {
-    if (this.requestA.error) return;
-    if (! this.requestA.atom_data) return molmil_dep.asyncStart(this.OnDone, [], this, 100);
-    var jso = JSON.parse(this.request.responseText);
-    jso["data_"+pdbid.toUpperCase()]["atom_site"] = this.requestA.atom_data["data_"+pdbid.toUpperCase()]["atom_site"];
-    soup.loadStructureData(jso, "mmjson", pdbid+".json", cb || function(target, struc) { // later switch this to use the new lite mmjson files...
-      struc.meta.pdbid = pdbid;
-      delete target.pdbxData;
-      molmil.displayEntry(struc, molmil.displayMode_Default);
-      molmil.displayEntry(struc, molmil.displayMode_CartoonRocket);
-      molmil.colorEntry(struc, 1, null, true, soup);
-    });
-  };
-  requestB.Send(molmil.settings.pdb_url.replace("__ID__", pdbid).replace("format=mmjson-all", "format=mmjson-plus-noatom"));
-};
-
 molmil.loadPDB = function(pdbid, cb, async, soup) {
   var tmp = molmil.configBox.skipComplexBondSearch;
   molmil.configBox.skipComplexBondSearch = true;
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  soup.loadStructure(molmil.settings.pdb_url.replace("__ID__", pdbid.toLowerCase()), 1, cb || function(target, struc) {
+  
+  var isBig = pdbid.toLowerCase() == "9fqr";
+  soup.loadStructure((isBig ? molmil.settings.mmcif_url : molmil.settings.pdb_url).replace("__ID__", pdbid.toLowerCase()), isBig ? 2 : 1, cb || function(target, struc) {
     struc.meta.pdbid = pdbid;
     if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);
