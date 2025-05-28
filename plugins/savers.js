@@ -70,7 +70,7 @@ molmil.saveJSO = function(soup, atomSelection, modelId, file) {
 molmil.savePDB = function(soup, atomSelection, modelId, file) {
   if (! window.saveAs && ! molmil.configBox.customSaveFunction) return molmil.loadPlugin(molmil.settings.src+"lib/FileSaver.js", molmil.savePDB, molmil, [soup, atomSelection, modelId, file]); 
   var info = new Set(atomSelection);
-  var saveMapping = {};
+  var saveMapping = {}, ccmapper = {};
   
   var s, c, a, atom, aid = 1, out = "", gname, aname, rname, cname, rid, x, y, z, prevChain = null, b, occupancy, label_alt_id, Bfactor;
   var saveModel = function(modelId_) {
@@ -91,6 +91,15 @@ molmil.savePDB = function(soup, atomSelection, modelId, file) {
 
           aname = atom.atomName.substr(0,4);
           rname = atom.molecule.name;
+          if (rname.length > 3) {
+            if (ccmapper[rname]) rname = ccmapper[rname];
+            else {
+              if (Object.keys(ccmapper).length == 0) rname = "LG0";
+              else if (Object.keys(ccmapper).length > 9) rname = "L"+Object.keys(ccmapper).length; // doesn't support more than 100 ligands, once it gets to that, the user should stop using the pdb format
+              else rname = "LG"+Object.keys(ccmapper).length;
+              ccmapper[atom.molecule.name] = rname;
+            }
+          }
           
           if (aname != rname && ! isNumber(aname[0]) && aname.length < 4) aname = ' ' + aname;
     
