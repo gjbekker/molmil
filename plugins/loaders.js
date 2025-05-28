@@ -960,7 +960,6 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     else if (atom.atomName == "P") {currentMol.P = atom; currentMol.N = atom;}
     else if (atom.atomName == "C1'") {currentChain.isHet = false; currentMol.CA = atom; currentMol.xna = true; currentMol.ligand = false;}
     else if (atom.atomName == "O3'") {currentMol.C = atom; currentMol.xna = true; currentMol.ligand = false;}
-   
     if (atom.element == "H" || atom.element == "D") atom.display = false;
     currentChain.atoms.push(atom);
     atom.AID = this.AID++;
@@ -973,7 +972,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
       mol = struc.chains[c].molecules[m];
       if (mol.xna) {
         if (m == 0 && ! mol.P && mol.CA && mol.C && struc.chains[c].molecules.length > 1 && struc.chains[c].molecules[1].xna) {}
-        else if ((! mol.P || ! mol.CA || ! mol.C)) {
+        else if ((! mol.CA || ! mol.C)) {
           mol.ligand = true;
           delete mol.P; delete mol.CA; delete mol.C;
           mol.xna = false;
@@ -1105,7 +1104,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         mol = struc.chains[c].molecules[m];
         if (mol.xna) {
           if (m == 0 && ! mol.P && mol.CA && mol.C && struc.chains[c].molecules.length > 1 && struc.chains[c].molecules[1].xna) {}
-          else if ((! mol.P || ! mol.CA || ! mol.C) && ! (mol.name in molmil.AATypes)) {
+          else if ((! mol.CA || ! mol.C) && ! (mol.name in molmil.AATypes)) {
             mol.ligand = true;
             delete mol.P; delete mol.CA; delete mol.C;
             mol.xna = false;

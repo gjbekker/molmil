@@ -3138,9 +3138,8 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
     }
     
     if (chain.displayMode == 3 && chain.molecules.length && chain.molecules[0].xna) { // default?
-      
       for (var m=0; m<chain.molecules.length; m++) {
-        if (chain.molecules[0].displayMode == 3 && chain.molecules[m].outer && chain.molecules[m].CA) xna2draw.push([chain.molecules[m].CA, chain.molecules[m].outer]);
+        if (chain.molecules[0].displayMode == 3 && chain.molecules[m].outer && chain.molecules[m].CA && chain.molecules[m].CA.displayMode == 0) xna2draw.push([chain.molecules[m].CA, chain.molecules[m].outer]);
       }
     }
     
