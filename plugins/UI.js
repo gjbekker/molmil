@@ -695,6 +695,7 @@ molmil.UI.prototype.resetRM=function() {
 molmil.UI.prototype.toggleCLI=function() {
   if (this.LM && this.LM.parentNode.childNodes.length > 1) this.LM.onclick();
   
+  this.canvas.commandLine.consoleBox.style.display = "";
   if (! this.canvas.commandLine) new molmil.commandLine(this.canvas);
   this.canvas.commandLine.icon.onclick();
 

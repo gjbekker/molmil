@@ -1752,11 +1752,11 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     molmil.configBox.connect_cutoff = parseFloat(value);
   }
   else if (key == "transparency") {
-    for (var i=0; i<selection.length; i++) selection[i].molecule.rgba = [selection[i].molecule.rgba[0], selection[i].molecule.rgba[2], selection[i].molecule.rgba[1], (1-value)*255];
+    for (var i=0; i<selection.length; i++) selection[i].molecule.rgba = [selection[i].molecule.rgba[0], selection[i].molecule.rgba[1], selection[i].molecule.rgba[2], (1-value)*255];
     this.cli_soup.renderer.rebuildRequired = true;
   }
   else if (key == "transparency_sticks") {
-    for (var i=0; i<selection.length; i++) selection[i].rgba = [selection[i].rgba[0], selection[i].rgba[2], selection[i].rgba[1], (1-value)*255];
+    for (var i=0; i<selection.length; i++) selection[i].rgba = [selection[i].rgba[0], selection[i].rgba[1], selection[i].rgba[2], (1-value)*255];
     this.cli_soup.renderer.rebuildRequired = true;
   }
 

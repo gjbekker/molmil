@@ -1284,7 +1284,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
           }
         }
       }
-      else if (chain.molecules[m1].CA && chain.molecules[m2].CA && m2 == m1+1) { // only allow sequential
+      else if (chain.molecules[m1].CA && chain.molecules[m2].CA && m2 == m1+1 && !chain.molecules[m1].xna) { // only allow sequential
         xyz1 = chain.molecules[m1].CA.xyz;
         xyz2 = chain.molecules[m2].CA.xyz;
         dx = xyzRef[xyz1]-xyzRef[xyz2]; dx *= dx;
@@ -9236,13 +9236,14 @@ molmil.mergeStructuresToModels = function(entries) { // merges multiple structur
 molmil.splitModelsToStructures = function(entry) { // splits multiple models into separate structures
 }
 
-molmil.showNearbyResidues = function(obj, r, soup) {
+molmil.showNearbyResidues = function(obj, r, soup, drawMode) {
+  drawMode = drawMode || displayMode_Stick;
   var atomList = molmil.fetchNearbyAtoms(obj, r, null, soup);
   var processed = [], res;
   for (var i=0; i<atomList.length; i++) {
     res = atomList[i].molecule;
     if (processed.indexOf(res) != -1) continue;
-    molmil.displayEntry(res, molmil.displayMode_Stick);
+    molmil.displayEntry(res, drawMode);
     processed.push(res);
   }
   soup.renderer.initBuffers();
@@ -9540,20 +9541,10 @@ molmil.autoSetup = function(options, canvas) {
   if (! canvas.molmilViewer) molmil.createViewer(canvas);
   if (canvas.setupDone) return;
   
-  
-  if (options.enable.includes("cli") && ! canvas.commandLine) {
+  if (! canvas.commandLine) {
     var cli = new molmil.commandLine(canvas);
     if (options.environment) {for (var e in options.environment) cli.environment[e] = options.environment[e];}
-  
-    if (options.enable.includes("cli-hash")) {
-      var hash = window.location.hash ? window.location.hash.substr(1) : "";
-      if (hash) cli.environment.console.runCommand(decodeURIComponent(hash));
-
-      window.onhashchange = function() {
-        var hash = window.location.hash ? window.location.hash.substr(1) : "";
-        if (hash) {molmil.clear(canvas); cli.environment.console.runCommand(decodeURIComponent(hash));}
-      }
-    }
+    cli.consoleBox.style.display = "none";
     
     if (window.onkeyup == null) {
       var lastPress = 0;
@@ -9566,19 +9557,22 @@ molmil.autoSetup = function(options, canvas) {
       }
     }
   }
-  else if (options.enable.includes("cli-hash") && ! canvas.commandLine) {
-    var hash = window.location.hash ? window.location.hash.substr(1) : "";
-    if (hash) {
-      var cli = new molmil.commandLine(canvas);
-      if (options.environment) {for (var e in options.environment) cli.environment[e] = options.environment[e];}
-      cli.environment.console.runCommand(decodeURIComponent(hash));
-      cli.consoleBox.style.display = "none";
-    }
-  }
-  
+  else var cli = canvas.commandLine;
+
   var wait = false;
   if (options.enable.includes("ui") && ! molmil.UI) {wait = true; molmil.loadPlugin(molmil.settings.src+"plugins/UI.js", null, null, null, true);}
   if (wait) return molmil_dep.asyncStart(molmil.autoSetup, [options, canvas], this, 10);
+
+  if (options.enable.includes("cli-hash")) {
+    var hash = window.location.hash ? window.location.hash.substr(1) : "";
+    if (hash) cli.environment.console.runCommand(decodeURIComponent(hash));
+
+    window.onhashchange = function() {
+      var hash = window.location.hash ? window.location.hash.substr(1) : "";
+      if (hash) {molmil.clear(canvas); cli.environment.console.runCommand(decodeURIComponent(hash));}
+    }
+  }
+  if (options.enable.includes("cli")) cli.consoleBox.style.display = "";
   
   if (options.enable.includes("ui")) {
     canvas.molmilViewer.UI = new molmil.UI(canvas.molmilViewer);
