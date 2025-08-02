@@ -1048,7 +1048,9 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         if (currentMol.name in molmil.SNFG) currentMol.SNFG = true;
       }
       
-      if (data[i].length >= 76) element = data[i].substr(76).trim().split(" ")[0];
+      if (data[i].length >= 76) {
+        element = data[i].substr(76).trim().split(" ")[0].replace("1+", "").replace("1-", "");
+      }
       else element = undefined;
       if (! element) {
         if (molmil.AATypes.hasOwnProperty(currentMol.name.substr(0, 3))) {
