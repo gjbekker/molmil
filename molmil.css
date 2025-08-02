@@ -219,6 +219,7 @@ select {
   display: inline-block;
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
+  color: rgb(var(--FOREGROUND_COLOR));
 }
 
 .molmil_UI_LB_icon:hover {
@@ -442,6 +443,10 @@ select {
     left: 5.6em !important;
     width: calc(100% - 7.5em) !important;
   }
+}
+
+#nw_settings td {
+  color: rgb(var(--FOREGROUND_COLOR));
 }
 
 #styleif {
