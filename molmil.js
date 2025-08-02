@@ -611,6 +611,11 @@ molmil.labelObject = function(soup) {
 
 // ** object controlling animation (multiple models & trajectories) **
 
+molmil.fetch = function(resource, options) {
+  if (window.fetch === undefined) throw "Browser too old";
+  return window.fetch(resource, options);
+}
+
 molmil.fetchCanvas = function() {
   for (var i=0; i<molmil.canvasList.length; i++) if (molmil.canvasList[i].molmilViewer) return molmil.canvasList[i];
 };
@@ -4101,8 +4106,8 @@ molmil.geometry.generateSurfaces = function(chains, soup) {
 
 // ** build cartoon representation **
 molmil.geometry.generateCartoon = function() {
-  var chains = this.cartoonChains, c, b, b2, m, chain, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges, BNs, currentBlock;
-  var noi = this.noi;
+  var chains = this.cartoonChains, c, b, b2, m, chain, line, tangents, binormals, normals, rgba, aid, ref, i, TG, BN, N, t = 0, normal, binormal, vec = [0, 0, 0], delta = 0.0001, t_ranges, BNs, currentBlock, colorNext;
+  var noi = this.noi, noiHWP = Math.round(this.noi*.5)+1;
   var novpr = this.novpr;
   
   var nowp, wp, tmp, rotationMatrix, identityMatrix, theta, smallest;
@@ -4172,8 +4177,14 @@ molmil.geometry.generateCartoon = function() {
       else {
         for (m=0; m<currentBlock.molecules.length-1; m++) {
           molmil.hermiteInterpolate(currentBlock.xyz[m], currentBlock.xyz[m+1], currentBlock.tangents[m], currentBlock.tangents[m+1], noi, line, tangents);
-          for (i=0; i<noi+1; i++) {
+          colorNext = currentBlock.molecules[m+1] ? currentBlock.molecules[m+1].rgba : colorThis;
+          for (i=0; i<noiHWP; i++) {
             rgba[wp] = currentBlock.molecules[m].rgba;
+            aid[wp] = currentBlock.molecules[m].CA.AID;
+            wp++;
+          }
+          for (i=noiHWP; i<noi+1; i++) {
+            rgba[wp] = colorNext;
             aid[wp] = currentBlock.molecules[m].CA.AID;
             wp++;
           }
@@ -8809,7 +8820,8 @@ molmil.commandLine.prototype.wait4Download = function() {
 };
 
 molmil.commandLine.prototype.runCommand = function(command) { // note the /this/ stuff will not work properly... if there are many functions and internal /var/s...
-  if (command.match(/\bfunction\b/)) command = command.replace(/(\b|;)function\s+(\w+)/g, "$1global.$2 = function"); // make sure that functions are stored in /this/ and not in the local scope...
+  if (command.match(/\basync function\b/)) command = command.replace(/(\b|;)async function\s+(\w+)/g, "$1global.$2 = async function"); // make sure that functions are stored in /this/ and not in the local scope...
+  else if (command.match(/\bfunction\b/)) command = command.replace(/(\b|;)function\s+(\w+)/g, "$1global.$2 = function"); // make sure that functions are stored in /this/ and not in the local scope...
   else command = (' '+command).replace(/(\s|;)var\s+(\w+)\s*=/g, "$1global.$2 ="); // make sure that variables are stored in /this/ and not in the local scope...
   command = command.replace(/(\s|;)return\sthis;/g, "$1return window;"); // make sure that it is impossible to get back the real window object
   try {with (this) {eval(command);}}
