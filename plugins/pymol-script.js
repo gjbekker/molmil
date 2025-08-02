@@ -570,7 +570,7 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
   if (! molmil.isBalancedStatement(expr)) throw "Incorrect statement"; // safety check
   
   var new_expr = [];
-  var word = "", key, ss_conv = {h: 3, s: 2, l: 1}, tmp, i, j, NOT = false, operator;
+  var word = "", key, ss_conv = {h: 3, s: 2, l: 1}, tmp, i, j;
   var toUpper = false, toUpper_, toLower = false, toLower_, ss = false, ss_;
   
   this.soupObject = this.soupObject || molmil.cli_soup || soup || this.cli_soup;
@@ -651,31 +651,30 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         continue;
       }
       toUpper_ = false, ss_ = false;
-      //operator = NOT ? "!=" : "=="; NOT = false;
-      operator = "==";
-      if (word == "name") {key = "this.soupObject.atomRef[a].atomName "+operator+" '%s'"; toUpper_ = true;}
-      else if (word == "index") key = "this.soupObject.atomRef[a].AID "+operator+" %s";
-      else if (word == "symbol") key = "this.soupObject.atomRef[a].element "+operator+" '%s'";
-      else if (word == "resn") {key = "this.soupObject.atomRef[a].molecule.name.toLowerCase() "+operator+" '%s'"; toLower_ = true;}
-      else if (word == "resi") key = "this.soupObject.atomRef[a].molecule.RSID "+operator+" %s";
-      else if (word == "resid") key = "this.soupObject.atomRef[a].molecule.id "+operator+" %s";
-      else if (word == "ss") {key = "this.soupObject.atomRef[a].molecule.sndStruc "+operator+" %s"; ss_ = true;}
-      else if (word == "entity") key = "this.soupObject.atomRef[a].molecule.chain.entity_id "+operator+" %s";
-      else if (word == "chain_auth") key = "this.soupObject.atomRef[a].molecule.chain.authName "+operator+" '%s'";
+      if (word == "name") {key = "(this.soupObject.atomRef[a].atomName == '%s')"; toUpper_ = true;}
+      else if (word == "index") key = "(this.soupObject.atomRef[a].AID == %s)";
+      else if (word == "symbol") key = "(this.soupObject.atomRef[a].element == '%s')";
+      else if (word == "resn") {key = "(this.soupObject.atomRef[a].molecule.name.toLowerCase() == '%s')"; toLower_ = true;}
+      else if (word == "resi") key = "(this.soupObject.atomRef[a].molecule.RSID == %s)";
+      else if (word == "resid") key = "(this.soupObject.atomRef[a].molecule.id == %s)";
+      else if (word == "ss") {key = "(this.soupObject.atomRef[a].molecule.sndStruc == %s)"; ss_ = true;}
+      else if (word == "entity") key = "(this.soupObject.atomRef[a].molecule.chain.entity_id == %s)";
+      else if (word == "chain_auth") key = "(this.soupObject.atomRef[a].molecule.chain.authName == '%s')";
       else if (word == "chain") {
-        if (this.cif_use_auth) key = "this.soupObject.atomRef[a].molecule.chain.authName "+operator+" '%s'";
-        else key = "this.soupObject.atomRef[a].molecule.chain.name "+operator+" '%s'";
+        if (this.cif_use_auth) key = "(this.soupObject.atomRef[a].molecule.chain.authName == '%s')";
+        else key = "(this.soupObject.atomRef[a].molecule.chain.name == '%s')";
       }
-      else if (word == "b") key = "this.soupObject.atomRef[a].Bfactor %s %s";
-      else if (word == "hydro") new_expr.push("this.soupObject.atomRef[a].molecule.water "+operator+" true");
-      else if (word == "disulf") new_expr.push("(this.soupObject.atomRef[a].molecule.name "+operator+" 'CYS' && this.soupObject.atomRef[a].molecule.weirdAA)");
-      else if (word == "hetatm") new_expr.push("this.soupObject.atomRef[a].molecule.ligand "+operator+" true");
-      else if (word == "snfg") new_expr.push("this.soupObject.atomRef[a].molecule.SNFG "+operator+" true");
-      else if (word == "altloc") {key = "this.soupObject.atomRef[a].label_alt_id "+operator+" '%s'";}
+      else if (word == "b") key = "(this.soupObject.atomRef[a].Bfactor %s %s)";
+      else if (word == "hydro") new_expr.push("(this.soupObject.atomRef[a].molecule.water == true)");
+      else if (word == "visible") new_expr.push("(this.soupObject.atomRef[a].displayMode != 0)");
+      else if (word == "disulf") new_expr.push("(this.soupObject.atomRef[a].molecule.name == 'CYS' && this.soupObject.atomRef[a].molecule.weirdAA)");
+      else if (word == "hetatm") new_expr.push("(this.soupObject.atomRef[a].molecule.ligand == true)");
+      else if (word == "snfg") new_expr.push("(this.soupObject.atomRef[a].molecule.SNFG == true)");
+      else if (word == "altloc") {key = "(this.soupObject.atomRef[a].label_alt_id == '%s')";}
       else if (word == "model") {
         // two modes, by name & by number (1-...)
-        if (expr[i+1] == "#") key = "this.soupObject.atomRef[a].chain.entry.meta.idnr "+operator+" '%s'";
-        else {key = "(this.soupObject.atomRef[a].chain.entry.meta.id || this.soupObject.atomRef[a].chain.entry.meta.filename).toLowerCase() "+operator+" '%s'"; toLower_ = true;}
+        if (expr[i+1] == "#") key = "(this.soupObject.atomRef[a].chain.entry.meta.idnr == '%s')";
+        else {key = "((this.soupObject.atomRef[a].chain.entry.meta.id || this.soupObject.atomRef[a].chain.entry.meta.filename).toLowerCase() == '%s')"; toLower_ = true;}
       }
       else if (word == "around") {
         var atomList = []
@@ -698,7 +697,6 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
         TEMPLIST.push(atomList);
         new_expr.push("TEMPLIST["+(TEMPLIST.length-1)+"].indexOf(this.soupObject.atomRef[a]) != -1");
       }
-      //else if (word.toLowerCase() == "not" || word == "!") NOT = true;
       else if (word.toLowerCase() == "not" || word == "!") new_expr.push("!");
       else if (word == "and") new_expr.push("&&");
       else if (word == "or") new_expr.push("||");
@@ -755,11 +753,10 @@ molmil.quickSelect = molmil.commandLines.pyMol.select = molmil.commandLines.pyMo
     }
     
     else if (expr[i] == "(" || expr[i] == ")") new_expr.push(expr[i]);
-    //else if (expr[i] == "!") NOT = true;
     else if (expr[i] == "!") new_expr.push("!");
     else word += expr[i];
   }
-  
+
   return executeExpr.apply(this, [new_expr.join(" ")]);
 }
 
