@@ -1563,6 +1563,8 @@ molmil.commandLines.pyMol.move = function(axis, amount, interval, frames) {
   this.animObjects = this.animObjects || [];
   this.animObjects.push(obj);
   
+  if (molmil.configBox.autoPauseExec) canvas.molmilViewer.downloadInProgress++;
+  
   var update = function() {
     if (axis == "x") camera.x += parseFloat(amount) || 0;
     else if (axis == "y") camera.y += parseFloat(amount) || 0;
@@ -1571,6 +1573,7 @@ molmil.commandLines.pyMol.move = function(axis, amount, interval, frames) {
     canvas.update = true;
     fid++;
     if (interval > 0 && fid != frames) obj[0] = setTimeout(update, interval);
+    else if (molmil.configBox.autoPauseExec) canvas.molmilViewer.downloadInProgress--;
   };
   update();
   
@@ -1580,7 +1583,7 @@ molmil.commandLines.pyMol.move = function(axis, amount, interval, frames) {
 molmil.commandLines.pyMol.stopAnim = function() {
   this.animObjects.forEach(function (x) {
     clearTimeout(x);
-    canvas.molmilViewer.downloadInProgress--;
+    if (molmil.configBox.autoPauseExec) canvas.molmilViewer.downloadInProgress--;
   });
   return;
 }
