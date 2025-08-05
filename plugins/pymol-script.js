@@ -1530,7 +1530,7 @@ molmil.commandLines.pyMol.turn = function(axis, degrees, interval, frames) {
   this.animObjects = this.animObjects || [];
   this.animObjects.push(obj);
   
-  canvas.molmilViewer.downloadInProgress++;
+  if (molmil.configBox.autoPauseExec) canvas.molmilViewer.downloadInProgress++;
   
   var update = function() {
     if (axis == "x") camera.pitchAngle += parseFloat(degrees) || 0;
@@ -1547,7 +1547,7 @@ molmil.commandLines.pyMol.turn = function(axis, degrees, interval, frames) {
       }
       obj[0] = setTimeout(update, interval);
     }
-    else canvas.molmilViewer.downloadInProgress--;
+    else if (molmil.configBox.autoPauseExec) canvas.molmilViewer.downloadInProgress--;
   };
   update();
   

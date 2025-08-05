@@ -5765,7 +5765,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     canvas.bindMouseTouch();
     canvas.addEventListener("webglcontextlost", function(event) {event.preventDefault();}, false);
     canvas.addEventListener("webglcontextrestored", function() {
-      this.reinitRenderer();
+      this.renderer.reinitRenderer();
     }, false);
   }
   
