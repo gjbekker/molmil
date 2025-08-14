@@ -5924,7 +5924,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
 };
 
 molmil.render.prototype.reinitRenderer = function() {
-  this.initGL(this);
+  this.initGL(this.canvas);
   // we need to recompile the shaders (in case the GPU changed...)
   molmil.shaderEngine.recompile(this);
   this.buffers.atomSelectionBuffer = undefined;
