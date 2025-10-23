@@ -20,10 +20,9 @@ var molmil = molmil || {};
 molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil.mouseMoved = false; molmil.Xcoord = 0; molmil.Ycoord = 0; molmil.Zcoord = 0; molmil.activeCanvas = null; molmil.touchList = null; molmil.touchMode = false; molmil.preRenderFuncs = [];
 molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
-molmil.vrDisplay = null;
-molmil.vrPose = [0, 0, 0];
-molmil.vrOrient = [0, 0, 0, 0];
 molmil.pdbj_data = "https://data.pdbj.org/";
+molmil.xrSupported = false;
+navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
@@ -58,6 +57,7 @@ molmil.configBox = {
   recordingMode: false,
   save_pdb_chain_only_change: false,
   xna_force_C1p: undefined,
+  glAttribs: {},
   
   // Co, Mo, D, Ru, W, Q, YB, gd, ir, os, Y, sm, pr, tb, re, eu, ta, rh, lu, ho
   
@@ -1595,8 +1595,7 @@ molmil.viewer.prototype.calcZ = function(geomRanges) {
 
   if (test) this.renderer.maxRange = (Math.max(Math.abs(geomRanges[1]-geomRanges[0]), Math.abs(geomRanges[3]-geomRanges[2]), Math.abs(geomRanges[5]-geomRanges[4]))*.5)-molmil.configBox.zNear-5;
   if (molmil.configBox.stereoMode) {
-    if (molmil.configBox.stereoMode == 3) return -(mx*molmil.vrDisplay.depthFar/4500)-molmil.vrDisplay.depthNear-1;
-    else return -(mx*molmil.configBox.zFar/9000)-molmil.configBox.zNear-1;
+    return -(mx*molmil.configBox.zFar/9000)-molmil.configBox.zNear-1;
   }
   
   if (molmil.configBox.projectionMode == 1) {
@@ -5693,28 +5692,25 @@ molmil.generateSphereImposterTexture = function(res, gl) {
 
 // ** initiates the WebGL context **
 molmil.render.prototype.initGL = function(canvas, width, height) {
-  var glAttribs = molmil.configBox.glAttribs || {};
-  if (molmil.vrDisplay && molmil.vrDisplay.capabilities.hasExternalDisplay) glAttribs.preserveDrawingBuffer = true;
+  molmil.configBox.glAttribs.xrCompatible = true;
   
-  if (molmil.configBox.webGL2) {
-    if (window.WebGL2RenderingContext) {
-      this.defaultContext = canvas.getContext("webgl2", glAttribs);
-      if (! this.defaultContext) molmil.configBox.webGL2 = false;
-      else {
-        molmil.configBox.OES_element_index_uint = true;
-        molmil.configBox.EXT_frag_depth = true;
-      }
+  if (window.WebGL2RenderingContext) {
+    this.defaultContext = canvas.getContext("webgl2", molmil.configBox.glAttribs);
+    console.log(this.defaultContext)
+    if (! this.defaultContext) molmil.configBox.webGL2 = false;
+    else {
+      molmil.configBox.OES_element_index_uint = true;
+      molmil.configBox.EXT_frag_depth = true;
+      molmil.configBox.webGL2 = true;
     }
-    else molmil.configBox.webGL2 = false;
   }
   if (! molmil.configBox.webGL2) {
-    this.defaultContext = this.defaultContext || canvas.getContext("webgl", glAttribs) || canvas.getContext("experimental-webgl", glAttribs);
+    this.defaultContext = this.defaultContext || canvas.getContext("webgl", molmil.configBox.glAttribs) || canvas.getContext("experimental-webgl", molmil.configBox.glAttribs);
   }
   
   canvas.renderer = this;
   
   this.FBOs = {};
-  
   if (! this.defaultContext) {
     this.altCanvas = molmil.__webglNotSupported__(canvas);
     return false;
@@ -5729,7 +5725,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   this.textures.atom_imposter = molmil.generateSphereImposterTexture(128, this.gl);
   
   this.gl.INDEXINT = molmil.configBox.OES_element_index_uint ? this.gl.UNSIGNED_INT : this.gl.UNSIGNED_SHORT;
-  this.gl.__glAttribs = glAttribs;
+  this.gl.__glAttribs = molmil.configBox.glAttribs;
 
   this.width = width | canvas.width;
   this.height = height | canvas.height;
@@ -5741,20 +5737,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
   document.onmouseup = molmil.handle_molmilViewer_mouseUp;
   document.onmousemove = molmil.handle_molmilViewer_mouseMove;
   
-  if (! molmil.vrDisplay) {
-    
-    window.addEventListener("vrdisplaypointerrestricted", function() {
-      canvas.requestPointerLock();
-    }, false);
-    
-    window.addEventListener("vrdisplaypointerunrestricted", function() {
-      document.exitPointerLock()
-      canvas.bindTouch();
-    }, false);
-    
-  //window.addEventListener('vrdisplaypointerrestricted', () => webglCanvas.requestPointerLock(), false);
-  //window.addEventListener('vrdisplaypointerunrestricted', document.exitPointerLock(), false);
-    
+  if (! molmil.xrSession) {
     canvas.bindMouseTouch = function() {
       canvas.addEventListener("wheel", molmil.handle_molmilViewer_mouseScroll, false);
       canvas.addEventListener("touchstart", molmil.handle_molmilViewer_touchStart, false);
@@ -5889,7 +5872,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
         this.renderer.gl.uniform1i(this.shader.uniforms.textureMap, 0);
         
         scaleFactor = 0.0003*.5*(N[i].settings.scaleFactor||1);
-        if (molmil.configBox.stereoMode == 3 && molmil.vrDisplay && ! N[i].settings.skipVRscale) scaleFactor *= 4;
+        if (molmil.xrSession && ! N[i].settings.skipVRscale) scaleFactor *= 4;
         
         if (N[i].settings.customWidth && N[i].settings.customHeight) scaleFactor *= Math.min(N[i].settings.customHeight/N[i].texture.renderHeight, N[i].settings.customWidth/N[i].texture.renderWidth);
         this.renderer.gl.uniform1f(this.shader.uniforms.scaleFactor, scaleFactor);
@@ -6114,73 +6097,17 @@ molmil.render.prototype.renderPrograms = function(COR) {
 }
 
 // ** renders the scene **
-molmil.render.prototype.render = function() {
-  if (! this.canvas.update || ! this.initBD) {
-    if (molmil.vrDisplay) {
-      var frameData = new VRFrameData(); molmil.vrDisplay.getFrameData(frameData);
-      var curFramePose = frameData.pose;
-      if (curFramePose.position == null && curFramePose.orientation == null) {
-        if (molmil.vrDisplay.displayName == "HTC Vive DVT") molmil.vrDisplay.submitFrame();
-        // maybe the above also needs to be enabled for the fujitsu one...
-        return;
-      }
-    }
-    else return;
-  }
-  else if (molmil.vrDisplay) {
-    var frameData = new VRFrameData(); molmil.vrDisplay.getFrameData(frameData);
-    var curFramePose = frameData.pose;
-  }
-  
-  // figure out whether the VR scene has been updated, if not -> return to save power (and prevent overheating...)
-  
-  if (frameData && this.camera.vrXYZupdated) {
-    var tempMat = mat4.copy(mat4.create(), frameData.leftViewMatrix);
-    tempMat[12] = tempMat[13] = tempMat[14];
-    var invMat = mat4.invert(mat4.create(), tempMat);
-    var trans = vec3.transformMat4([0, 0, 0], this.camera.vrXYZ, invMat);
-    this.camera.x += trans[0]; this.camera.y += trans[1]; this.camera.z += trans[2];
-    this.camera.vrXYZ[0] = this.camera.vrXYZ[1] = this.camera.vrXYZ[2] = 0.0;
-    this.camera.vrXYZupdated = false;
-  }
-  else if (frameData && molmil.vrDisplay.displayName.toLowerCase().indexOf("cardboard") != -1) {
-    var epsilon1 = 0.0001, epsilon2 = 0.1, epsilon_cutoff = 0.001;
-    // now, use two versions of epsilon...
-    if (this.camera.vrMatrix_backup) {
-      var a = this.camera.vrMatrix_backup, b = frameData.leftViewMatrix, now = Date.now();
-      var temp = [Math.abs(a[0]-b[0]), Math.abs(a[1]-b[1]), Math.abs(a[2]-b[2]), Math.abs(a[3]-b[3]), Math.abs(a[4]-b[4]), Math.abs(a[5]-b[5]), Math.abs(a[6]-b[6]), Math.abs(a[7]-b[7]), Math.abs(a[8]-b[8]), Math.abs(a[9]-b[9]), Math.abs(a[10]-b[10]), Math.abs(a[11]-b[11]), Math.abs(a[12]-b[12]), Math.abs(a[13]-b[13]), Math.abs(a[14]-b[14]), Math.abs(a[15]-b[15])], maxDiff;
-      maxDiff = Math.max.apply(null, temp);
-
-      if (maxDiff < this.camera.vrMatrix_epsilon) {
-        this.canvas.update = false;
-        return;
-      }
-      
-      // let's render
-      if (this.camera.vrMatrix_epsilon == epsilon1) { // currently fast-polling mode
-        if (maxDiff < epsilon_cutoff) { // not moving that much (twilight zone)
-          if (this.camera.vrMatrix_timestamp+2000 < now) { // so the matrix has been more-or-less stable at least for two seconds 
-            this.camera.vrMatrix_epsilon = epsilon2; // switch to slow-polling mode
-            this.camera.vrMatrix_timestamp = now; // reset the timer
-          }
-        }
-        else this.camera.vrMatrix_timestamp = now;
-      }
-      else { // currently low-polling mode
-        this.camera.vrMatrix_epsilon = epsilon1; // switch to fast-polling mode
-        this.camera.vrMatrix_timestamp = now; // reset the timer
-      }
-    }
-    
-    if (! this.camera.vrMatrix_backup) { // only set this for cardboard renderer...
-      this.camera.vrMatrix_backup = mat4.create();
-      this.camera.vrMatrix_epsilon = epsilon1;
-      this.camera.vrMatrix_timestamp = now;
-    }
-    mat4.copy(this.camera.vrMatrix_backup, frameData.leftViewMatrix);
+molmil.render.prototype.render = function(options) {
+  var glLayer, xrPose;
+  if (molmil.xrSession && options && options.xrFrame) {
+    var frame = options.xrFrame;
+    xrPose = frame.getViewerPose(molmil.xrSession.molmilConfig.refSpace);
+    if (!xrPose) return;
+    glLayer = molmil.xrSession.renderState.baseLayer; // get the WebGL layer (it contains some important information we need)
+    molmil.configBox.stereoMode = 3;
   }
 
-  if (this.canvas.update || molmil.vrDisplay) {
+  if (this.canvas.update || molmil.xrSession) {
     if (this.canvas.update != -1) {
       for (var c=0; c<this.soup.canvases.length; c++) if (this.soup.canvases[c] != this.canvas) this.soup.canvases[c].update = -1;
     }
@@ -6218,11 +6145,6 @@ molmil.render.prototype.render = function() {
       mat4.ortho(this.projectionMatrix, -this.width*zoomFraction, this.width*zoomFraction, -this.height*zoomFraction, this.height*zoomFraction, Math.max(molmil.configBox.zNear, 0.1), this.camera.z+(molmil.configBox.zFar*10));
     }
   }
-  else {
-    var frameData = new VRFrameData();
-    molmil.vrDisplay.getFrameData(frameData);
-    this.canvas.update = false;
-  }
   
   if (this.customFogRange) {
     this.fogStart = this.customFogRange[0];
@@ -6245,20 +6167,20 @@ molmil.render.prototype.render = function() {
 
   if (molmil.configBox.jitRenderFunc) molmil.configBox.jitRenderFunc.apply(this, [{frameData: frameData}]);
   
-  if (molmil.configBox.stereoMode && (molmil.configBox.stereoMode != 3 || molmil.vrDisplay)) {
-    if (! this.FBOs.hasOwnProperty("stereoLeft")) {
-      this.FBOs.stereoLeft = new molmil.FBO(this.gl, this.width, this.height);
-      this.FBOs.stereoLeft.multisample = "stereoLeft";
-      this.FBOs.stereoLeft.addTexture("stereoLeft", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
-      this.FBOs.stereoLeft.setup();
-      
-      this.FBOs.stereoRight = new molmil.FBO(this.gl, this.width, this.height);
-      this.FBOs.stereoRight.multisample = "stereoRight";
-      this.FBOs.stereoRight.addTexture("stereoRight", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
-      this.FBOs.stereoRight.setup();
-    }
-
+  if (molmil.configBox.stereoMode && (molmil.configBox.stereoMode != 3 || molmil.xrSession)) {
     if (molmil.configBox.stereoMode != 3) {
+      
+      if (! this.FBOs.hasOwnProperty("stereoLeft")) {
+        this.FBOs.stereoLeft = new molmil.FBO(this.gl, this.width, this.height);
+        this.FBOs.stereoLeft.multisample = "stereoLeft";
+        this.FBOs.stereoLeft.addTexture("stereoLeft", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
+        this.FBOs.stereoLeft.setup();
+        
+        this.FBOs.stereoRight = new molmil.FBO(this.gl, this.width, this.height);
+        this.FBOs.stereoRight.multisample = "stereoRight";
+        this.FBOs.stereoRight.addTexture("stereoRight", this.gl.RGBA, this.gl.RGBA);//GL2.GL_RGB32F, this.gl.GL_RGB
+        this.FBOs.stereoRight.setup();
+      }
     
       var tmpVal = this.modelViewMatrix[12];
       var sCC = molmil.configBox.stereoCameraConfig; //[bottom, top, a, b, c, eyeSep, convergence, zNear, zfar];
@@ -6292,25 +6214,35 @@ molmil.render.prototype.render = function() {
       this.gl.clearColor.apply(this.gl, BGCOLOR); this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
       this.renderPrograms(COR);
     }
-    else if (molmil.configBox.stereoMode == 3) { // webvr
-      mat4.copy(tmp2MMat, frameData.leftViewMatrix);
-      tmp2MMat[12] *= 100; tmp2MMat[13] *= 100; tmp2MMat[14] *= 100;
-      
-      tmp3MVec[0] = tmp2MMat[12]-frameData.leftViewMatrix[12];
-      tmp3MVec[1] = tmp2MMat[13]-frameData.leftViewMatrix[13];
-      tmp3MVec[2] = tmp2MMat[14]-frameData.leftViewMatrix[14];
-
-      if (molmil.configBox.altVR) mat4.multiply(tmpMMat, this.modelViewMatrix, tmp2MMat);
-      else mat4.multiply(tmpMMat, tmp2MMat, this.modelViewMatrix);
-            
-      var tmp = mat3.create(); mat3.fromMat4(tmp, tmpMMat);
-      vec3.transformMat3(COR, this.soup.COR, tmp);
-      this.projectionMatrix = frameData.leftProjectionMatrix;
-      this.gl.viewport(0, 0, this.width * 0.5, this.height);
-
+    else if (molmil.configBox.stereoMode == 3) { // webxr
+      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, glLayer.framebuffer);
       this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements && this.programs[p].status) this.programs[p].render(tmpMMat, COR);
-      this.billboardProgram.render(tmpMMat, COR);
+
+      for (var view of xrPose.views) {
+        var viewport = glLayer.getViewport(view);
+        this.gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+        this.projectionMatrix = view.projectionMatrix;
+        
+        mat4.copy(tmp2MMat, view.transform.inverse.matrix);
+        tmp2MMat[12] *= 100; tmp2MMat[13] *= 100; tmp2MMat[14] *= 100;
+
+        mat4.multiply(tmpMMat, tmp2MMat, this.modelViewMatrix);
+        
+        var tmp = mat3.create(); mat3.fromMat4(tmp, tmpMMat);
+        vec3.transformMat3(COR, this.soup.COR, tmp);
+        
+        for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements && this.programs[p].status) this.programs[p].render(tmpMMat, COR);
+        this.billboardProgram.render(tmpMMat, COR);
+      }
+      
+      // render to the normal screen in spectator mode
+      if (molmil.configBox.xrSpectator) {
+        this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+        this.gl.viewport(0, 0, this.width, this.height);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements && this.programs[p].status) this.programs[p].render(tmpMMat, COR);
+        this.billboardProgram.render(tmpMMat, COR);
+      }
     }
     
     if (molmil.configBox.stereoMode != 3) {
@@ -6338,26 +6270,6 @@ molmil.render.prototype.render = function() {
       this.gl.viewport(this.width, 0, this.width, this.height);
       this.gl.scissor(this.width, 0, this.width, this.height);
       this.renderPrograms(COR);
-    }
-    else if (molmil.configBox.stereoMode == 3) { // webvr
-      mat4.copy(tmp2MMat, frameData.rightViewMatrix);
-      tmp2MMat[12] += tmp3MVec[0];
-      tmp2MMat[13] += tmp3MVec[1];
-      tmp2MMat[14] += tmp3MVec[2];
-      
-      if (molmil.configBox.altVR) mat4.multiply(tmpMMat, this.modelViewMatrix, tmp2MMat);
-      else mat4.multiply(tmpMMat, tmp2MMat, this.modelViewMatrix);
-      
-      var tmp = mat3.create(); mat3.fromMat4(tmp, tmpMMat);
-      vec3.transformMat3(COR, this.soup.COR, tmp);
-      this.projectionMatrix = frameData.rightProjectionMatrix;
-      this.gl.viewport(this.width * 0.5, 0, this.width * 0.5, this.height);
-
-      var tmp = mat3.create(); mat3.fromMat4(tmp, tmpMMat);
-      vec3.transformMat3(COR, this.soup.COR, tmp);
-      
-      for (var p=0; p<this.programs.length; p++) if (this.programs[p].nElements && this.programs[p].status) this.programs[p].render(tmpMMat, COR);
-      this.billboardProgram.render(tmpMMat, COR);
     }
     
     if (molmil.configBox.stereoMode == 1) {
@@ -6393,10 +6305,6 @@ molmil.render.prototype.render = function() {
   
   if (this.buffers.atomSelectionBuffer) { // this doesn't work properly with stereoscopy...
     this.renderAtomSelection(this.modelViewMatrix, COR);
-  }
-
-  if (molmil.configBox.stereoMode == 3 && molmil.vrDisplay) {
-    molmil.vrDisplay.submitFrame();
   }
   
   if (this.onRenderFinish) this.onRenderFinish();
@@ -6598,8 +6506,6 @@ molmil.glCamera.prototype.reset = function() {
   this.QRoll = quat.create();
   this.Qtmp = quat.create();
   this.pitchAngle = this.headingAngle = this.rollAngle = 0.0;
-  this.vrXYZ = [0.0, 0.0, 0.0];
-  this.vrXYZupdated = false;
 }
 
 molmil.glCamera.prototype.generateMatrix = function() {
@@ -6754,7 +6660,7 @@ molmil.infoPopUp = function(text) {
   }, 5000);
 }
 
-molmil.handle_molmilViewer_mouseScroll = function (event) { // not always firing in vr mode...
+molmil.handle_molmilViewer_mouseScroll = function (event) {
   if (molmil.settings.recordingMode) return;
   if (molmil.configBox.wheelZoomRequiresCtrl && ! document.fullscreenElement) {
     if (! event.ctrlKey) return molmil.infoPopUp("Press Ctrl button while scrolling to enable zoom");
@@ -7951,12 +7857,12 @@ molmil.safeStartViewer = function (canvas) {
   if (document.body.classList !== undefined) document.body.classList.add("entryLoaded");
 }
 
-molmil.animate_molmilViewers = function () {
-  if (molmil.vrDisplay) molmil.settings.animationFrameID = molmil.vrDisplay.requestAnimationFrame(molmil.animate_molmilViewers);
+molmil.animate_molmilViewers = function(t, frame) {
+  if (molmil.xrSession) molmil.xrSession.requestAnimationFrame(molmil.animate_molmilViewers);
   else molmil.settings.animationFrameID = requestAnimationFrame(molmil.animate_molmilViewers);
   if (! molmil.settings.recordingMode) {
-    for (var i=0; i<molmil.preRenderFuncs.length; i++) molmil.preRenderFuncs[i]();
-    for (var c=0; c<molmil.canvasList.length; c++) molmil.canvasList[c].renderer.render();
+    for (var i=0; i<molmil.preRenderFuncs.length; i++) molmil.preRenderFuncs[i]({xrFrame: frame});
+    for (var c=0; c<molmil.canvasList.length; c++) molmil.canvasList[c].renderer.render({xrFrame: frame});
   }
 }
 
@@ -9510,31 +9416,30 @@ molmil.pointerLock_update = function(e) {
   activeCanvas.update = true;
 };
 
+molmil.onXRSessionEnded = function() {molmil.xrSession = null;}
 
-molmil.startWebVR = function(that) {
-  //canvas.requestPointerLock(that.canvas);
+molmil.startWebXR = function(that) {
+  if (!molmil.xrSupported) return;
+  navigator.xr.requestSession('immersive-vr').then(function(session) {
+    molmil.xrSession = session; 
     
-  molmil.vrDisplays[0].requestPresent([{ source: that.canvas }]).then(function() {
-    molmil.vrDisplay = molmil.vrDisplays[0];
-    that.renderer.reinitRenderer();
-    //molmil.vrDisplay.resetPose(); // deprecated
-    var leftEye = molmil.vrDisplay.getEyeParameters('left');
-    var rightEye = molmil.vrDisplay.getEyeParameters('right');
-    that.renderer.width = that.width = that.canvas.width = Math.max(leftEye.renderWidth, rightEye.renderWidth) * 2;
-    that.renderer.height = that.height = that.canvas.height = Math.max(leftEye.renderHeight, rightEye.renderHeight);
-    molmil.configBox.stereoMode = 3;
-    that.renderer.camera.z = that.calcZ();
-    
-    //molmil.pointerLoc_setup(that.canvas);
-    
-    window.addEventListener('vrdisplaypresentchange', function() {
-      if (molmil.vrDisplay.isPresenting) return;
-      molmil.configBox.stereoMode = 0;
-      that.canvas.update = true; // draw scene
+    session.updateRenderState({
+      depthNear: molmil.configBox.zNear,
+      depthFar: molmil.configBox.zFar,
     });
-    that.canvas.update = true; // draw scene
+    
+    
+    session.molmilConfig = {};
+    session.addEventListener("end", molmil.onXRSessionEnded);
+    molmil.configBox.glAttribs.xrCompatible = true;
+    that.renderer.reinitRenderer();
+    session.updateRenderState({baseLayer: new XRWebGLLayer(session, that.renderer.gl)});
+    session.requestReferenceSpace("local").then(function(refSpace) {
+      molmil.xrSession.molmilConfig.refSpace = refSpace;
+      molmil.xrSession.requestAnimationFrame(molmil.animate_molmilViewers);
+    });
   });
-};
+}
 
 // END
 
@@ -10142,36 +10047,6 @@ if (! window.molmil_dep) {
   dep.src = molmil.settings.src+"molmil_dep.js";
   var head = document.getElementsByTagName("head")[0];
   head.appendChild(dep);
-}
-
-molmil.initVR = function(soup, callback) {
-  var initFakeVR = function() {
-    var dep = document.createElement("script")
-    dep.src = molmil.settings.src+"lib/webvr-polyfill.min.js";
-    dep.onload = function() {
-      var config = {
-        // Scales the recommended buffer size reported by WebVR, which can improve
-        // performance.
-        BUFFER_SCALE: 1.0, // Default: 0.5.
-      }
-      var polyfill = new WebVRPolyfill(config);
-      navigator.getVRDisplays().then(function(displays) {
-        if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup, callback);}
-        else {molmil.VRstatus = false; callback();}
-    });};
-    var head = document.getElementsByTagName("head")[0];
-    head.appendChild(dep);
-  }
-  if (! molmil.VRstatus) {
-    if (navigator.getVRDisplays) {
-      navigator.getVRDisplays().then(function(displays) {if (displays.length) {molmil.vrDisplays = displays; molmil.VRstatus = true; molmil.initVR(soup, callback);} else initFakeVR();}).catch(function(){initFakeVR();});
-    }
-    else initFakeVR();
-  }
-  else {
-    if (soup) molmil.startWebVR(soup);
-    if (callback) callback();
-  }
 }
 
 molmil.arrayMin = function(arr) {

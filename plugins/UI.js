@@ -358,7 +358,6 @@ molmil.UI.prototype.showResidues=function(target, payload) {
 
 molmil.UI.prototype.showLM=function(icon) {
   var UI = this;
-  if (molmil.VRstatus === void 0) return molmil.initVR(null, function() {UI.showLM(icon);});
   
   try {
     if (icon.parentNode.childNodes.length > 1) {
@@ -499,14 +498,14 @@ molmil.UI.prototype.showLM=function(icon) {
     };
   }
 
-  if (molmil.vrDisplays && molmil.vrDisplays.length) {
+  if (molmil.xrSupported) {
     e = menu.pushNode("div");
     e.className = "molmil_UI_ME";
-    e.innerHTML = "Enable WebVR";
+    e.innerHTML = "Enable VR";
     e.canvas = this.canvas; e.LM = icon;
     e.title = "Enables Virtual Reality mode";
     e.onclick = function() {
-      molmil.initVR(this.canvas.molmilViewer);
+      molmil.startWebXR(this.canvas.molmilViewer);
       this.LM.onclick();
     };
   }

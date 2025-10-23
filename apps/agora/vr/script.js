@@ -127,13 +127,16 @@ function doRender() {
     canvas.molmilViewer.renderer.QLV = 1;
     canvas.molmilViewer.renderer.initBuffers();
     canvas.molmilViewer.renderer.canvas.update = true;
-    blaat();
+    molmil.configBox.xrSpectator = true;
+    if (molmil.xrSupported) {
+      const button = document.getElementsByClassName("startbutton")[0];
+      button.style.display = "block";
+      button.onclick = function() {
+        button.style.display = "none";
+        molmil.startWebXR(canvas.molmilViewer);
+      };
+    }
   }
-}
-
-function blaat() {
-  if (! molmil.VRstatus) return molmil.initVR(null, function() {blaat();});
-  if (molmil.VRstatus) document.getElementsByClassName("startbutton")[0].style.display = "block";
 }
 
 function loadEntry(pdbid, pos, text, r, nodebug, visualization, BUINFO) {
