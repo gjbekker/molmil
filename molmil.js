@@ -5692,11 +5692,10 @@ molmil.generateSphereImposterTexture = function(res, gl) {
 
 // ** initiates the WebGL context **
 molmil.render.prototype.initGL = function(canvas, width, height) {
-  molmil.configBox.glAttribs.xrCompatible = true;
   
   if (window.WebGL2RenderingContext) {
+    molmil.configBox.glAttribs.xrCompatible = true;
     this.defaultContext = canvas.getContext("webgl2", molmil.configBox.glAttribs);
-    console.log(this.defaultContext)
     if (! this.defaultContext) molmil.configBox.webGL2 = false;
     else {
       molmil.configBox.OES_element_index_uint = true;
@@ -5705,6 +5704,7 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     }
   }
   if (! molmil.configBox.webGL2) {
+    delete molmil.configBox.glAttribs.xrCompatible;
     this.defaultContext = this.defaultContext || canvas.getContext("webgl", molmil.configBox.glAttribs) || canvas.getContext("experimental-webgl", molmil.configBox.glAttribs);
   }
   
@@ -9036,7 +9036,7 @@ molmil.addLabel = function(text, settings, soup) {
     
     
     textCtx.canvas.width = w; textCtx.canvas.height = h*1.2;
-    textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
+    textCtx.font = "bold "+settings.fontSize+"px Consolas, \"Liberation Mono\", Courier, monospace, Meiryo"; textCtx.textAlign = settings.textAlign || "center"; textCtx.textBaseline = settings.textBaseline || "middle"; 
     textCtx.clearRect(0, 0, textCtx.canvas.width, textCtx.canvas.height);
     
     if (settings.bg_color) {

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="../../agora/vr/style.css" type="text/css"/>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/2.4.3/seedrandom.min.js"></script>
+  <script>
+  
+    var molmil_settings = {src: "../../../"};
+    var canvas, cli;
+  
+    function initViewer() {
+      if (! window.molmil.configBox || ! molmil.configBox.initFinished) {return setTimeout(initViewer, 100);}
+      
+      randomSeed = 12;
+      
+      molmil.configBox.BGCOLOR = [0, 0, 0, 1];
+      molmil.configBox.cartoon_highlight_color = -1;
+      //molmil.configBox.zFar = 1000000;
+      
+      canvas = document.getElementById("molmilViewer");
+      canvas.width = (window.innerWidth || document.documentElement.clientWidth);
+      canvas.height = (window.innerHeight || document.documentElement.clientHeight);
+      canvas = molmil.createViewer(canvas);
+      
+      window.onresize = function() {
+        var dpr = devicePixelRatio || 1;
+        canvas.style.width = (window.innerWidth || document.documentElement.clientWidth);
+        canvas.style.height = (window.innerHeight || document.documentElement.clientHeight);
+        if (molmil.configBox.stereoMode != 3) {
+          canvas.width = (window.innerWidth || document.documentElement.clientWidth)*dpr;
+          canvas.height = (window.innerHeight || document.documentElement.clientHeight)*dpr;
+          canvas.renderer.resizeViewPort();
+        }
+        canvas.update = true;
+      };
+      
+      canvas.molmilViewer.calcZ = function() {return 0;}
+      
+      canvas.molmilViewer.skipCOGupdate = true;
+      
+      molmil.autoSetup();
+      
+      //loadEntry("5h8y", [-90.28249734964311, 51.05564785932719, -0.010721151885848018], -50, 40, 540);
+      //loadEntry("structures/5ire.mpbf", [0, 0, 0], "debug", 385, false); // add BU support...
+
+      var visualize_1ema = function(strucs) {
+        canvas.commandLine.environment.struc_1ema = molmil.quickSelect("model "+strucs[0].meta.idnr);
+
+        canvas.commandLine.eval("show cartoon, struc_1ema and chain A");
+        canvas.commandLine.eval("cartoon_color white, struc_1ema and chain A");
+        canvas.commandLine.eval("hide sticks, struc_1ema");
+        canvas.commandLine.eval("show sticks, struc_1ema and resn CRO");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 64 and name C");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 64 and name CA");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 66 and name N");
+        canvas.commandLine.eval("show sticks, struc_1ema and resi 66 and name CA");
+        canvas.commandLine.eval("bond struc_1ema and resi 64 and name C, struc_1ema and resn CRO and name N1");
+        canvas.commandLine.eval("bond struc_1ema and resi 66 and name N, struc_1ema and resn CRO and name C3");
+        canvas.commandLine.eval("color tan, struc_1ema and symbol C and resn CRO");
+      };      
+      
+      var visualize_1mbn = function(strucs) {
+        canvas.commandLine.environment.struc_1mbn = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_1mbn and chain A");
+        canvas.commandLine.eval("cartoon_color group, struc_1mbn and chain A");
+        canvas.commandLine.eval("show spheres, struc_1mbn and resn HEM");
+        canvas.commandLine.eval("show spheres, struc_1mbn and resn OH");
+        canvas.commandLine.eval("show sticks, struc_1mbn and resi 64 and sidechain");
+        canvas.commandLine.eval("color tan, struc_1mbn and symbol C and resn HEM");
+      };
+      var visualize_dna = function(strucs) {
+        canvas.commandLine.environment.struc_dna = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show sticks, struc_dna");
+        canvas.commandLine.eval("color khaki, struc_dna and symbol C and resn DC");
+        canvas.commandLine.eval("color salmon, struc_dna and symbol C and resn DG");
+        canvas.commandLine.eval("color lightskyblue, struc_dna and symbol C and resn DA");
+        canvas.commandLine.eval("color mediumseagreen, struc_dna and symbol C and resn DT");
+      };
+      var visualize_1tph = function(strucs) {
+        canvas.commandLine.environment.struc_1tph = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_1tph and chain A");
+        canvas.commandLine.eval("delete struc_1tph and chain B");
+        canvas.commandLine.eval("delete struc_1tph and chain D");
+        canvas.commandLine.eval("delete struc_1tph and chain E");
+        canvas.commandLine.eval("delete struc_1tph and chain F");
+        canvas.commandLine.eval("cartoon_color group, struc_1tph");
+        canvas.commandLine.eval("show spheres, struc_1tph and resn PGH");
+      };
+      
+      var visualize_3odv = function (strucs) {
+        canvas.commandLine.environment.struc_3odv = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_3odv");
+        canvas.commandLine.eval("cartoon_color lime, struc_3odv");
+        
+      };
+      
+      var visualize_2dn2 = function (strucs) {
+        canvas.commandLine.environment.struc_2dn2 = molmil.quickSelect("model "+strucs[0].meta.idnr);
+        canvas.commandLine.eval("show cartoon, struc_2dn2");
+        canvas.commandLine.eval("cartoon_color green, struc_2dn2 and (chain A or chain D)");
+        canvas.commandLine.eval("cartoon_color gold, struc_2dn2 and (chain B or chain C)");
+        canvas.commandLine.eval("show sticks, struc_2dn2 and resn HEM");
+        canvas.commandLine.eval("color pink, struc_2dn2 and resn HEM and symbol C");
+      };
+
+      
+      
+      var list = [];
+
+
+      list.push(["../../expo/vr/structures/3j3q.mpbf", [498.1543841381684, 609.675326993088, 470.2615158019828], 593.63]);
+      list.push(["../../../expo/vr/structures/1ema", [25.630047272727257, 27.931607272727298, 39.48978545454547], 27, visualize_1ema]);
+      list.push(["structures/1bbt.mpbf", [0, 0, 0], 161.08]);
+      list.push(["../../expo/vr/structures/5ire.mpbf", [0.07820328432419131, 0.1991919628225624, 0.3876471288888365], 258.48]);
+      list.push(["../../../expo/vr/structures/1mbn", [14.077157360406089, 22.322335025380728, 7.487817258883243], 21.01, visualize_1mbn]);
+      list.push(["../../../expo/vr/structures/dna", [0.051772277227722416, -0.01682178217821778, 15.21], 19.76, visualize_dna]);
+      list.push(["../../../expo/vr/structures/1tph", [6.470076902465184, 27.534610932475925, 21.694391211146804], 41.13, visualize_1tph]);
+      
+      list.push(["3odv", [14.7005, 12.624842105263157, 22.728289473684214], 12.5, visualize_3odv]);
+      list.push(["2dn2", [10.255550938337821, 13.26331501340483, 39.79517694369978], 34.3, visualize_2dn2]);
+      
+      list.push(["structures/7mry.mpbf", [309.7924190743882, 309.29493280087206, 308.94497733121216], 229]);
+      
+      //loadEntry("structures/emd_30430_spike_fds8.mpbf", [0, 0, 0], "debug", 385, false); // add BU support...
+      
+      //loadEntry("structures/7mry.mpbf", [0, 0, 0], "debug", 385, false); // add BU support...
+      
+      // fetch 7mry; molmil.duplicateBU(1); show coarse-surface, all; cartoon_color lime, chain A; cartoon_color cyan, chain B; cartoon_color orange, chain C; molmil.exportMPBF(cli_soup);
+      
+      
+      filename2name["../../expo/vr/structures/3j3q.mpbf"] = "HIVゲノムの収納箱\nHIVカプシド";
+      filename2name["../../../expo/vr/structures/1ema"] = "光るタンパク質\n緑色蛍光タンパク質\n（GFP）";
+      filename2name["structures/1bbt.mpbf"] = "ウシなどに病気を起こす\n口蹄疫ウイルス";
+      filename2name["../../../expo/vr/structures/1mbn"] = "ミオグロビン";
+      filename2name["../../../expo/vr/structures/dna"] = "生き物の設計図\nDNA";
+      filename2name["../../../expo/vr/structures/1tph"] = "多くの酵素に見られる筒型構造\nTIMバレル";
+      filename2name["../../expo/vr/structures/5ire.mpbf"] = "蚊が運ぶ\nジカウイルス";
+      filename2name["3odv"] = "サソリ毒";
+      filename2name["2dn2"] = "ヘモグロビン";
+      filename2name["structures/7mry.mpbf"] = "ノロウイルス";
+      
+      
+      
+      
+      // make some function to load an entry and place it somewhere...
+      distributeEntries(list);
+      
+      setupGamepad();
+      
+    }
+  
+  </script>
+  
+  <script type="text/javascript" src="../../agora/vr/script.js" charset="utf-8"></script>
+  <script type="text/javascript" src="../../../molmil.js"></script>
+  
+  <link rel="preload" href="../../../plugins/pymol-script.js" as="script">
+  <link rel="preload" href="../../../plugins/UI.js" as="script">
+  
+</head>
+<body onload="initViewer()">
+  <div class="molmil_popup_outer">
+    <div class = "molmil_popup_inner">
+    </div>
+  </div>
+  <div class="molmil_UI_container">
+    <canvas id="molmilViewer">
+    </canvas>
+  </div>
+  <div class="startbutton" onclick="molmil.startWebVR(canvas.molmilViewer);">Enable Molmil VR</div>
+</body>
+</html>
