@@ -22,7 +22,7 @@ molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
 molmil.pdbj_data = "https://data.pdbj.org/";
 molmil.xrSupported = false;
-navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
+if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
