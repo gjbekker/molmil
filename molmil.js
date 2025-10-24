@@ -5632,7 +5632,10 @@ molmil.render.prototype.selectDefaultContext=function() {
 };
 
 molmil.render.prototype.selectDataContext=function() {
-  if (! this.dataContext) this.dataContext = this.canvas.getContext("webgl", {preserveDrawingBuffer: true}) || this.canvas.getContext("experimental-webgl", {preserveDrawingBuffer: true});
+  if (! this.dataContext) {
+    if (molmil.configBox.webGL2) this.dataContext = this.canvas.getContext("webgl2", {preserveDrawingBuffer: true});
+    else this.dataContext = this.canvas.getContext("webgl", {preserveDrawingBuffer: true}) || this.canvas.getContext("experimental-webgl", {preserveDrawingBuffer: true});
+  }
   this.gl = this.dataContext;
 };
 
