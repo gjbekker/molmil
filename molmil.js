@@ -8445,8 +8445,8 @@ molmil.commandLine = function(canvas) {
   this.commandBuffer = [];
   for (var e in window) this.environment[e] = undefined;
   
-  this.environment.setTimeout = function(cb, tm) {window.setTimeout(cb, tm);}
-  this.environment.clearTimeout = function() {window.clearTimeout();}
+  this.environment.setTimeout = function(cb, tm) {return window.setTimeout(cb, tm);}
+  this.environment.clearTimeout = function(tid) {return window.clearTimeout(tid);}
   this.environment.navigator = window.navigator;
   this.environment.window = this;
   

@@ -1247,7 +1247,7 @@ molmil.bindCanvasInputs = function(canvas) {
           if (canvas.inputFunctions[j](canvas, fakeObj)) break;
         }
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1279,11 +1279,11 @@ molmil.bindCanvasInputs = function(canvas) {
             });
           }
           processFiles([], files2);
-          canvas.molmilViewer.downloadInProgress = false;
+          canvas.molmilViewer.downloadInProgress--;
         });
       }
       fr.readAsArrayBuffer(fr.fileHandle);
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       return true;
     }
   });
@@ -1294,9 +1294,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".pdb") || fr.filename.endsWith(".ent")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 4, this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1307,9 +1307,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".mmtf")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "mmtf", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1320,9 +1320,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".cif")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 'cif', this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1333,9 +1333,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".gro")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 7, this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1346,9 +1346,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".trr")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "gromacs-trr", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1359,9 +1359,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".xtc")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "gromacs-xtc", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1372,9 +1372,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".cor") || fr.filename.endsWith(".cod")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "presto-traj", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1385,9 +1385,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".mnt")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "presto-mnt", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1398,9 +1398,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".mpbf")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 8, this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1411,9 +1411,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".ccp4")) {
       fr.onload = function(e) {
         canvas.molmilViewer.UI.ccp4_input_popup(e.target.result, this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsArrayBuffer(fr.fileHandle);
       return true;
     }
@@ -1424,9 +1424,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".mdl") || fr.filename.endsWith(".mol") || fr.filename.endsWith(".sdf")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 'mdl', this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1437,9 +1437,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".mol2")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, 'mol2', this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1450,9 +1450,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".xyz")) {
       fr.onload = function(e) {
         canvas.molmilViewer.UI.xyz_input_popup(e.target.result, this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1463,9 +1463,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".obj")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "obj", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
@@ -1476,9 +1476,9 @@ molmil.bindCanvasInputs = function(canvas) {
     if (fr.filename.endsWith(".wrl")) {
       fr.onload = function(e) {
         canvas.molmilViewer.loadStructureData(e.target.result, "wrl", this.filename, renderOnlyFinal);
-        delete canvas.molmilViewer.downloadInProgress;
+        canvas.molmilViewer.downloadInProgress--;
       }
-      canvas.molmilViewer.downloadInProgress = true;
+      canvas.molmilViewer.downloadInProgress++;
       fr.readAsText(fr.fileHandle);
       return true;
     }
