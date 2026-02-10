@@ -20,7 +20,7 @@ var molmil = molmil || {};
 molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil.mouseMoved = false; molmil.Xcoord = 0; molmil.Ycoord = 0; molmil.Zcoord = 0; molmil.activeCanvas = null; molmil.touchList = null; molmil.touchMode = false; molmil.preRenderFuncs = [];
 molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
-molmil.pdbj_data = "https://data.pdbj.org/";
+molmil.pdbj_data = "https://data.pdbjdv1.pdbj.org/";
 molmil.xrSupported = false;
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
 
@@ -1088,7 +1088,7 @@ molmil.viewer.prototype.loadStructure = function(loc, format, ondone, settings) 
   else {
     var fakeObj = {filename: loc, readAsText: function() {}, readAsArrayBuffer: function() {}};
     for (var j=0; j<this.canvas.inputFunctions.length; j++) {
-      if (this.canvas.inputFunctions[j](this.canvas, fakeObj)) {
+      if (this.canvas.inputFunctions[j](this.canvas, fakeObj, true)) {
         request.inputFunction = this.canvas.inputFunctions[j];
         request.canvas = this.canvas;
         request.parse = function() {
@@ -1637,14 +1637,11 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
   var entries = Object.keys(mmjso), structs = [], offset, isHet;
   settings = settings || {};
   for (var e=0; e<entries.length; e++) {
-
     //var entryId = Object.keys(mmjso)[0].substr(5).split("-")[0];
     var entryId = entries[e].substr(5).split("-")[0];
     var pdb = mmjso[entries[e]];
 
-    var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || pdb.
-ihm_starting_model_coord
- || null;
+    var atom_site = pdb.atom_site || pdb.chem_comp_atom || pdb.pdbx_chem_comp_model_atom || pdb.ihm_starting_model_coord || null;
     
     if (! atom_site) continue;
     
@@ -1681,6 +1678,15 @@ ihm_starting_model_coord
 
     var struc = null, Xpos, cmnum, Xpos_first = {}, isLigand, alt_loc_handler = null;
   
+    var loadOnlyModel = molmil.configBox.loadOnlyModel;
+    if (loadOnlyModel == true) {
+      try {
+        loadOnlyModel = pdb.pdbx_nmr_representative.conformer_id[0];
+        if (!pdbx_PDB_model_num.includes(loadOnlyModel)) loadOnlyModel = pdbx_PDB_model_num[0];
+      }
+      catch (e) {loadOnlyModel = pdbx_PDB_model_num[0];}
+    }
+  
     var polyTypes = {}, ligands = {};
     try {for (var i=0; i<pdb.entity_poly_seq.mon_id.length; i++) polyTypes[pdb.entity_poly_seq.mon_id[i]] = false;}
     catch (e) {}
@@ -1690,7 +1696,7 @@ ihm_starting_model_coord
         if (pdb.chem_comp.mon_nstd_flag[i] || pdb.chem_comp.type[i].toLowerCase().indexOf("peptide") != -1) polyTypes[pdb.chem_comp.id[i]] = true;
         else if (pdb.chem_comp.type[i] == "non-polymer") ligands[pdb.chem_comp.id[i]] = true;
       }
-      polyTypes.ACE = polyTypes.NME = true;
+      polyTypes.ACE = polyTypes.NME = polyTypes.NH2 = true;
     }
     catch (e) {polyTypes = molmil.AATypes;}
 
@@ -1707,6 +1713,7 @@ ihm_starting_model_coord
     
       if ((pdbx_PDB_model_num && pdbx_PDB_model_num[a] != cmnum) || ! struc) {
         if (struc && ! molmil.configBox.loadModelsSeparately) break;
+        if (loadOnlyModel !== undefined && loadOnlyModel != pdbx_PDB_model_num[a]) continue;
         this.structures.push(struc = new molmil.entryObject({id: entryId})); structs.push(struc);
         if (pdbx_PDB_model_num) struc.meta.modelnr = pdbx_PDB_model_num[a];
         cmnum = pdbx_PDB_model_num ? pdbx_PDB_model_num[a] : 0; ccid = cmid = false;
@@ -5749,9 +5756,13 @@ molmil.render.prototype.initGL = function(canvas, width, height) {
     };
     
     canvas.bindMouseTouch();
-    canvas.addEventListener("webglcontextlost", function(event) {event.preventDefault();}, false);
+    canvas.addEventListener("webglcontextlost", function(event) {
+      canvas.molmilViewer.downloadInProgress++;
+      event.preventDefault();
+    }, false);
     canvas.addEventListener("webglcontextrestored", function() {
       this.renderer.reinitRenderer();
+      canvas.molmilViewer.downloadInProgress--;
     }, false);
   }
   
