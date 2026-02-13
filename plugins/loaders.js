@@ -1030,12 +1030,12 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
         currentMol = new molmil.molObject(molName, molID, currentChain);
         if (currentMol.name == "HOH" || currentMol.name == "DOD" || currentMol.name == "WAT" || currentMol.name == "SOL" || currentMol.name == "TIP3") {
           currentMol.water = true; currentMol.ligand = false;
-          currentChain.display = this.showWaters;
           if (currentChain.molecules.length && ! currentChain.molecules[currentChain.molecules.length-1].water) {
             struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
             currentChain.CID = this.CID++;
             currentChain.water = true;
           }
+          currentChain.display = this.showWaters;
         }
         else if (currentChain.molecules.length && currentChain.molecules[currentChain.molecules.length-1].water) {
           struc.chains.push(currentChain = new molmil.chainObject(chainName, struc));
@@ -1163,7 +1163,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
 
 molmil.viewer.prototype.processStrucLoader = function(struc) {
   var newChains = {}, chainRef, rC, m1;
-  
+
   // add some functionality to better deal with weird amino acids (i.e. build some way to detect and show a continuous chain...)
   for (c=0; c<struc.chains.length; c++) this.buildMolBondList(struc.chains[c]);
   
