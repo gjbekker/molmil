@@ -20,15 +20,19 @@ var molmil = molmil || {};
 molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil.mouseMoved = false; molmil.Xcoord = 0; molmil.Ycoord = 0; molmil.Zcoord = 0; molmil.activeCanvas = null; molmil.touchList = null; molmil.touchMode = false; molmil.preRenderFuncs = [];
 molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
-molmil.pdbj_data = "https://data.pdbjdv1.pdbj.org/";
+molmil.pdbj_data = "https://data.pdbjpw2.pdbj.org/";
 molmil.xrSupported = false;
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
+
+function stringInterpolate(string, params) {
+  return string.replace(/\${(.*?)}/g, function(x,g){return params[g]});
+}
 
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
   src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
-  pdb_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson/__ID__.json",
-  mmcif_url: molmil.pdbj_data+"pub/pdb/data/structures/all/mmCIF/__ID__.cif",
+  pdb_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson/pdb_${pdbid}.json",
+  mmcif_url: molmil.pdbj_data+"pub/wwpdb/pdb/data/entries/${odbid23}/pdb_${pdbid}/structures/pdb_${pdbid}.cif.gz",
   pdb_chain_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
   comp_url: molmil.pdbj_data+"pdbjplus/data/cc/mmjson/__ID__.json",
   data_url: molmil.pdbj_data,
@@ -8148,13 +8152,17 @@ molmil.loadFile = function(loc, format, cb, async, soup) {
   }, {async: async ? true : false});
 };
 
+molmil.isBig = new Set(["00009fqr"]);
+
 molmil.loadPDB = function(pdbid, cb, async, soup) {
   var tmp = molmil.configBox.skipComplexBondSearch;
   molmil.configBox.skipComplexBondSearch = true;
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
-  
-  var isBig = pdbid.toLowerCase() == "9fqr";
-  soup.loadStructure((isBig ? molmil.settings.mmcif_url : molmil.settings.pdb_url).replace("__ID__", pdbid.toLowerCase()), isBig ? 2 : 1, cb || function(target, struc) {
+  pdbid = pdbid.toLowerCase();
+  if (pdbid.startsWith("pdb_")) pdbid = pdbid.substr(4);
+  if (pdbid.length == 4) pdbid = "0000"+pdbid;
+  var isBig = molmil.isBig.has(pdbid);
+  soup.loadStructure((isBig ? stringInterpolate(molmil.settings.mmcif_url, {pdbid: pdbid, pdbid23: pdbid.substr(5,1)}) : stringInterpolate(molmil.settings.pdb_url, {pdbid: pdbid})), isBig ? 2 : 1, cb || function(target, struc) {
     struc.meta.pdbid = pdbid;
     if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);

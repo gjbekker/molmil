@@ -384,7 +384,7 @@ molmil.commandLines.pyMol.afdbCommand = function(env, command) {
 }
 
 molmil.commandLines.pyMol.fetchCommand = function(env, command) {
-  var cmd = command.match(/fetch[\s]+([a-zA-Z0-9]{4})/);
+  var cmd = command.match(/fetch[\s]+([a-zA-Z0-9]*)/);
   if (cmd != null) {
     var cb = function(soup, struc) {
       struc.meta.pdbid = cmd[1].trim().toLowerCase();

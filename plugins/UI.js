@@ -2437,7 +2437,7 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
       var idx = struct.meta.pdbxData && struct.meta.pdbxData.pdbx_struct_assembly && struct.meta.pdbxData.pdbx_struct_assembly.id ? struct.meta.pdbxData.pdbx_struct_assembly.id.indexOf(e) : -1;
       var txt = "";
       if (idx != -1) {
-        txt = struct.meta.pdbxData.pdbx_struct_assembly.details[idx];
+        txt = struct.meta.pdbxData.pdbx_struct_assembly.details[idx]||"";
         txt = txt.charAt(0).toUpperCase() + txt.slice(1);
         txt += " (%NOC chains, %D D)".replace("%NOC", noc).replace("%D", molmil_dep.Rounding(MW, 2));
       }

@@ -1155,7 +1155,6 @@ molmil.taubinSmoothing = function(vertices, faces, lambda, mu, iter) {
 }
 
 // ** biological unit generation **
- 
 //no_identity, NOC
 molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
   soup = soup || molmil.cli_soup;
@@ -1261,14 +1260,12 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
   sceneBU.NOC = NOC;
   sceneBU.no_identity = ! any_identity;
   
-
-
   var tst = soup.pdbxData.pdbx_struct_assembly || {details: []};
   var ref = ["octahedral", "tetrahedral", "dihedral", "circular", "point"];
   var OK = false, OK_type = 0;
   for (var i=0, j; i<tst.details.length; i++) {
     for (j=0; j<ref.length; j++) {
-      if (tst.details[i].toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 1; break;}
+      if ((tst.details[i]||"").toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 1; break;}
     }
     if (OK) break;
   }
@@ -1276,7 +1273,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
   var ref = ["icosahedral", "helical"];
   for (var i=0, j; i<tst.details.length; i++) {
     for (j=0; j<ref.length; j++) {
-      if (tst.details[i].toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 2; break;}
+      if ((tst.details[i]||"").toLowerCase().indexOf(ref[j]) != -1) {OK = true; OK_type = 2; break;}
     }
     if (OK) break;
   }
@@ -1330,16 +1327,16 @@ molmil.figureOutAssemblyId = function(pdbxData, BUassemblies) {
   if (pdbxData.pdbx_struct_assembly) {
     var tst = pdbxData.pdbx_struct_assembly || {details: []};
     for (var i=0; i<tst.details.length; i++) {
-      if (tst.details[i].substr(0, 19) == "author_and_software") {assembly_id = tst.id[i]; break;}
+      if ((tst.details[i]||"").substr(0, 19) == "author_and_software") {assembly_id = tst.id[i]; break;}
     }
     if (assembly_id == null) {
       for (var i=0; i<tst.details.length; i++) {
-        if (tst.details[i].substr(0, 6) == "author") {assembly_id = tst.id[i]; break;}
+        if ((tst.details[i]||"").substr(0, 6) == "author") {assembly_id = tst.id[i]; break;}
       }
     }
     if (assembly_id == null) {
       for (var i=0; i<tst.details.length; i++) {
-        if (tst.details[i].substr(0, 8) == "software") {assembly_id = tst.id[i]; break;}
+        if ((tst.details[i]||"").substr(0, 8) == "software") {assembly_id = tst.id[i]; break;}
       }
     }
   }
