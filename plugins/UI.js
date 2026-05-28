@@ -2837,11 +2837,17 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
     var sigma1 = parseFloat(form.sigma1.value) || 1;
     var sigma2 = parseFloat(form.sigma2.value) || 2;
     
-    if (! form.atom) {
+    var XYZ = [], atm;
+    for (var a=0; a<UI.soup.atomSelection.length; a++) {
+      atm = UI.soup.atomSelection[a];
+      XYZ.push([atm.chain.modelsXYZ[0][atm.xyz], atm.chain.modelsXYZ[0][atm.xyz+1], atm.chain.modelsXYZ[0][atm.xyz+2]]);
+    }
+    
+    if (XYZ.length == 0) {
       alert("Please select an atom...");
       return false;
     }
-    var XYZ = [[form.atom.chain.modelsXYZ[0][form.atom.xyz], form.atom.chain.modelsXYZ[0][form.atom.xyz+1], form.atom.chain.modelsXYZ[0][form.atom.xyz+2]]];
+    
     var doRequest = function(mode, filename, red, green, blue, sigma) {
       var request = new molmil_dep.CallRemote("POST");
       request.AddParameter("xyz", JSON.stringify(XYZ));
@@ -2892,11 +2898,6 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
     form.modeSel[0].checked = true;
     form.modeSel[0].onchange();
   }
-  
-  
-  this.soup.onAtomPick = function(atom) {
-    form.atom = atom;
-  };
   
   edmap2_downloads();
 };

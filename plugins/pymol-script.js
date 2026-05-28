@@ -1088,8 +1088,7 @@ molmil.commandLines.pyMol.align = function(name1, name2) {
   obj1 = obj1.chains.find(function(x) {return x.name == name1[1]}) || obj1.chains[0];
   obj2 = obj2.chains.find(function(x) {return x.name == name2[1]}) || obj2.chains[0];
   
-  molmil.align(obj1, obj2);
-  return true;
+  return molmil.align(obj1, obj2);
 }
 
 molmil.commandLines.pyMol.alter = function(atoms, options) {
@@ -1111,7 +1110,7 @@ molmil.commandLines.pyMol.alter = function(atoms, options) {
   return true;
 }
 
-molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
+molmil.commandLines.pyMol.edmap = function(atoms, border, mode, ondone) {
   if (typeof atoms != "object") {
     if (this.hasOwnProperty(atoms)) atoms = this[atoms];
     //else atoms = molmil.commandLines.pyMol.select(atoms);
@@ -1153,6 +1152,7 @@ molmil.commandLines.pyMol.edmap = function(atoms, border, mode) {
     var struct = soup.load_ccp4(this.request.response, "edmap mesh", settings);
     struct.meta.idnr = "#"+(soup.SID++);
     soup.downloadInProgress--;
+    if (ondone) ondone(struct);
   };
   soup.downloadInProgress++;
   request.OnError = function() {this.console.error("Unable to retrieve map...");};

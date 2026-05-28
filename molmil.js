@@ -534,7 +534,6 @@ molmil.chainObject = function (name, entry) {
   this.displayMode = molmil.displayMode_Default;
   this.isHet = true;
   this.rgba = [255, 255, 255, 255];
-  this.display = true;
 }
 
 molmil.chainObject.prototype.toString = function() {return (this.name ? "Chain " + this.name : "");};
@@ -1267,7 +1266,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
         dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
         r = dx+dy+dz;
 
-        if (r <= 3.0) {
+        if (r <= 3.2) {
           chain.molecules[m1].next = chain.molecules[m2]; 
           chain.molecules[m2].previous = chain.molecules[m1]; 
           chain.bonds.push([chain.molecules[m1].C, chain.molecules[m2].N, 1]); 
@@ -1280,7 +1279,6 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
           dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
           dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
           r = dx+dy+dz;
-
           if (r <= 3.0) {
             chain.molecules[m1].next = chain.molecules[m2];
             chain.molecules[m2].previous = chain.molecules[m1];
@@ -9881,7 +9879,7 @@ molmil.superpose = function(A, B, C, modelId, iterate) {
     atom.chain.modelsXYZ[modelId][atom.xyz+2] = xyz[2] + data[2][2];
   }
 
-  return {initial_rmsd: initialRMSD, rmsd: data[0], aligned_indices: selIdxs};
+  return {initial_rmsd: initialRMSD, rmsd: data[0], aligned_indices: selIdxs, matrix: rotationMatrix};
 };
 
 molmil.alignInfo = {};
@@ -9954,6 +9952,7 @@ molmil.align = function(A, B, options) {
   if (! options.skipOrient) molmil.orient(Aarr, A.entry.soup);
   A.entry.soup.renderer.rebuildRequired = true;
   molmil.geometry.reInitChains = true;
+  return data;
 }
 
 molmil.record = function(canvas, video_path, video_framerate) {
