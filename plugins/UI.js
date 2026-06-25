@@ -1935,6 +1935,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 3, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 3, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 3, 10001]],
       ]]
@@ -2031,6 +2032,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 4, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 4, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 4, 10001]]
       ]],
@@ -2070,6 +2072,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 3, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 3, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 3, 10001]]
       ]],
@@ -2480,6 +2483,12 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
   
   td = BUrm.pushNode("option", "Coarse surface, colored by each asymmetric chain"); td.value = [5, 2];
   td = BUrm.pushNode("option", "Coarse surface, colored by each chain"); td.value = [5, 3];
+  td = BUrm.pushNode("option", "VDW surface, colored by each asymmetric chain"); td.value = [7, 2];
+  td = BUrm.pushNode("option", "VDW surface, colored by each chain"); td.value = [7, 3];
+  td = BUrm.pushNode("option", "SAS surface, colored by each asymmetric chain"); td.value = [8, 2];
+  td = BUrm.pushNode("option", "SAS surface, colored by each chain"); td.value = [8, 3];
+  td = BUrm.pushNode("option", "SES surface, colored by each asymmetric chain"); td.value = [9, 2];
+  td = BUrm.pushNode("option", "SES surface, colored by each chain"); td.value = [9, 3];
   
   BUrm.value = rm;
   

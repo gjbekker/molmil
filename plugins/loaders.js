@@ -256,6 +256,49 @@ molmil.viewer.prototype.load_obj = function(data, filename, settings) {
   
 };
 
+function trianglesToWireframe(indices) {
+    const triangleCount = indices.length / 3;
+    // Max possible lines is 3 per triangle
+    const maxLines = triangleCount * 3; 
+    
+    const tempLines = new Int32Array(maxLines * 2);
+    const seen = new Set();
+    let lineCount = 0;
+
+    for (let i = 0; i < indices.length; i += 3) {
+        const a = indices[i];
+        const b = indices[i + 1];
+        const c = indices[i + 2];
+
+        // Process all 3 edges: (a,b), (b,c), (c,a)
+        lineCount = addEdge(a, b, seen, tempLines, lineCount);
+        lineCount = addEdge(b, c, seen, tempLines, lineCount);
+        lineCount = addEdge(c, a, seen, tempLines, lineCount);
+    }
+
+    // Trim the array to the exact size used
+    return tempLines.slice(0, lineCount * 2);
+}
+
+function addEdge(v1, v2, seenSet, storageArray, count) {
+    const min = v1 < v2 ? v1 : v2;
+    const max = v1 > v2 ? v1 : v2;
+    
+    // Pack two 32-bit ints into one 64-bit BigInt key (super fast)
+    const key = (BigInt(min) << 32n) | BigInt(max);
+
+    if (!seenSet.has(key)) {
+        seenSet.add(key);
+        const index = count * 2;
+        storageArray[index] = min;
+        storageArray[index + 1] = max;
+        return count + 1;
+    }
+    
+    return count;
+}
+
+
 molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   var head = document.getElementsByTagName("head")[0];
   if (! molmil.conditionalPluginLoad(molmil.settings.src+"plugins/misc.js", this.load_ccp4, this, [buffer, filename, settings])) return;
@@ -304,152 +347,132 @@ molmil.viewer.prototype.load_ccp4 = function(buffer, filename, settings) {
   
   if (settings.color) settings.rgba = molmil.color2rgba(settings.color);
   var rgba = settings.rgba || [255, 255, 255, 255];
-      
-  var sz = a[0]*a[1]*a[2];
-  var voxels = new Float32Array(buffer, 1024+e[1], sz); 
-  // ^ this should actually be based on mode (a[4]):
-  // 0: 8bit
-  // 1: 16bit
-  // 2: 32bit (float)
-  // 3: 32bit (fourier int)
-  // 4: 64bit (fourier float)
 
-  // alpha, beta, gamma...
-  var iIndex = c[0]-1, jIndex = c[1]-1, kIndex = c[2]-1;
-  var temp = [-1, -1, -1]; temp[c[0]-1] = 0; temp[c[1]-1] = 1; temp[c[2]-1] = 2;
-  var xIndex = temp[0], yIndex = temp[1], zIndex = temp[2];
+  var temp = [-1, -1, -1]; 
+  temp[c[0]-1] = 0; 
+  temp[c[1]-1] = 1; 
+  temp[c[2]-1] = 2;
 
-  var voxel_size = [b[0]/a[7], b[1]/a[8], b[2]/a[9]];
-  // console.log(1/b[0], 1/b[1], 1/b[2]); scalen inverse (diagonal)
-  //var first = [voxel_size[0]*a[iIndex+4], voxel_size[1]*a[jIndex+4], voxel_size[2]*a[kIndex+4]];
+  // Get the spatial dimensions from the header
+  const Nc = a[0]; // Number of grid units along columns (fastest in file)
+  const Nr = a[1]; // Number of grid units along rows    (medium in file)
+  const Ns = a[2]; // Number of grid units along sections (slowest in file)
 
-  var selectFunc = function(x, y, z) {return arguments[iIndex] + a[0] * (arguments[jIndex] + a[1] * arguments[kIndex]);}
-  var surf = polygonize([a[xIndex], a[yIndex], a[zIndex]], voxels, sigma, selectFunc);
+  // Compute total voxel size and extract map data payload
+  const sz = Nc * Nr * Ns;
+  const voxels = new Float32Array(buffer, 1024 + e[1], sz);
 
-  var st = new Float32Array(buffer, 100, 12); // header
-  
-  var alpha = (Math.PI/180.0)*b[3], beta = (Math.PI/180.0)*b[4], gamma = (Math.PI/180.0)*b[5];
-  var cosa = Math.cos(alpha), cosb = Math.cos(beta), cosg = Math.cos(gamma), sing = Math.sin(gamma); var tmp = (cosa - cosb*cosg) / sing;
+  const surf = molmil.polygonize_fast(voxels, Nc, Nr, Ns, sigma);
 
-  var matrix = mat4.create();
+  // Smooth right here while still in uniform grid coordinates!
+  molmil.volumeRescalingSmoothing(surf.vertices, surf.vertex_normals, surf.vertexIndex, 0.5, 2);
+
+  // Set Up Standard Transformation Matrix
+  const xIndex = temp[0], yIndex = temp[1], zIndex = temp[2];
+
+  const voxel_size = [b[0] / a[7], b[1] / a[8], b[2] / a[9]];
+  const alpha = (Math.PI / 180.0) * b[3];
+  const beta  = (Math.PI / 180.0) * b[4];
+  const gamma = (Math.PI / 180.0) * b[5];
+
+  const cosa = Math.cos(alpha), cosb = Math.cos(beta), cosg = Math.cos(gamma), sing = Math.sin(gamma);
+  const tmp = (cosa - cosb * cosg) / sing;
+
+  const matrix = mat4.create();
   matrix[0] = voxel_size[0];
   matrix[4] = cosg * voxel_size[1];
   matrix[5] = sing * voxel_size[1];
   matrix[8] = cosb * voxel_size[2];
   matrix[9] = tmp * voxel_size[2];
-  matrix[10] = Math.sqrt(1.0 - cosb*cosb - tmp*tmp) * voxel_size[2];
-  
-  if (f[24] == 0 && f[25] == 0 && f[26] == 0) { // Handle both MRC-2000 and older format maps
-    matrix[12] = matrix[0] * a[xIndex+4] + matrix[4] * a[yIndex+4] + matrix[8] * a[zIndex+4];
-    matrix[13] = matrix[5] * a[yIndex+4] + matrix[9] * a[zIndex+4];
-    matrix[14] = matrix[10] * a[zIndex+4];
-  }
-  else { // using MRC2000 origin
-    matrix[12] = f[xIndex+24];
-    matrix[13] = f[yIndex+24];
-    matrix[14] = f[zIndex+24];
-  }
-  
-  for (i=0; i<surf.vertices.length; i++) {
-    vec3.transformMat4(surf.vertices[i], surf.vertices[i], matrix);
-  }
-  
-  /*
-  if (e[2] != 0) { // translate & scale if required by ccp4 (LSKFLG)
-    var S = mat3.fromValues(1/st[0], 1/st[1], 1/st[2], 1/st[3], 1/st[4], 1/st[5], 1/st[6], 1/st[7], 1/st[8]);
-    var t = vec3.fromValues(st[9], st[10], st[11]);
-    t[0] -= first[0]; t[1] -= first[1]; t[2] -= first[2];
-    
-    var x, y, z;
-    for (i=0; i<surf.vertices.length; i++) {
-      x = ((surf.vertices[i][0]) * voxel_size[0]);
-      y = ((surf.vertices[i][1]) * voxel_size[1]);
-      z = ((surf.vertices[i][2]) * voxel_size[2]);
+  matrix[10] = Math.sqrt(1.0 - cosb * cosb - tmp * tmp) * voxel_size[2];
 
-      surf.vertices[i][0] = (x * S[0] + y * S[3] + z * S[6]) + t[0];
-      surf.vertices[i][1] = (x * S[1] + y * S[4] + z * S[7]) + t[0];
-      surf.vertices[i][2] = (x * S[2] + y * S[5] + z * S[8]) + t[0];
-    }
+  if (f[24] === 0 && f[25] === 0 && f[26] === 0) {
+    matrix[12] = matrix[0] * a[xIndex + 4] + matrix[4] * a[yIndex + 4] + matrix[8] * a[zIndex + 4];
+    matrix[13] = matrix[5] * a[yIndex + 4] + matrix[9] * a[zIndex + 4];
+    matrix[14] = matrix[10] * a[zIndex + 4];
+  } else {
+    matrix[12] = f[xIndex + 24];
+    matrix[13] = f[yIndex + 24];
+    matrix[14] = f[zIndex + 24];
   }
-  else { // do some translation 
-    var t = vec3.fromValues(st[9], st[10], st[11]);
-    if (t[0] == 0 && t[1] == 0 && t[2] == 0) {t[0] = first[0]; t[1] = first[1]; t[2] = first[2];}
-    if (f[24] != 0) {t[0] = f[24]; t[1] = f[25]; t[2] = f[26];}
-    
-    for (i=0; i<surf.vertices.length; i++) {
-      surf.vertices[i][0] = ((surf.vertices[i][0]) * voxel_size[0]) + t[0];
-      surf.vertices[i][1] = ((surf.vertices[i][1]) * voxel_size[1]) + t[1];
-      surf.vertices[i][2] = ((surf.vertices[i][2]) * voxel_size[2]) + t[2];
-    }
-  }
-*/
-  molmil.taubinSmoothing(surf.vertices, surf.faces, .5, -.53, 10);
 
-  var i, faces, f, normals = [], normal;
-  for (i=0; i<surf.vertices.length; i++) normals.push([0, 0, 0]);
-  
-  for (i in surf.vertexIndex) {
-    normal = normals[surf.vertexIndex[i][0]];
-    faces = surf.vertexIndex[i][1];
-    for (f=0; f<faces.length; f++) vec3.add(normal, normal, surf.face_normals[faces[f]]);
-    vec3.normalize(normal, normal);
-  }
-  surf.normals = normals;
-  
-  molmil.taubinSmoothing(surf.normals, surf.faces, .5, -.53, 10);
+  // Set up safe normal transformations
+  const normalMatrix = mat3.create();
+  mat3.fromMat4(normalMatrix, matrix);
+  mat3.invert(normalMatrix, normalMatrix);
+  mat3.transpose(normalMatrix, normalMatrix);
 
-  var vertices = new Float32Array(surf.vertices.length*7); // x, y, z, nx, ny, nz, rgba
-      
-  var vertices8 = new Uint8Array(vertices.buffer);
-    
-  var hihi = [0, 0, 0, 0], tmp = [0, 0, 0];
+  // Track Data Axis Mappings
+  const axisMapping = [c[0] - 1, c[1] - 1, c[2] - 1];
+
+  // Execute Unified Single-Pass Transform & Interleave Loop
+  var hihi = [0, 0, 0, 0];
   var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99];
-  for (var v=0, v2, v3; v<surf.vertices.length; v++) {
-    v2 = v*7;
-    v3 = v*28;
-        
-    vertices[v2+3] = normals[v][0];
-    vertices[v2+4] = normals[v][1];
-    vertices[v2+5] = normals[v][2];
-        
-    vertices[v2] = surf.vertices[v][0];
-    vertices[v2+1] = surf.vertices[v][1];
-    vertices[v2+2] = surf.vertices[v][2];
-        
-    hihi[0] += surf.vertices[v][0];
-    hihi[1] += surf.vertices[v][1];
-    hihi[2] += surf.vertices[v][2];
-    hihi[3] += 1;
-        
-    if (vertices[v2] < geomRanges[0]) geomRanges[0] = vertices[v2];
-    if (vertices[v2] > geomRanges[1]) geomRanges[1] = vertices[v2];
-      
-    if (vertices[v2+1] < geomRanges[2]) geomRanges[2] = vertices[v2+1];
-    if (vertices[v2+1] > geomRanges[3]) geomRanges[3] = vertices[v2+1];
-     
-    if (vertices[v2+2] < geomRanges[4]) geomRanges[4] = vertices[v2+2];
-    if (vertices[v2+2] > geomRanges[5]) geomRanges[5] = vertices[v2+2];
+
+  const vTmpIn = vec3.create();
+  const vPosOut = vec3.create();
+  const vNormOut = vec3.create();
+
+  // Count by single vertex index units (0, 1, 2, 3...) to guarantee clean strides
+  const numVertices = surf.vertices.length / 3;
+
+  var vertices = new Float32Array(numVertices*7); // x, y, z, nx, ny, nz, rgba
+  var vertices8 = new Uint8Array(vertices.buffer);
+
+  for (let v = 0; v < numVertices; v++) {
+    const vSrcIdx = v * 3;
+    const v2 = v * 7;  // Clean sequence: 0, 7, 14, 21...
+    const v3 = v * 28; // Clean sequence: 0, 28, 56, 84...
+
+    // Extract raw data and apply Axis-Swizzling to [X, Y, Z] layout slots
+    vTmpIn[axisMapping[0]] = surf.vertices[vSrcIdx]     - 0.5;
+    vTmpIn[axisMapping[1]] = surf.vertices[vSrcIdx + 1] - 0.5;
+    vTmpIn[axisMapping[2]] = surf.vertices[vSrcIdx + 2] - 0.5;
+
+    // Transform position to Cartesian space
+    vec3.transformMat4(vPosOut, vTmpIn, matrix);
+
+    // Repeat swizzling & transformation for the normal vectors
+    vTmpIn[axisMapping[0]] = surf.vertex_normals[vSrcIdx];
+    vTmpIn[axisMapping[1]] = surf.vertex_normals[vSrcIdx + 1];
+    vTmpIn[axisMapping[2]] = surf.vertex_normals[vSrcIdx + 2];
     
-    vertices8[v3+24] = 255;
-    vertices8[v3+25] = 255;
-    vertices8[v3+26] = 255;
-    vertices8[v3+27] = 255;
+    vec3.transformMat3(vNormOut, vTmpIn, normalMatrix);
+    vec3.normalize(vNormOut, vNormOut);
+
+    // Package everything cleanly into your target WebGL output arrays
+    vertices[v2]     = vPosOut[0];
+    vertices[v2 + 1] = vPosOut[1];
+    vertices[v2 + 2] = vPosOut[2];
+    
+    vertices[v2 + 3] = vNormOut[0];
+    vertices[v2 + 4] = vNormOut[1];
+    vertices[v2 + 5] = vNormOut[2];
+
+    // Update tracking ranges and totals
+    hihi[0] += vPosOut[0];
+    hihi[1] += vPosOut[1];
+    hihi[2] += vPosOut[2];
+    hihi[3] += 1;
+
+    if (vPosOut[0] < geomRanges[0]) geomRanges[0] = vPosOut[0];
+    if (vPosOut[0] > geomRanges[1]) geomRanges[1] = vPosOut[0];
+    
+    if (vPosOut[1] < geomRanges[2]) geomRanges[2] = vPosOut[1];
+    if (vPosOut[1] > geomRanges[3]) geomRanges[3] = vPosOut[1];
+    
+    if (vPosOut[2] < geomRanges[4]) geomRanges[4] = vPosOut[2];
+    if (vPosOut[2] > geomRanges[5]) geomRanges[5] = vPosOut[2];
+
+    // Assign default color attributes
+    vertices8[v3 + 24] = 255;
+    vertices8[v3 + 25] = 255;
+    vertices8[v3 + 26] = 255;
+    vertices8[v3 + 27] = 255;
   }
    
-  var indices = new Int32Array(surf.faces.length*3);
-  for (var i=0, i2; i<surf.faces.length; i++) {
-    i2 = i*3;
-    indices[i2] = surf.faces[i][0];
-    indices[i2+1] = surf.faces[i][1];
-    indices[i2+2] = surf.faces[i][2];
-  }
-  
-  var line_indices = new Int32Array(surf.lines.length*2);
-  for (var i=0, i2; i<surf.lines.length; i++) {
-    i2 = i*2;
-    line_indices[i2] = surf.lines[i][0];
-    line_indices[i2+1] = surf.lines[i][1];
-  }
+  var indices = surf.vertexIndex;
+  var line_indices = trianglesToWireframe(surf.vertexIndex);
 
   struct.meta.COR = hihi; struct.meta.geomRanges = geomRanges;
 
@@ -597,6 +620,8 @@ molmil.viewer.prototype.load_xyz = function(data, filename, settings) {
     currentChain.modelsXYZ[0].push(x, y, z);
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, atomName, currentMol, currentChain));
     if (atom.element == "H") atom.display = this.showHydrogens;
+    atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
+    
     atom.AID = this.AID++;
     this.atomRef[atom.AID] = atom;
     currentChain.atoms.push(atom);
@@ -715,6 +740,7 @@ molmil.viewer.prototype.load_mol2 = function(data, filename) {
       refmap[tmp[0]] = atom;
       if (atom.element == "H") atom.display = this.showHydrogens;
       else atom.display = true;
+      atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
       atom.Bfactor = parseFloat(tmp[8]);
       
       atom.AID = this.AID++;
@@ -773,6 +799,7 @@ molmil.viewer.prototype.load_mdl3000 = function(data, filename) {
       currentChain.atoms.push(atom);
       if (atom.element == "H") atom.display = this.showHydrogens;
       else atom.display = true;
+      atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
     
       atom.AID = this.AID++;
       this.atomRef[atom.AID] = atom;
@@ -828,6 +855,7 @@ molmil.viewer.prototype.load_mdl = function(data, filename) {
       currentChain.atoms.push(atom);
       if (atom.element == "H") atom.display = this.showHydrogens;
       else atom.display = true;
+      atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
     
       atom.AID = this.AID++;
       this.atomRef[atom.AID] = atom;
@@ -952,6 +980,7 @@ molmil.viewer.prototype.load_GRO = function(data, filename) {
     currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
     if (atom.element == "H") atom.display = this.showHydrogens;
     else atom.display = true;
+    atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
    
     if (atom.atomName == "N") {currentMol.N = atom; currentMol.ligand = false;}
     else if (atom.atomName == "CA" || atom.atomName == "CA") {currentMol.CA = atom; currentMol.ligand = false;}
@@ -1081,6 +1110,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
       currentMol.atoms.push(atom=new molmil.atomObject(Xpos, atomName, element, currentMol, currentChain));
       if (atom.element == "H") atom.display = this.showHydrogens;
       else atom.display = true;
+      atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
       if (data[i].length >= 66) atom.Bfactor = parseFloat(data[i].substring(60, 66).trim());
 
       if (atom.atomName == "N") {currentMol.N = atom; currentMol.ligand = false;}
@@ -1164,8 +1194,7 @@ molmil.viewer.prototype.load_PDB = function(data, filename) {
 molmil.viewer.prototype.processStrucLoader = function(struc) {
   var newChains = {}, chainRef, rC, m1;
 
-  // add some functionality to better deal with weird amino acids (i.e. build some way to detect and show a continuous chain...)
-  for (c=0; c<struc.chains.length; c++) this.buildMolBondList(struc.chains[c]);
+  for (c=0; c<struc.chains.length; c++) this.buildAminoChain(struc.chains[c]);
   
   for (c=0; c<struc.chains.length; c++) {
     currentChain = struc.chains[c];
@@ -1245,6 +1274,7 @@ molmil.viewer.prototype.processStrucLoader = function(struc) {
     for (a=0; a<chain.atoms.length; a++) chain.molWeight += molmil.configBox.MW[chain.atoms[a].element] || 0;
   }
   
+  for (c=0; c<struc.chains.length; c++) this.buildMolBondList(struc.chains[c]);
   for (c=0; c<struc.chains.length; c++) this.ssAssign(struc.chains[c]);
   
   molmil.resetColors(struc, this);
@@ -1304,6 +1334,7 @@ molmil.viewer.prototype.load_MMTF = function(data, filename) {
     var currentMol = mmtf_tempStorage.currentMol;
     var currentChain = mmtf_tempStorage.currentChain;
     var atom = new molmil.atomObject(mmtf_tempStorage.currentChain.modelsXYZ[0].length, atomData.atomName, atomData.element, currentMol, currentChain);
+    atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
       
     currentChain.modelsXYZ[0].push(atomData.xCoord, atomData.yCoord, atomData.zCoord);
     currentMol.atoms.push(atom);

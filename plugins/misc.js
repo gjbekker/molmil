@@ -154,7 +154,606 @@ molmil.attachResidue = function(parentResidue, newResType, soup) {
   return newRes;
 }
 
-// ** build coarse surface representation **
+// ** new surface code **
+
+molmil.createGrid = function(atoms, XYZ, res, pad) {
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+  for (const atom of atoms) {
+    const r = atom.radius || 1.7;
+    
+    const x = XYZ[atom.xyz];
+    const y = XYZ[atom.xyz + 1];
+    const z = XYZ[atom.xyz + 2];
+
+    if (x - r < minX) minX = x - r;
+    if (y - r < minY) minY = y - r;
+    if (z - r < minZ) minZ = z - r;
+    
+    if (x + r > maxX) maxX = x + r;
+    if (y + r > maxY) maxY = y + r;
+    if (z + r > maxZ) maxZ = z + r;
+  }
+
+  minX -= pad; minY -= pad; minZ -= pad;
+  maxX += pad; maxY += pad; maxZ += pad;
+
+  const nx = Math.ceil((maxX - minX) / res);
+  const ny = Math.ceil((maxY - minY) / res);
+  const nz = Math.ceil((maxZ - minZ) / res);
+
+  const data = new Float32Array(nx * ny * nz);
+
+  return { 
+    nx: nx, ny: ny, nz: nz, 
+    minX: minX, minY: minY, minZ: minZ, 
+    spacing: res, 
+    data: data
+  };
+}
+
+molmil.computeAnalyticalVDWGrid = function (grid, atoms, XYZ, probeRadius) {
+  grid.data.fill(1e38);
+  const spacing = grid.spacing;
+  const invSpacing = 1.0 / spacing;
+  const nx = grid.nx, ny = grid.ny, nz = grid.nz;
+  const strideY = nx, strideZ = nx * ny;
+
+  for (const atom of atoms) {
+    const x = XYZ[atom.xyz];
+    const y = XYZ[atom.xyz+1];
+    const z = XYZ[atom.xyz+2];
+    const rEff = (atom.radius || 1.7) + probeRadius;
+
+    const pad = rEff + (spacing * 2);
+    const minIx = Math.max(0, Math.floor((x - pad - grid.minX) * invSpacing - 0.5));
+    const maxIx = Math.min(nx - 1, Math.ceil((x + pad - grid.minX) * invSpacing - 0.5));
+    const minIy = Math.max(0, Math.floor((y - pad - grid.minY) * invSpacing - 0.5));
+    const maxIy = Math.min(ny - 1, Math.ceil((y + pad - grid.minY) * invSpacing - 0.5));
+    const minIz = Math.max(0, Math.floor((z - pad - grid.minZ) * invSpacing - 0.5));
+    const maxIz = Math.min(nz - 1, Math.ceil((z + pad - grid.minZ) * invSpacing - 0.5));
+
+    for (let iz = minIz; iz <= maxIz; iz++) {
+      const zCenter = grid.minZ + (iz + 0.5) * spacing;
+      const dz = zCenter - z;
+      const zDist2 = dz * dz;
+      const baseZ = iz * strideZ;
+
+      for (let iy = minIy; iy <= maxIy; iy++) {
+        const yCenter = grid.minY + (iy + 0.5) * spacing;
+        const dy = yCenter - y;
+        const yDist2 = dy * dy;
+        const zyDist2 = zDist2 + yDist2;
+        const baseZY = baseZ + iy * strideY;
+
+        for (let ix = minIx; ix <= maxIx; ix++) {
+          const xCenter = grid.minX + (ix + 0.5) * spacing;
+          const dx = xCenter - x;
+          const trueCenterDist2 = zyDist2 + dx * dx;
+          const idx = baseZY + ix;
+
+          const actualDist = Math.sqrt(trueCenterDist2) - rEff;
+          if (actualDist < grid.data[idx]) grid.data[idx] = actualDist;
+        }
+      }
+    }
+  }
+}
+
+// 1D EDT (Saito's Algorithm) Linear time O(N) 1D Distance Transform
+molmil.edt1D = function(f, d, length, v, z) {
+  let k = 0;
+  v[0] = 0;
+  z[0] = -1e38; 
+  z[1] = 1e38;
+
+  let fp = f[0];
+
+  for (let q = 1; q < length; q++) {
+    const fq = f[q];
+    if (fq > 1e37) continue;
+    
+    const qSq = q * q;
+    const fq_plus_qSq = fq + qSq;
+    let s = 0.0;
+
+    while (k >= 0) {
+      const p = v[k];
+      const p_val = f[p];
+      
+      s = (fq_plus_qSq - (p_val + p * p)) / (2 * (q - p));
+      
+      if (s <= z[k]) k--;
+       else break;
+    }
+    
+    k++;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = 1e38;
+  }
+
+  let kIdx = 0;
+  for (let q = 0; q < length; q++) {
+    while (z[kIdx + 1] < q) kIdx++;
+    
+    const p = v[kIdx];
+    const fp_val = f[p];
+    
+    if (fp_val > 1e37) d[q] = 1e38;
+    else {
+      const diff = q - p;
+      d[q] = diff * diff + fp_val;
+    }
+  }
+}
+
+molmil.computeEDT = function(grid) {
+  const { nx, ny, nz, data, spacing } = grid;
+  const maxDim = Math.max(nx, ny, nz);
+  const strideY = nx;
+  const strideZ = nx * ny;
+  
+  const f = new Float32Array(maxDim);
+  const d = new Float32Array(maxDim);
+  const v = new Int32Array(maxDim);
+  const z = new Float32Array(maxDim + 1);
+
+  for (let iz = 0; iz < nz; iz++) {
+    const baseZ = iz * strideZ;
+    for (let iy = 0; iy < ny; iy++) {
+      const baseIdx = baseZ + iy * strideY;
+      f.set(data.subarray(baseIdx, baseIdx + nx));
+      molmil.edt1D(f, d, nx, v, z);
+      data.set(d.subarray(0, nx), baseIdx);
+    }
+  }
+
+  for (let iz = 0; iz < nz; iz++) {
+    const baseZ = iz * strideZ;
+    for (let ix = 0; ix < nx; ix++) {
+      const baseIdx = baseZ + ix;
+      for (let iy = 0; iy < ny; iy++) f[iy] = data[baseIdx + iy * strideY]; 
+      molmil.edt1D(f, d, ny, v, z);
+      for (let iy = 0; iy < ny; iy++) data[baseIdx + iy * strideY] = d[iy];
+    }
+  }
+
+  for (let iy = 0; iy < ny; iy++) {
+    const baseY = iy * strideY;
+    for (let ix = 0; ix < nx; ix++) {
+      const baseIdx = baseY + ix;
+      for (let iz = 0; iz < nz; iz++) f[iz] = data[baseIdx + iz * strideZ];
+      molmil.edt1D(f, d, nz, v, z);
+      for (let iz = 0; iz < nz; iz++) {
+        const val = d[iz];
+        data[baseIdx + iz * strideZ] = (val > 1e37) ? 1e38 : Math.sqrt(val) * spacing;
+      }
+    }
+  }
+}
+
+molmil.processSesGrid = function (grid, probeRadius) {
+  const totalVoxels = grid.nx * grid.ny * grid.nz;
+  
+  const data = grid.data;
+  for (let i = 0; i < totalVoxels; i++) {
+    const voxelDist = data[i];
+    data[i] = (voxelDist !== 1e38 && voxelDist >= 0) ? 0 : 1e38;
+  }
+  
+  molmil.computeEDT(grid);
+
+  for (let i = 0; i < totalVoxels; i++) {
+    const inwardDist = data[i];
+    if (inwardDist >= 1e38) data[i] = 999;
+    else data[i] = probeRadius - inwardDist;
+  }
+}
+
+molmil.HQsurface = function(chain, res, probeR, settings) {
+  let mode = (settings && settings.mode) || "SES";
+  const padVal = 1.8 + probeR + res; 
+  let isoLevel = res*.1, smoothIter = settings.smoothIter;
+  if (smoothIter === undefined) smoothIter = 2;
+  
+  const grid = molmil.createGrid(chain.atoms, chain.modelsXYZ[chain.entry.soup.renderer.modelId], res, padVal);
+  molmil.computeAnalyticalVDWGrid(grid, chain.atoms, chain.modelsXYZ[chain.entry.soup.renderer.modelId], mode == "VDW" ? 0 : probeR);
+  if (mode == "SES") molmil.processSesGrid(grid, probeR);
+  
+  const surf = molmil.polygonize_fast(grid.data, grid.nx, grid.ny, grid.nz, isoLevel);
+  molmil.volumeRescalingSmoothing(surf.vertices, surf.vertex_normals, surf.vertexIndex, .5, smoothIter);
+  
+  surf.normals = surf.vertex_normals;
+  
+  if (settings.deproj) {
+    const sf = 1./res;
+  
+    const N = surf.vertices.length;
+    for (i=0; i<N; i+=3) {
+      surf.vertices[i+0] = ((surf.vertices[i+0] - surf.normals[i+0] * probeR * sf) * res) - grid.minX;
+      surf.vertices[i+1] = ((surf.vertices[i+1] - surf.normals[i+1] * probeR * sf) * res) - grid.minY;
+      surf.vertices[i+2] = ((surf.vertices[i+2] - surf.normals[i+2] * probeR * sf) * res) - grid.minZ;
+    }
+  }
+  else {
+    const N = surf.vertices.length;
+    for (i=0; i<N; i+=3) {
+      surf.vertices[i+0] = ((surf.vertices[i+0]) * res) + grid.minX;
+      surf.vertices[i+1] = ((surf.vertices[i+1]) * res) + grid.minY;
+      surf.vertices[i+2] = ((surf.vertices[i+2]) * res) + grid.minZ;
+    }
+  }
+  
+  return surf;
+}
+
+molmil.polygonize_fast = function (data, Nx, Ny, Nz, isovalue) {
+  const sliceSize = Nx * Ny;
+  const Nx_minus_1 = Nx - 1;
+  const Ny_minus_1 = Ny - 1;
+  const Nz_minus_1 = Nz - 1;
+
+  let exactTriangleCount = 0;
+  const numRows = Ny * Nz;
+  const xL = new Int32Array(numRows).fill(Nx); 
+  const xR = new Int32Array(numRows).fill(-1); 
+
+  for (let z = 0; z < Nz_minus_1; z++) {
+    const zOff = z * sliceSize;
+    for (let y = 0; y < Ny_minus_1; y++) {
+      const yOff = y * Nx;
+      const rowIdx = y + z * Ny;
+      const baseIdx = yOff + zOff;
+      let firstX = Nx, lastX = -1;
+
+      for (let x = 0; x < Nx_minus_1; x++) {
+        const idx = x + baseIdx;
+        let caseIdx = 0;
+        if (data[idx] < isovalue)                               caseIdx |= 1;   
+        if (data[idx + 1] < isovalue)                           caseIdx |= 2;   
+        if (data[idx + Nx + 1] < isovalue)                       caseIdx |= 4;   
+        if (data[idx + Nx] < isovalue)                           caseIdx |= 8;   
+        if (data[idx + sliceSize] < isovalue)               caseIdx |= 16;  
+        if (data[idx + sliceSize + 1] < isovalue)           caseIdx |= 32;  
+        if (data[idx + sliceSize + Nx + 1] < isovalue)       caseIdx |= 64;  
+        if (data[idx + sliceSize + Nx] < isovalue)           caseIdx |= 128; 
+
+        if (caseIdx !== 0 && caseIdx !== 255) {
+          if (x < firstX) firstX = x;
+          if (x > lastX) lastX = x;
+          const offset = caseIdx << 4;
+          for (let i = 0; triTable[offset + i] !== -1; i += 3) exactTriangleCount++;
+        }
+      }
+      if (lastX !== -1) { xL[rowIdx] = firstX; xR[rowIdx] = lastX; }
+    }
+  }
+
+  const maxVertices = exactTriangleCount * 3; 
+  const vertices = new Float32Array(maxVertices);
+  const vertex_normals = new Float32Array(maxVertices);
+  const faces = new Uint32Array(exactTriangleCount * 3);
+
+  let currXEdges = new Int32Array(sliceSize).fill(-1);
+  let nextXEdges = new Int32Array(sliceSize).fill(-1);
+  let currYEdges = new Int32Array(sliceSize).fill(-1);
+  let nextYEdges = new Int32Array(sliceSize).fill(-1);
+  let currZEdges = new Int32Array(sliceSize).fill(-1);
+
+  let vertexCount = 0;
+  let triangleCount = 0;
+
+  function computeGradient(x, y, z, outGrad) {
+    const xm1 = x > 0 ? x - 1 : 0;
+    const xp1 = x < Nx_minus_1 ? x + 1 : Nx_minus_1;
+    const ym1 = (y > 0 ? y - 1 : 0) * Nx;
+    const yp1 = (y < Ny_minus_1 ? y + 1 : Ny_minus_1) * Nx;
+    const zm1 = (z > 0 ? z - 1 : 0) * sliceSize;
+    const zp1 = (z < Nz_minus_1 ? z + 1 : Nz_minus_1) * sliceSize;
+    const zOff = z * sliceSize;
+    const yOff = y * Nx;
+
+    outGrad[0] = data[xp1 + yOff + zOff] - data[xm1 + yOff + zOff];
+    outGrad[1] = data[x + yp1 + zOff] - data[x + ym1 + zOff];
+    outGrad[2] = data[x + yOff + zp1] - data[x + yOff + zm1];
+  }
+
+  const grad0 = new Float32Array(3);
+  const grad1 = new Float32Array(3);
+
+  for (let z = 0; z < Nz_minus_1; z++) {
+    const zOff = z * sliceSize;
+    const nextZOff = zOff + sliceSize;
+
+    nextXEdges.fill(-1);
+    nextYEdges.fill(-1);
+    currZEdges.fill(-1);
+
+    for (let y = 0; y < Ny; y++) {
+      const yOff = y * Nx;
+      const rowIdx = y + z * Ny;
+      const prevYRowIdx = y > 0 ? (y - 1) + z * Ny : rowIdx;
+
+      const startX = Math.min(xL[rowIdx], xL[prevYRowIdx]);
+      if (startX === Nx) continue;
+      const endX = Math.min(Nx_minus_1, Math.max(xR[rowIdx], xR[prevYRowIdx]) + 1);
+
+      for (let x = startX; x <= endX; x++) {
+        const idxCurr = x + yOff + zOff;
+        const idxNext = x + yOff + nextZOff;
+        
+        const vCurr_low = data[idxCurr] < isovalue;
+        const vNext_low = data[idxNext] < isovalue;
+
+        if (z === 0 && x < Nx_minus_1 && vCurr_low !== (data[idxCurr + 1] < isovalue)) {
+          const vId = vertexCount++;
+          currXEdges[x + yOff] = vId;
+          const t = (isovalue - data[idxCurr]) / (data[idxCurr + 1] - data[idxCurr]);
+          const i3 = vId * 3;
+          vertices[i3] = x + 0.5 + t; vertices[i3 + 1] = y + 0.5; vertices[i3 + 2] = z + 0.5;
+          
+          computeGradient(x, y, z, grad0);
+          computeGradient(x + 1, y, z, grad1);
+          vertex_normals[i3] += grad0[0] + t * (grad1[0] - grad0[0]);
+          vertex_normals[i3 + 1] += grad0[1] + t * (grad1[1] - grad0[1]);
+          vertex_normals[i3 + 2] += grad0[2] + t * (grad1[2] - grad0[2]);
+        }
+        if (x < Nx_minus_1 && vNext_low !== (data[idxNext + 1] < isovalue)) {
+          const vId = vertexCount++;
+          nextXEdges[x + yOff] = vId;
+          const t = (isovalue - data[idxNext]) / (data[idxNext + 1] - data[idxNext]);
+          const i3 = vId * 3;
+          vertices[i3] = x + 0.5 + t; vertices[i3 + 1] = y + 0.5; vertices[i3 + 2] = (z + 1) + 0.5;
+          
+          computeGradient(x, y, z + 1, grad0);
+          computeGradient(x + 1, y, z + 1, grad1);
+          vertex_normals[i3] += grad0[0] + t * (grad1[0] - grad0[0]);
+          vertex_normals[i3 + 1] += grad0[1] + t * (grad1[1] - grad0[1]);
+          vertex_normals[i3 + 2] += grad0[2] + t * (grad1[2] - grad0[2]);
+        }
+
+        if (z === 0 && y < Ny_minus_1 && vCurr_low !== (data[idxCurr + Nx] < isovalue)) {
+          const vId = vertexCount++;
+          currYEdges[x + yOff] = vId;
+          const t = (isovalue - data[idxCurr]) / (data[idxCurr + Nx] - data[idxCurr]);
+          const i3 = vId * 3;
+          vertices[i3] = x + 0.5; vertices[i3 + 1] = y + 0.5 + t; vertices[i3 + 2] = z + 0.5;
+          
+          computeGradient(x, y, z, grad0);
+          computeGradient(x, y + 1, z, grad1);
+          vertex_normals[i3] += grad0[0] + t * (grad1[0] - grad0[0]);
+          vertex_normals[i3 + 1] += grad0[1] + t * (grad1[1] - grad0[1]);
+          vertex_normals[i3 + 2] += grad0[2] + t * (grad1[2] - grad0[2]);
+        }
+        if (y < Ny_minus_1 && vNext_low !== (data[idxNext + Nx] < isovalue)) {
+          const vId = vertexCount++;
+          nextYEdges[x + yOff] = vId;
+          const t = (isovalue - data[idxNext]) / (data[idxNext + Nx] - data[idxNext]);
+          const i3 = vId * 3;
+          vertices[i3] = x + 0.5; vertices[i3 + 1] = y + 0.5 + t; vertices[i3 + 2] = (z + 1) + 0.5;
+          
+          computeGradient(x, y, z + 1, grad0);
+          computeGradient(x, y + 1, z + 1, grad1);
+          vertex_normals[i3] += grad0[0] + t * (grad1[0] - grad0[0]);
+          vertex_normals[i3 + 1] += grad0[1] + t * (grad1[1] - grad0[1]);
+          vertex_normals[i3 + 2] += grad0[2] + t * (grad1[2] - grad0[2]);
+        }
+
+        if (vCurr_low !== vNext_low) {
+          const vId = vertexCount++;
+          currZEdges[x + yOff] = vId;
+          const t = (isovalue - data[idxCurr]) / (data[idxNext] - data[idxCurr]);
+          const i3 = vId * 3;
+          vertices[i3] = x + 0.5; vertices[i3 + 1] = y + 0.5; vertices[i3 + 2] = z + 0.5 + t;
+          
+          computeGradient(x, y, z, grad0);
+          computeGradient(x, y, z + 1, grad1);
+          vertex_normals[i3] += grad0[0] + t * (grad1[0] - grad0[0]);
+          vertex_normals[i3 + 1] += grad0[1] + t * (grad1[1] - grad0[1]);
+          vertex_normals[i3 + 2] += grad0[2] + t * (grad1[2] - grad0[2]);
+        }
+      }
+    }
+
+    for (let y = 0; y < Ny_minus_1; y++) {
+      const yOff = y * Nx;
+      const nextYOff = yOff + Nx;
+      const rowIdx = y + z * Ny;
+      const startX = xL[rowIdx];
+      if (startX === Nx) continue;
+      const endX = xR[rowIdx];
+
+      for (let x = startX; x <= endX; x++) {
+        const idx = x + yOff + zOff;
+        
+        let caseIdx = 0;
+        if (data[idx] < isovalue) caseIdx |= 1;   
+        if (data[idx + 1] < isovalue) caseIdx |= 2;   
+        if (data[idx + Nx + 1] < isovalue) caseIdx |= 4;   
+        if (data[idx + Nx] < isovalue) caseIdx |= 8;   
+        if (data[idx + sliceSize] < isovalue) caseIdx |= 16;  
+        if (data[idx + sliceSize + 1] < isovalue) caseIdx |= 32;  
+        if (data[idx + sliceSize + Nx + 1] < isovalue) caseIdx |= 64;  
+        if (data[idx + sliceSize + Nx] < isovalue) caseIdx |= 128; 
+
+        if (caseIdx === 0 || caseIdx === 255) continue;
+
+        const localEdges = [
+          currXEdges[x + yOff],
+          currYEdges[(x + 1) + yOff],
+          currXEdges[x + nextYOff],
+          currYEdges[x + yOff],
+          nextXEdges[x + yOff],
+          nextYEdges[(x + 1) + yOff],
+          nextXEdges[x + nextYOff],
+          nextYEdges[x + yOff],
+          currZEdges[x + yOff],
+          currZEdges[(x + 1) + yOff],
+          currZEdges[(x + 1) + nextYOff],
+          currZEdges[x + nextYOff]
+        ];
+
+        const offset = caseIdx << 4;
+        for (let i = 0; triTable[offset + i] !== -1; i += 3) {
+          faces[triangleCount]     = localEdges[triTable[offset + i + 2]];
+          faces[triangleCount + 1] = localEdges[triTable[offset + i + 1]];
+          faces[triangleCount + 2] = localEdges[triTable[offset + i]];
+          triangleCount += 3;
+        }
+      }
+    }
+
+    let tempX = currXEdges; currXEdges = nextXEdges; nextXEdges = tempX;
+    let tempY = currYEdges; currYEdges = nextYEdges; nextYEdges = tempY;
+  }
+
+  for (let i = 0; i < vertexCount; i++) {
+    const i3 = i * 3;
+    const nx = vertex_normals[i3];
+    const ny = vertex_normals[i3 + 1];
+    const nz = vertex_normals[i3 + 2];
+    const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (len > 0) {
+      vertex_normals[i3] = nx / len;
+      vertex_normals[i3 + 1] = ny / len;
+      vertex_normals[i3 + 2] = nz / len;
+    }
+  }
+
+  return {
+    vertices: vertices.subarray(0, vertexCount * 3),
+    vertexIndex: faces.subarray(0, triangleCount),
+    vertex_normals: vertex_normals.subarray(0, vertexCount * 3)
+  };
+}
+
+molmil.volumeRescalingSmoothing = function (vertices, vertex_normals, vertexIndex, lambda, iter) {
+  const numVertices = vertices.length / 3;
+  const numIndices = vertexIndex.length;
+
+  let centerOrigX = 0, centerOrigY = 0, centerOrigZ = 0;
+  for (let v = 0; v < numVertices; v++) {
+    centerOrigX += vertices[v * 3];
+    centerOrigY += vertices[v * 3 + 1];
+    centerOrigZ += vertices[v * 3 + 2];
+  }
+  centerOrigX /= numVertices; centerOrigY /= numVertices; centerOrigZ /= numVertices;
+
+  let totalDistOrig = 0;
+  for (let v = 0; v < numVertices; v++) {
+    const dx = vertices[v * 3] - centerOrigX;
+    const dy = vertices[v * 3 + 1] - centerOrigY;
+    const dz = vertices[v * 3 + 2] - centerOrigZ;
+    totalDistOrig += Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  const degrees = new Int32Array(numVertices);
+  const head = new Int32Array(numVertices).fill(-1);
+  const next = new Int32Array(numIndices * 2);
+  const to = new Int32Array(numIndices * 2);
+  let edgeCount = 0;
+
+  function addEdge(u, v) {
+    let curr = head[u];
+    while (curr !== -1) {
+      if (to[curr] === v) return;
+      curr = next[curr];
+    }
+    to[edgeCount] = v; next[edgeCount] = head[u]; head[u] = edgeCount++; degrees[u]++;
+  }
+
+  for (let i = 0; i < numIndices; i += 3) {
+    const v0 = vertexIndex[i], v1 = vertexIndex[i + 1], v2 = vertexIndex[i + 2];
+    addEdge(v0, v1); addEdge(v0, v2);
+    addEdge(v1, v0); addEdge(v1, v2);
+    addEdge(v2, v0); addEdge(v2, v1);
+  }
+
+  const rowOffsets = new Int32Array(numVertices + 1);
+  for (let v = 0; v < numVertices; v++) rowOffsets[v + 1] = rowOffsets[v] + degrees[v];
+
+  const neighborsFlat = new Uint32Array(rowOffsets[numVertices]);
+  const currentOffset = new Int32Array(numVertices);
+  for (let v = 0; v < numVertices; v++) currentOffset[v] = rowOffsets[v];
+
+  for (let v = 0; v < numVertices; v++) {
+    let curr = head[v];
+    while (curr !== -1) {
+      neighborsFlat[currentOffset[v]++] = to[curr];
+      curr = next[curr];
+    }
+  }
+
+  const vertexTemp = new Float32Array(vertices.length);
+  const normalTemp = new Float32Array(vertex_normals.length);
+  for (let it = 0; it < iter; it++) {
+    for (let v = 0; v < numVertices; v++) {
+      const v3 = v * 3;
+      const start = rowOffsets[v];
+      const end = rowOffsets[v + 1];
+      const count = end - start;
+
+      if (count === 0) {
+        vertexTemp[v3] = vertices[v3]; vertexTemp[v3+1] = vertices[v3+1]; vertexTemp[v3+2] = vertices[v3+2];
+        normalTemp[v3] = vertex_normals[v3]; normalTemp[v3+1] = vertex_normals[v3+1]; normalTemp[v3+2] = vertex_normals[v3+2];
+        continue;
+      }
+
+      let sumX = 0.0, sumY = 0.0, sumZ = 0.0;
+      let sumNX = 0.0, sumNY = 0.0, sumNZ = 0.0;
+
+      for (let i = start; i < end; i++) {
+        const n3 = neighborsFlat[i] * 3;
+        sumX += vertices[n3]; sumY += vertices[n3 + 1]; sumZ += vertices[n3 + 2];
+        sumNX += vertex_normals[n3]; sumNY += vertex_normals[n3 + 1]; sumNZ += vertex_normals[n3 + 2];
+      }
+
+      const invCount = 1.0 / count;
+      vertexTemp[v3]     = vertices[v3] + lambda * ((sumX * invCount) - vertices[v3]);
+      vertexTemp[v3 + 1] = vertices[v3 + 1] + lambda * ((sumY * invCount) - vertices[v3 + 1]);
+      vertexTemp[v3 + 2] = vertices[v3 + 2] + lambda * ((sumZ * invCount) - vertices[v3 + 2]);
+
+      let rx = vertex_normals[v3] + lambda * ((sumNX * invCount) - vertex_normals[v3]);
+      let ry = vertex_normals[v3 + 1] + lambda * ((sumNY * invCount) - vertex_normals[v3 + 1]);
+      let rz = vertex_normals[v3 + 2] + lambda * ((sumNZ * invCount) - vertex_normals[v3 + 2]);
+
+      const len = Math.sqrt(rx * rx + ry * ry + rz * rz);
+      if (len > 0) { rx /= len; ry /= len; rz /= len; }
+      normalTemp[v3] = rx; normalTemp[v3 + 1] = ry; normalTemp[v3 + 2] = rz;
+    }
+
+    vertices.set(vertexTemp);
+    vertex_normals.set(normalTemp);
+  }
+
+  let centerNewX = 0, centerNewY = 0, centerNewZ = 0;
+  for (let v = 0; v < numVertices; v++) {
+    centerNewX += vertices[v * 3]; centerNewY += vertices[v * 3 + 1]; centerNewZ += vertices[v * 3 + 2];
+  }
+  centerNewX /= numVertices; centerNewY /= numVertices; centerNewZ /= numVertices;
+
+  let totalDistNew = 0;
+  for (let v = 0; v < numVertices; v++) {
+    const dx = vertices[v * 3] - centerNewX;
+    const dy = vertices[v * 3 + 1] - centerNewY;
+    const dz = vertices[v * 3 + 2] - centerNewZ;
+    totalDistNew += Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  const scaleFactor = totalDistNew > 0 ? (totalDistOrig / totalDistNew) : 1.0;
+  for (let v = 0; v < numVertices; v++) {
+    const v3 = v * 3;
+    vertices[v3]     = centerOrigX + (vertices[v3] - centerNewX) * scaleFactor;
+    vertices[v3 + 1] = centerOrigY + (vertices[v3 + 1] - centerNewY) * scaleFactor;
+    vertices[v3 + 2] = centerOrigZ + (vertices[v3 + 2] - centerNewZ) * scaleFactor;
+  }
+}
+
+
+
+// ** build simple surface representation **
 molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't draw simple tubes, it adds volume (radii at different positions along the tube) to the tube
   if (chains instanceof molmil.chainObject) chains = [chains];
   if (! chains.length) return;
@@ -488,157 +1087,6 @@ molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't dr
   
 }
 
-// use an alternate way of generating the isosurface...
-// 1) use a coarse grid (e.g. 4x lower density) to calculate the nearest point on the isosurface (vdw+probeR)
-// 2) throw away everything that wasn't mapped
-// 3) use a hq grid to calculate the sasa (previous isosurface-probeR)
-
-//molmil.coarseSurface = function(chain, res, probeR) {
-//  
-//}
-
-// ** generates a coarse surface for a chain **
-molmil.coarseSurface = function(chain, res, probeR, settings) {
-  settings = settings || {};
-
-  var inv_res = 1 / res;
-  // make this also work with res not being a number, but an array of integers, so Nx, Ny, Nz, where this represents the number of voxels...
-
-  var atoms = chain.atoms;
-  var modelsXYZ = chain.modelsXYZ[chain.entry.soup.renderer.modelId];
-      
-  var geomRanges = [1e99, -1e99, 1e99, -1e99, 1e99, -1e99], a, tmp1, elements = {}, rX, rY, rZ, dX, dY, dZ, gs, grid_r = {}, grid_a = {}, block_ranges = [0, 0, 0, 0, 0, 0],
-  gr, ga, vdwR = molmil.configBox.vdwR, r, aX, aY, aZ, xi, yi, zi, mp, xb, yb, zb, dx, dy, dz, grid_x, grid_y;
-      
-  for (a=0; a<atoms.length; a++) {
-    tmp1 = modelsXYZ[atoms[a].xyz];
-    if (tmp1 < geomRanges[0]) geomRanges[0] = tmp1;
-    if (tmp1 > geomRanges[1]) geomRanges[1] = tmp1;
-        
-    tmp1 = modelsXYZ[atoms[a].xyz+1];
-    if (tmp1 < geomRanges[2]) geomRanges[2] = tmp1;
-    if (tmp1 > geomRanges[3]) geomRanges[3] = tmp1;
-        
-    tmp1 = modelsXYZ[atoms[a].xyz+2];
-    if (tmp1 < geomRanges[4]) geomRanges[4] = tmp1;
-    if (tmp1 > geomRanges[5]) geomRanges[5] = tmp1;
-        
-    elements[atoms[a].element] = 1;
-  }
-      
-      
-  rX = Math.ceil((geomRanges[1]-geomRanges[0] + (2*probeR) + (2*1.8))/res)+2;
-  rY = Math.ceil((geomRanges[3]-geomRanges[2] + (2*probeR) + (2*1.8))/res)+2;
-  rZ = Math.ceil((geomRanges[5]-geomRanges[4] + (2*probeR) + (2*1.8))/res)+2;
-
-  dX = -geomRanges[0] + probeR + 1.8 + res;
-  dY = -geomRanges[2] + probeR + 1.8 + res;
-  dZ = -geomRanges[4] + probeR + 1.8 + res;
-      
-  gs = rX*rY*rZ;
-
-  for (a in elements) {
-    grid_r[a] = new Float32Array(gs);
-    grid_a[a] = [];
-    for (xi=0; xi<gs; xi++) {
-      grid_r[a][xi] = 1e99;
-      grid_a[a].push(null);
-    }
-    elements[a] = molmil_dep.getKeyFromObject(vdwR, a, vdwR.DUMMY);
-  }
-
-  for (a=0; a<atoms.length; a++) {
-    gr = grid_r[atoms[a].element];
-    ga = grid_a[atoms[a].element];
-    r = elements[atoms[a].element];
-        
-    aX = modelsXYZ[atoms[a].xyz]   + dX;
-    aY = modelsXYZ[atoms[a].xyz+1] + dY;
-    aZ = modelsXYZ[atoms[a].xyz+2] + dZ;
-
-    block_ranges[0] = 0; block_ranges[1] = rX;
-    block_ranges[2] = 0; block_ranges[3] = rY;
-    block_ranges[4] = 0; block_ranges[5] = rZ;
-        
-    for (xi=block_ranges[0]; xi<block_ranges[1]; xi++) {
-      xb = xi*res;
-      for (yi=block_ranges[2]; yi<block_ranges[3]; yi++) {
-        yb = yi*res;
-        for (zi=block_ranges[4]; zi<block_ranges[5]; zi++) {
-          zb = zi*res;
-             
-          mp = xi + rX * (yi + rY * zi);
-              
-          dx = aX-xb; dy = aY-yb; dz = aZ-zb;
-          tmp1 = dx*dx + dy*dy + dz*dz;
-          if (tmp1 < gr[mp]) {
-            gr[mp] = tmp1; ga[mp] = r;
-          }
-        }
-      }
-        
-    }        
-  }
-      
-  // now that for each grid point & element the nearest atom is calculated --> map it back to the surface...
-      
-  grid_x = new Float32Array(gs);
-      
-  for (xi=0; xi<gs; xi++) {
-    mp = 1e99;
-    for (a in elements) {
-      r = Math.sqrt(grid_r[a][xi]) - (probeR + grid_a[a][xi]); // distance from point - grid
-      if (r < mp) mp = r;
-    }
-    grid_x[xi] = mp * inv_res;
-  }
-  
-  if (! settings.deproj && ! settings.sas) {
-    var probeR_alt = probeR/res;
-    for (xi=0; xi<gs; xi++) grid_x[xi] += probeR_alt;
-  }
-  
-  var surf = polygonize([rX, rY, rZ], grid_x, 0.0);
-  
-  molmil.taubinSmoothing(surf.vertices, surf.faces, .5, -.53, 10);
-
-  var i, faces, f, normals = [], normal;
-  for (i=0; i<surf.vertices.length; i++) normals.push([0, 0, 0]);
-  
-  for (i in surf.vertexIndex) {
-    normal = normals[surf.vertexIndex[i][0]];
-    faces = surf.vertexIndex[i][1];
-    for (f=0; f<faces.length; f++) vec3.add(normal, normal, surf.face_normals[faces[f]]);
-    vec3.normalize(normal, normal);
-  }
-  surf.normals = normals;
-  
-  molmil.taubinSmoothing(surf.normals, surf.faces, .5, -.53, 10);
-  
-  if (settings.deproj) {
-    
-    var sf = 1./res;
-  
-    for (i=0; i<normals.length; i++) {
-      surf.vertices[i][0] = ((surf.vertices[i][0] - normals[i][0] * probeR * sf) * res) - dX;
-      surf.vertices[i][1] = ((surf.vertices[i][1] - normals[i][1] * probeR * sf) * res) - dY;
-      surf.vertices[i][2] = ((surf.vertices[i][2] - normals[i][2] * probeR * sf) * res) - dZ;
-    }
-    
-  }
-  else {
-    
-    for (i=0; i<normals.length; i++) {
-      surf.vertices[i][0] = ((surf.vertices[i][0]) * res) - dX;
-      surf.vertices[i][1] = ((surf.vertices[i][1]) * res) - dY;
-      surf.vertices[i][2] = ((surf.vertices[i][2]) * res) - dZ;
-    }
-    
-  }
-  
-  return surf;
-}
-
 var edgeTable = new Int32Array([
 		0x0, 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
 		0x80c, 0x905, 0xa0f, 0xb06, 0xc0a, 0xd03, 0xe09, 0xf00,
@@ -931,186 +1379,6 @@ var triTable = new Int32Array([
 		0, 3, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
 		-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 ]);
 
-// size indicates the size of the 3D array (x, y, z)
-// gridCoords is a 3D array
-// gridVals is a 1D array
-// isolevel indicates the value at which to generate the mesh
-function polygonize(size, gridVals, isolevel, selectFunc) {
-	var cubeIndex = 0, vertlist = [], i, x, y, z, v0 = [0, 0, 0], v1 = [0, 0, 0], iv = 0, faces = [], lines = [], vertexIndex = {}, vertices = [], face_normals = [], idx, vert1, vert2, vert3;
-  var grid0, grid1, grid2, grid3, grid4, grid5, grid6, grid7, idx1, idx2, idx3;
-
-  for (i=0; i<12; i++) vertlist.push([0.0, 0.0, 0.0]);
-  
-  for (z=0; z<size[2]-1; z++) {
-    for (y=0; y<size[1]-1; y++) {
-      for (x=0; x<size[0]-1; x++) {
-
-        if (selectFunc) {
-          grid0 = selectFunc(x,   y,   z);
-          grid1 = selectFunc(x+1, y,   z);
-          grid2 = selectFunc(x+1, y,   z+1);
-          grid3 = selectFunc(x,   y,   z+1);
-          grid4 = selectFunc(x,   y+1, z);
-          grid5 = selectFunc(x+1, y+1, z);
-          grid6 = selectFunc(x+1, y+1, z+1);
-          grid7 = selectFunc(x,   y+1, z+1);
-        }
-        else {
-          grid0 = x + size[0] * (y + size[1] * z);
-          grid1 = (x+1) + size[0] * (y + size[1] * z);
-          grid2 = (x+1) + size[0] * (y + size[1] * (z+1));
-          grid3 = x + size[0] * (y + size[1] * (z+1));
-          grid4 = x + size[0] * ((y+1) + size[1] * z);
-          grid5 = (x+1) + size[0] * ((y+1) + size[1] * z);
-          grid6 = (x+1) + size[0] * ((y+1) + size[1] * (z+1));
-          grid7 = x + size[0] * ((y+1) + size[1] * (z+1));
-        }
-        
-        cubeIndex = 0;
-        if (gridVals[grid0] < isolevel) cubeIndex |= 1;
-      	if (gridVals[grid1] < isolevel) cubeIndex |= 2;
-	      if (gridVals[grid2] < isolevel) cubeIndex |= 4;
-	      if (gridVals[grid3] < isolevel) cubeIndex |= 8;
-	      if (gridVals[grid4] < isolevel) cubeIndex |= 16;
-	      if (gridVals[grid5] < isolevel) cubeIndex |= 32;
-	      if (gridVals[grid6] < isolevel) cubeIndex |= 64;
-	      if (gridVals[grid7] < isolevel) cubeIndex |= 128;
-
-        
-	      if (edgeTable[cubeIndex] === 0) continue;
-  
-	      if (edgeTable[cubeIndex] & 1) {
-          v0[0] = x; v0[1] = y; v0[2] = z; // grid0
-          v1[0] = x+1; v1[1] = y; v1[2] = z; // grid1
-          iv = (isolevel-gridVals[grid0]) / (gridVals[grid1]-gridVals[grid0]);
-          vec3.lerp(vertlist[0], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 2) {
-          v0[0] = x+1; v0[1] = y; v0[2] = z; // grid1
-          v1[0] = x+1; v1[1] = y; v1[2] = z+1; // grid2
-          iv = (isolevel-gridVals[grid1]) / (gridVals[grid2]-gridVals[grid1]);
-          vec3.lerp(vertlist[1], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 4) {
-          v0[0] = x+1; v0[1] = y; v0[2] = z+1; // grid2
-          v1[0] = x; v1[1] = y; v1[2] = z+1; // grid3
-          iv = (isolevel-gridVals[grid2]) / (gridVals[grid3]-gridVals[grid2]);
-          vec3.lerp(vertlist[2], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 8) {
-          v0[0] = x; v0[1] = y; v0[2] = z+1; // grid3
-          v1[0] = x; v1[1] = y; v1[2] = z; // grid0
-          iv = (isolevel-gridVals[grid3]) / (gridVals[grid0]-gridVals[grid3]);
-          vec3.lerp(vertlist[3], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 16) {
-          v0[0] = x; v0[1] = y+1; v0[2] = z; // grid4
-          v1[0] = x+1; v1[1] = y+1; v1[2] = z; // grid5
-          iv = (isolevel-gridVals[grid4]) / (gridVals[grid5]-gridVals[grid4]);
-          vec3.lerp(vertlist[4], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 32) {
-          v0[0] = x+1; v0[1] = y+1; v0[2] = z; // grid5
-          v1[0] = x+1; v1[1] = y+1; v1[2] = z+1; // grid6
-          iv = (isolevel-gridVals[grid5]) / (gridVals[grid6]-gridVals[grid5]);
-          vec3.lerp(vertlist[5], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 64) {
-          v0[0] = x+1; v0[1] = y+1; v0[2] = z+1; // grid6
-          v1[0] = x; v1[1] = y+1; v1[2] = z+1; // grid7
-          iv = (isolevel-gridVals[grid6]) / (gridVals[grid7]-gridVals[grid6]);
-          vec3.lerp(vertlist[6], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 128) {
-          v0[0] = x; v0[1] = y+1; v0[2] = z+1; // grid7
-          v1[0] = x; v1[1] = y+1; v1[2] = z; // grid4
-          iv = (isolevel-gridVals[grid7]) / (gridVals[grid4]-gridVals[grid7]);
-          vec3.lerp(vertlist[7], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 256) {
-          v0[0] = x; v0[1] = y; v0[2] = z; // grid0
-          v1[0] = x; v1[1] = y+1; v1[2] = z; // grid4
-          iv = (isolevel-gridVals[grid0]) / (gridVals[grid4]-gridVals[grid0]);
-          vec3.lerp(vertlist[8], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 512) {
-          v0[0] = x+1; v0[1] = y; v0[2] = z; // grid1
-          v1[0] = x+1; v1[1] = y+1; v1[2] = z; // grid5
-          iv = (isolevel-gridVals[grid1]) / (gridVals[grid5]-gridVals[grid1]);
-          vec3.lerp(vertlist[9], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 1024) {
-          v0[0] = x+1; v0[1] = y; v0[2] = z+1; // grid2
-          v1[0] = x+1; v1[1] = y+1; v1[2] = z+1; // grid6
-          iv = (isolevel-gridVals[grid2]) / (gridVals[grid6]-gridVals[grid2]);
-          vec3.lerp(vertlist[10], v0, v1, iv);
-        }
-	      if (edgeTable[cubeIndex] & 2048) {
-          v0[0] = x; v0[1] = y; v0[2] = z+1; // grid3
-          v1[0] = x; v1[1] = y+1; v1[2] = z+1; // grid7
-          iv = (isolevel-gridVals[grid3]) / (gridVals[grid7]-gridVals[grid3]);
-          vec3.lerp(vertlist[11], v0, v1, iv);
-        }
-
-	      for (i=0; triTable[16 * cubeIndex + i] != -1; i+=3) {
-          vert1 = vertlist[triTable[16 * cubeIndex + i + 1]];
-          vert2 = vertlist[triTable[16 * cubeIndex + i + 2]];
-          vert3 = vertlist[triTable[16 * cubeIndex + i]];
-
-          // represent the position as an index with respect to the grid size
-          idx1 = (vert1[0] | 0) + size[0] * ((vert1[1] | 0) + size[1] * (vert1[2] | 0));
-          idx2 = (vert2[0] | 0) + size[0] * ((vert2[1] | 0) + size[1] * (vert2[2] | 0));
-          idx3 = (vert3[0] | 0) + size[0] * ((vert3[1] | 0) + size[1] * (vert3[2] | 0));
-
-          var triangle = [-1, -1, -1];
-          
-          // vertices that map to the same index (i.e. have the same or have virtually the same position), are not added again, but are instead referenced (i.e. via indexed buffers)
-          
-          if (! vertexIndex[idx1]) {
-            vertexIndex[idx1] = [vertices.length, []];
-            vertices.push([vert1[0], vert1[1], vert1[2]]);
-          }
-          vertexIndex[idx1][1].push(faces.length);
-          
-          if (! vertexIndex[idx2]) {
-            vertexIndex[idx2] = [vertices.length, []];
-            vertices.push([vert2[0], vert2[1], vert2[2]]);
-          }
-          vertexIndex[idx2][1].push(faces.length);
-          
-          if (! vertexIndex[idx3]) {
-            vertexIndex[idx3] = [vertices.length, []];
-            vertices.push([vert3[0], vert3[1], vert3[2]]);
-          }
-          vertexIndex[idx3][1].push(faces.length);
-
-          
-          if (selectFunc) {
-            triangle[0] = vertexIndex[idx3][0];
-            triangle[1] = vertexIndex[idx2][0];
-            triangle[2] = vertexIndex[idx1][0];
-            vec3.sub(v0, vert2, vert1); vec3.sub(v1, vert3, vert1); var normal = [0.0, 0.0, 0.0]; vec3.cross(normal, v1, v0);
-          }
-          else {
-            triangle[0] = vertexIndex[idx1][0];
-            triangle[1] = vertexIndex[idx2][0];
-            triangle[2] = vertexIndex[idx3][0];
-            vec3.sub(v0, vert2, vert1); vec3.sub(v1, vert3, vert1); var normal = [0.0, 0.0, 0.0]; vec3.cross(normal, v0, v1);
-          }
-          
-          lines.push([triangle[0], triangle[1]]); lines.push([triangle[1], triangle[2]]); lines.push([triangle[0], triangle[2]]);
-          faces.push(triangle);
-          face_normals.push(normal);
-        }
-      }
-    }
-  }
-  
-  return {vertices:vertices, faces:faces, lines:lines, vertexIndex:vertexIndex, face_normals:face_normals};
-};
-
-
-
 // ** performs taubin smoothing for geometry (such as coarse/ccp4 surface) **
 molmil.taubinSmoothing = function(vertices, faces, lambda, mu, iter) {
   var i, f, v, avgCoord = [0.0, 0.0, 0.0, 0], ref, tmp;
@@ -1150,7 +1418,7 @@ molmil.taubinSmoothing = function(vertices, faces, lambda, mu, iter) {
      smoothFunc(lambda);
      for (v=0; v<vertices.length; v++) {vertices[v][0] = vertexTemp[v][0]; vertices[v][1] = vertexTemp[v][1]; vertices[v][2] = vertexTemp[v][2];}
      smoothFunc(mu);
-    for (v=0; v<vertices.length; v++) {vertices[v][0] = vertexTemp[v][0]; vertices[v][1] = vertexTemp[v][1]; vertices[v][2] = vertexTemp[v][2];}
+     for (v=0; v<vertices.length; v++) {vertices[v][0] = vertexTemp[v][0]; vertices[v][1] = vertexTemp[v][1]; vertices[v][2] = vertexTemp[v][2];}
   }
 }
 
@@ -1237,7 +1505,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
       
         
       }
-      else if ((displayMode == 3 || displayMode == 4 || displayMode == 5) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
+      else if ((displayMode == 3 || displayMode == 4 || displayMode == 5 ||  displayMode == 7 || displayMode == 8 || displayMode == 9) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
         for (c=0; c<BU[p][0].length; c++) {
           m = struct.BUmatrices[BU[p][0][c]];
           if (m[0] == "identity operation") {no_identity = false; continue;}
@@ -1483,7 +1751,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
 
   for (i=0, m=0; i<b; i++, m++) {
     if (m >= molmil.configBox.bu_colors.length) m = 0;
-    if (displayMode == 5) uniform_colors.push(molmil.lighterRGB(molmil.configBox.bu_colors[m], 0.5));
+    if (displayMode == 5 || displayMode == 7 || displayMode == 8 || displayMode == 9) uniform_colors.push(molmil.lighterRGB(molmil.configBox.bu_colors[m], 0.5));
     else uniform_colors.push(molmil.configBox.bu_colors[m]);
     
   }
@@ -1595,48 +1863,52 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         molmil.geometry.reset();
         
       }
-      else if (displayMode == 5) { // lowres surface...
+      else if (displayMode == 5 || displayMode == 7 || displayMode == 8 || displayMode == 9) { // surface...
         var surf, c2;
         for (c=0; c<struct.chains.length; c++) {
           if (struct.chains[c].molecules.length < 1 || struct.chains[c].isHet || struct.chains[c].molecules[0].water) continue;
           if (struct.chains[c].name != asym_ids[i]) continue;
-          surf = molmil.coarseSurface(struct.chains[c], 7.5, 7.5*.75, {deproj: true});
+          //else 
+          if (displayMode == 5) surf = molmil.HQsurface(struct.chains[c], 7.5, 2.8, {deproj: false, smoothIter: 2, mode: "SAS"});
+          else if (displayMode == 7) surf = molmil.HQsurface(struct.chains[c], 1, 0, {deproj: false,  mode: "VDW"});
+          else if (displayMode == 8) surf = molmil.HQsurface(struct.chains[c], 1, molmil.configBox.solventRadius, {deproj: false,  mode: "SAS"});
+          else if (displayMode == 9) surf = molmil.HQsurface(struct.chains[c], 1, molmil.configBox.solventRadius, {deproj: false,  mode: "SES"});
           
-          // build vbuffer, ibuffer, COM, noe
-          
-          vertices = new Float32Array(surf.vertices.length*8); // x, y, z, nx, ny, nz, rgba, none
+          vertices = new Float32Array((surf.vertices.length/3)*8); // x, y, z, nx, ny, nz, rgba, none
           vertices8 = new Uint8Array(vertices.buffer);
-          if (molmil.configBox.OES_element_index_uint) indices = new Uint32Array(surf.faces.length*3);
-          else indices = new Uint16Array(surf.faces.length*3);
+          if (molmil.configBox.OES_element_index_uint) indices = surf.vertexIndex;
+          else {
+            indices = new Uint16Array(surf.vertexIndex.length);
+            indices.set(surf.vertexIndex);
+          }
+          
           COM = [0, 0, 0, 0];
           A[0] = A[1] = A[2] = 1e99; // xyzMin
           B[0] = B[1] = B[2] = -1e99; // xyzMax
           
-          for (c2=0, m=0, m8=0; c2<surf.vertices.length; c2++, m8 += 32) {
-            vertices[m++] = surf.vertices[c2][0];
-            vertices[m++] = surf.vertices[c2][1];
-            vertices[m++] = surf.vertices[c2][2];
+          for (c2=0, m=0, m8=0; c2<surf.vertices.length; c2+=3, m8 += 32) {
+            vertices[m++] = surf.vertices[c2+0];
+            vertices[m++] = surf.vertices[c2+1];
+            vertices[m++] = surf.vertices[c2+2];
             
-            COM[0] += surf.vertices[c2][0]; COM[1] += surf.vertices[c2][1]; COM[2] += surf.vertices[c2][2]; COM[3] += 1;
+            COM[0] += surf.vertices[c2+0]; COM[1] += surf.vertices[c2+1]; COM[2] += surf.vertices[c2+2]; COM[3] += 1;
             
-            if (surf.vertices[c2][0] < A[0]) A[0] = surf.vertices[c2][0];
-            if (surf.vertices[c2][1] < A[1]) A[1] = surf.vertices[c2][1];
-            if (surf.vertices[c2][2] < A[2]) A[2] = surf.vertices[c2][2];
-            if (surf.vertices[c2][0] > B[0]) B[0] = surf.vertices[c2][0];
-            if (surf.vertices[c2][1] > B[1]) B[1] = surf.vertices[c2][1];
-            if (surf.vertices[c2][2] > B[2]) B[2] = surf.vertices[c2][2];
+            if (surf.vertices[c2+0] < A[0]) A[0] = surf.vertices[c2+0];
+            if (surf.vertices[c2+1] < A[1]) A[1] = surf.vertices[c2+1];
+            if (surf.vertices[c2+2] < A[2]) A[2] = surf.vertices[c2+2];
+            if (surf.vertices[c2+0] > B[0]) B[0] = surf.vertices[c2+0];
+            if (surf.vertices[c2+1] > B[1]) B[1] = surf.vertices[c2+1];
+            if (surf.vertices[c2+2] > B[2]) B[2] = surf.vertices[c2+2];
             
-            vertices[m++] = surf.normals[c2][0];
-            vertices[m++] = surf.normals[c2][1];
-            vertices[m++] = surf.normals[c2][2];
+            vertices[m++] = surf.normals[c2+0];
+            vertices[m++] = surf.normals[c2+1];
+            vertices[m++] = surf.normals[c2+2];
             
             m++; // color
             m++; // AID
           }
           
           COM[0] /= COM[3]; COM[1] /= COM[3]; COM[2] /= COM[3];
-          
-          for (c2=0, m=0; c2<surf.faces.length; c2++) {indices[m++] = surf.faces[c2][0]; indices[m++] = surf.faces[c2][1]; indices[m++] = surf.faces[c2][2];}
           
           vbuffer = gl.createBuffer();
           gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
@@ -1648,7 +1920,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         
           if (! soup.BUcache.hasOwnProperty(asym_ids[i])) soup.BUcache[asym_ids[i]] = {};
         
-          soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = surf.faces.length*3, [], vertices];
+          soup.BUcache[asym_ids[i]][displayMode] = [vbuffer, ibuffer, COM, noe = surf.vertexIndex.length, [], vertices];
         }
       }
       else {
@@ -1805,7 +2077,7 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
         settings.solid = true;
         settings.has_ID = true;
       }
-      else if ((displayMode == 3 || displayMode == 4 || displayMode == 5 || displayMode == 6) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
+      else if ((displayMode == 3 || displayMode == 4 || displayMode == 5 || displayMode == 6 || displayMode == 7 || displayMode == 8 || displayMode == 9) && (colorMode == 2 || colorMode == 3 || colorMode == 5)) {
         uniform_color = [];
         for (c=0; c<BU[p][0].length; c++) {
           m = struct.BUmatrices[BU[p][0][c]];
@@ -2482,6 +2754,7 @@ molmil.geometry.generator = function(objects, soup, name, programOptions) {
     if (object.type == "dotted-cylinder") {
       tmpObj = object.lowQuality ? cylinderLQ : cylinder;
       object.N = object.N || 1;
+      if (object.interval) object.N = Math.round(vec3.distance(object.coords[0], object.coords[1])/object.interval);
       nov += (tmpObj.vertices.length/3) * object.N;
       noi += tmpObj.indices.length * object.N;
       nov += 2 * object.N; // caps

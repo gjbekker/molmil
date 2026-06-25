@@ -1631,6 +1631,9 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
       selection[i].stickRadius = value;
     }
   }
+  else if (key == "solvent_radius") {
+    molmil.configBox.solventRadius = parseFloat(value);
+  }
   else if (key == "depth_cue") {
     molmil.configBox.glsl_fog = value == 1;
     molmil.shaderEngine.recompile(this.cli_soup.renderer);
@@ -1752,7 +1755,12 @@ molmil.commandLines.pyMol.set = function(key, value, atoms, quiet) {
     molmil.configBox.connect_cutoff = parseFloat(value);
   }
   else if (key == "transparency") {
-    for (var i=0; i<selection.length; i++) selection[i].molecule.rgba = [selection[i].molecule.rgba[0], selection[i].molecule.rgba[1], selection[i].molecule.rgba[2], (1-value)*255];
+    for (var i=0; i<selection.length; i++) {
+      selection[i].molecule.rgba = vec4.clone(selection[i].molecule.rgba);
+      selection[i].chain.rgba = vec4.clone(selection[i].chain.rgba);
+      selection[i].molecule.rgba[3] = (1-value)*255;
+      selection[i].chain.rgba[3] = (1-value)*255;
+    }
     this.cli_soup.renderer.rebuildRequired = true;
   }
   else if (key == "transparency_sticks") {
@@ -1948,6 +1956,24 @@ molmil.commandLines.pyMol.show = function(repr, atoms, quiet) {
         for (var a=0; a<resshow[i].selection.length; a++) {
           if (! backboneAtoms.hasOwnProperty(resshow[i].selection[a].atomName)) resshow[i].selection[a].displayMode = resshow[i].selection[a].displayMode || 3;
         }
+      }
+    }
+    else if (repr == "surface") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].chain.entry.display = true;
+        selection[i].chain.displayMode = molmil.displayMode_ChainSurfaceSES;
+      }
+    }
+    else if (repr == "vdw-surface") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].chain.entry.display = true;
+        selection[i].chain.displayMode = molmil.displayMode_ChainSurfaceVDW;
+      }
+    }
+    else if (repr == "sas-surface") {
+      for (var i=0; i<selection.length; i++) {
+        selection[i].chain.entry.display = true;
+        selection[i].chain.displayMode = molmil.displayMode_ChainSurfaceSAS;
       }
     }
     else if (repr == "coarse-surface") {
