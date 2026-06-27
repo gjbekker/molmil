@@ -3482,7 +3482,7 @@ molmil.geometry.initCartoon = function(chains) {
   for (c=0; c<chains.length; c++) {
     
     chain = chains[c];
-    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG || chain.displayMode == molmil.displayMode_ChainSurfaceSimple || chain.displayMode == molmil.displayMode_ChainSurfaceSES || chain.SNFG) continue;
+    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG || chain.displayMode == molmil.displayMode_ChainSurfaceSimple || chain.displayMode == molmil.displayMode_ChainSurfaceSES || chain.SNFG || ! Array.isArray(chain.twoDcache)) continue;
     nowp = 0;
     cartoonChains.push(chain);
 
