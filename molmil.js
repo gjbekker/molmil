@@ -20,7 +20,7 @@ var molmil = molmil || {};
 molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil.mouseMoved = false; molmil.Xcoord = 0; molmil.Ycoord = 0; molmil.Zcoord = 0; molmil.activeCanvas = null; molmil.touchList = null; molmil.touchMode = false; molmil.preRenderFuncs = [];
 molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
-molmil.pdbj_data = "https://data.pdbjpw2.pdbj.org/";
+molmil.pdbj_data = "https://data.pdbjdv1.pdbj.org/";
 molmil.pdbj_rest = "https://pdbjdv1.pdbj.org/";
 molmil.xrSupported = false;
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
