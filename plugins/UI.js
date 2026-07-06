@@ -1935,6 +1935,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 3, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 3, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 3, 10001]],
       ]]
@@ -2031,6 +2032,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 4, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 4, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 4, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 4, 10001]]
       ]],
@@ -2070,6 +2072,7 @@ molmil.UI.prototype.initMenus = function() {
         ["Cartoon", this.displayFunction, this, [null, 3, molmil.displayMode_Cartoon]],
         ["Rocket", this.displayFunction, this, [null, 3, molmil.displayMode_CartoonRocket]],
         ["CG Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceCG]],
+        ["SES Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSES]],
         ["Simple Surface", this.displayFunction, this, [null, 3, molmil.displayMode_ChainSurfaceSimple]],
         ["Hydrogen bonds", this.displayFunction, this, [null, 3, 10001]]
       ]],
@@ -2480,6 +2483,12 @@ molmil.UI.prototype.styleif_bu = function(contentBox, afterDL) {
   
   td = BUrm.pushNode("option", "Coarse surface, colored by each asymmetric chain"); td.value = [5, 2];
   td = BUrm.pushNode("option", "Coarse surface, colored by each chain"); td.value = [5, 3];
+  td = BUrm.pushNode("option", "VDW surface, colored by each asymmetric chain"); td.value = [7, 2];
+  td = BUrm.pushNode("option", "VDW surface, colored by each chain"); td.value = [7, 3];
+  td = BUrm.pushNode("option", "SAS surface, colored by each asymmetric chain"); td.value = [8, 2];
+  td = BUrm.pushNode("option", "SAS surface, colored by each chain"); td.value = [8, 3];
+  td = BUrm.pushNode("option", "SES surface, colored by each asymmetric chain"); td.value = [9, 2];
+  td = BUrm.pushNode("option", "SES surface, colored by each chain"); td.value = [9, 3];
   
   BUrm.value = rm;
   
@@ -2837,11 +2846,17 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
     var sigma1 = parseFloat(form.sigma1.value) || 1;
     var sigma2 = parseFloat(form.sigma2.value) || 2;
     
-    if (! form.atom) {
+    var XYZ = [], atm;
+    for (var a=0; a<UI.soup.atomSelection.length; a++) {
+      atm = UI.soup.atomSelection[a];
+      XYZ.push([atm.chain.modelsXYZ[0][atm.xyz], atm.chain.modelsXYZ[0][atm.xyz+1], atm.chain.modelsXYZ[0][atm.xyz+2]]);
+    }
+    
+    if (XYZ.length == 0) {
       alert("Please select an atom...");
       return false;
     }
-    var XYZ = [[form.atom.chain.modelsXYZ[0][form.atom.xyz], form.atom.chain.modelsXYZ[0][form.atom.xyz+1], form.atom.chain.modelsXYZ[0][form.atom.xyz+2]]];
+    
     var doRequest = function(mode, filename, red, green, blue, sigma) {
       var request = new molmil_dep.CallRemote("POST");
       request.AddParameter("xyz", JSON.stringify(XYZ));
@@ -2892,11 +2907,6 @@ molmil.UI.prototype.styleif_edmap = function(contentBox, callOptions) {
     form.modeSel[0].checked = true;
     form.modeSel[0].onchange();
   }
-  
-  
-  this.soup.onAtomPick = function(atom) {
-    form.atom = atom;
-  };
   
   edmap2_downloads();
 };

@@ -295,6 +295,7 @@ molmil.configBox = {
   stereoEyeSepFraction: 30,
   camera_fovy: 22.5,
   HQsurface_gridSpacing: 1.0,
+  solventRadius: 1.4,
   webGL2: false,
   vdwSphereMultiplier: 1.0,
   stickRadius: 0.15,
@@ -470,6 +471,9 @@ molmil.displayMode_Cartoon = 8;
 molmil.displayMode_CartoonRocket = 8.5;
 molmil.displayMode_ChainSurfaceCG = 10;
 molmil.displayMode_ChainSurfaceSimple = 11;
+molmil.displayMode_ChainSurfaceSES = 12;
+molmil.displayMode_ChainSurfaceVDW = 13;
+molmil.displayMode_ChainSurfaceSAS = 14;
 
 molmil.displayMode_XNA = 400;
 
@@ -538,7 +542,6 @@ molmil.chainObject = function (name, entry) {
   this.displayMode = molmil.displayMode_Default;
   this.isHet = true;
   this.rgba = [255, 255, 255, 255];
-  this.display = true;
 }
 
 molmil.chainObject.prototype.toString = function() {return (this.name ? "Chain " + this.name : "");};
@@ -1271,7 +1274,7 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
         dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
         r = dx+dy+dz;
 
-        if (r <= 3.0) {
+        if (r <= 3.2) {
           chain.molecules[m1].next = chain.molecules[m2]; 
           chain.molecules[m2].previous = chain.molecules[m1]; 
           chain.bonds.push([chain.molecules[m1].C, chain.molecules[m2].N, 1]); 
@@ -1284,7 +1287,6 @@ molmil.viewer.prototype.buildAminoChain = function(chain) {
           dy = xyzRef[xyz1+1]-xyzRef[xyz2+1]; dy *= dy;
           dz = xyzRef[xyz1+2]-xyzRef[xyz2+2]; dz *= dz;
           r = dx+dy+dz;
-
           if (r <= 3.0) {
             chain.molecules[m1].next = chain.molecules[m2];
             chain.molecules[m2].previous = chain.molecules[m1];
@@ -1760,6 +1762,7 @@ molmil.viewer.prototype.load_PDBx = function(mmjso, settings) { // this should b
         else atom.element = atom.atomName.substring(offset, offset+1);
       }
       if (atom.element == "H") atom.display = this.showHydrogens;
+      atom.radius = molmil.configBox.vdwR[atom.element] || 1.7;
 
       isHet = true;
       if (group_PDB.length) {if (group_PDB[a] != "HETATM" || polyTypes.hasOwnProperty(currentMol.name)) isHet = false;}
@@ -2477,8 +2480,8 @@ molmil.geometry.generate = function(structures, render, detail_or) {
   this.generateCartoon();
   this.generateSNFG();
   //this.generateRockets();
-  
-  this.generateSurfaces(cchains, render.soup);
+
+  this.generateSurfaces(chains, render.soup);
 
   this.registerPrograms(render);
   
@@ -3223,7 +3226,7 @@ molmil.geometry.initChains = function(chains, render, detail_or) {
         upvec_scan[obj.id] = vec4.create();
       }
     }
-    if (chain.displayMode > 1 && (chain.displayMode != molmil.displayMode_ChainSurfaceCG || chain.displayMode != molmil.displayMode_ChainSurfaceSimple)) {
+    if (chain.displayMode > 1 && (chain.displayMode != molmil.displayMode_ChainSurfaceCG || chain.displayMode != molmil.displayMode_ChainSurfaceSimple || chain.displayMode != molmil.displayMode_ChainSurfaceSES)) {
       if (! chain.twoDcache || this.reInitChains) molmil.prepare2DRepr(chain, modelId || 0);
       nor += chain.molecules.length;
     }
@@ -3483,7 +3486,7 @@ molmil.geometry.initCartoon = function(chains) {
   for (c=0; c<chains.length; c++) {
     
     chain = chains[c];
-    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG || chain.displayMode == molmil.displayMode_ChainSurfaceSimple || chain.SNFG) continue;
+    if (chain.displayMode < 2 || chain.displayMode == molmil.displayMode_ChainSurfaceCG || chain.displayMode == molmil.displayMode_ChainSurfaceSimple || chain.displayMode == molmil.displayMode_ChainSurfaceSES || chain.SNFG || ! Array.isArray(chain.twoDcache)) continue;
     nowp = 0;
     cartoonChains.push(chain);
 
@@ -4036,30 +4039,89 @@ molmil.geometry.generateWireframe = function() {
   this.buffer2.iP = iP;  
 };
 
-// ** build coarse surface representation **
+// ** build surface representation **
 molmil.geometry.generateSurfaces = function(chains, soup) {
   var c, surf, surfaces = [], surfaces2 = [], verts = 0, idcs = 0, settings, alpha = false;
-  
   for (c=0; c<chains.length; c++) {
     if (chains[c].displayMode == molmil.displayMode_ChainSurfaceCG) {
-      if (chains[c].HQsurface) surf = molmil.coarseSurface(chains[c], molmil.configBox.HQsurface_gridSpacing, 1.4);
-      else surf = molmil.coarseSurface(chains[c], 7.5, 7.5*.75, {deproj: true});
+      settings = chains[c].displaySettings || {};
+      settings.smoothIter = 10;
+      settings.mode = "SAS";
+      const id = JSON.stringify(settings);
+      if (chains[c].surf && chains[c].surf.id == id) surf = chains[c].surf;
+      else {
+        surf = molmil.HQsurface(chains[c], 7.5, 2.8, settings);
+        surf.id = id;
+      }
+      chains[c].surf = surf;
       surf.rgba = chains[c].rgba;
       surfaces.push(surf);
-      verts += surf.vertices.length;
-      idcs += surf.faces.length*3;
+      verts += surf.vertices.length/3;
+      idcs += surf.vertexIndex.length;
       alpha = alpha || surf.rgba[3] != 255;
+      
     }
     else if (chains[c].displayMode == molmil.displayMode_ChainSurfaceSimple) {
       settings = chains[c].displaySettings || {};
       settings.skipProgram = true;
-      surf = molmil.tubeSurface(chains[c], settings, soup);
+      settings.type = molmil.displayMode_ChainSurfaceSimple;
+      if (chains[c].surf && chains[c].surf.id == JSON.stringify(chains[c].surf.id)) surf = chains[c].surf;
+      else surf = molmil.tubeSurface(chains[c], settings, soup);
+      chains[c].surf = surf;
       verts += surf.vBuffer.length;
       idcs += surf.iBuffer.length;
       surf.rgba = chains[c].rgba;
       surfaces2.push(surf);
       alpha = alpha || surf.rgba[3] != 255;
     }
+    else if (chains[c].displayMode == molmil.displayMode_ChainSurfaceSES) {
+      settings = chains[c].displaySettings || {};
+      settings.mode = "SES";
+      const id = JSON.stringify(settings);
+      if (chains[c].surf && chains[c].surf.id == id) surf = chains[c].surf;
+      else {
+        surf = molmil.HQsurface(chains[c], molmil.configBox.HQsurface_gridSpacing, molmil.configBox.solventRadius, settings);
+        surf.id = id;
+      }
+      chains[c].surf = surf;
+      surf.rgba = chains[c].rgba;
+      surfaces.push(surf);
+      verts += surf.vertices.length/3;
+      idcs += surf.vertexIndex.length;
+      alpha = alpha || surf.rgba[3] != 255;
+    } 
+    else if (chains[c].displayMode == molmil.displayMode_ChainSurfaceSAS) {
+      settings = chains[c].displaySettings || {};
+      settings.mode = "SAS";
+      const id = JSON.stringify(settings);
+      if (chains[c].surf && chains[c].surf.id == id) surf = chains[c].surf;
+      else {
+        surf = molmil.HQsurface(chains[c], molmil.configBox.HQsurface_gridSpacing, molmil.configBox.solventRadius, settings);
+        surf.id = id;
+      }
+      chains[c].surf = surf;
+      surf.rgba = chains[c].rgba;
+      surfaces.push(surf);
+      verts += surf.vertices.length/3;
+      idcs += surf.vertexIndex.length;
+      alpha = alpha || surf.rgba[3] != 255;
+    } 
+    else if (chains[c].displayMode == molmil.displayMode_ChainSurfaceVDW) {
+      settings = chains[c].displaySettings || {};
+      settings.mode = "VDW";
+      const id = JSON.stringify(settings);
+      if (chains[c].surf && chains[c].surf.id == id) surf = chains[c].surf;
+      else {
+        surf = molmil.HQsurface(chains[c], molmil.configBox.HQsurface_gridSpacing, molmil.configBox.solventRadius, settings);
+        surf.id = id;
+      }
+      chains[c].surf = surf;
+      surf.rgba = chains[c].rgba;
+      surfaces.push(surf);
+      verts += surf.vertices.length/3;
+      idcs += surf.vertexIndex.length;
+      alpha = alpha || surf.rgba[3] != 255;
+    } 
   }
   
   var vertices = new Float32Array(verts*7); // x, y, z, nx, ny, nz, rgba
@@ -4068,27 +4130,52 @@ molmil.geometry.generateSurfaces = function(chains, soup) {
   var m=0, m8=0, s, rgba, offset = 0, i=0;
   for (s=0; s<surfaces.length; s++) {
     surf = surfaces[s]; rgba = surf.rgba;
-    for (c=0; c<surf.vertices.length; c++, m8 += 28) {
-      vertices[m++] = surf.vertices[c][0];
-      vertices[m++] = surf.vertices[c][1];
-      vertices[m++] = surf.vertices[c][2];
+    
+    if (surf.faces !== undefined) {
+      for (c=0; c<surf.vertices.length; c++, m8 += 28) {
+        vertices[m++] = surf.vertices[c][0];
+        vertices[m++] = surf.vertices[c][1];
+        vertices[m++] = surf.vertices[c][2];
+              
+        vertices[m++] = surf.normals[c][0];
+        vertices[m++] = surf.normals[c][1];
+        vertices[m++] = surf.normals[c][2];
+              
+              
+        vertices8[m8+24] = rgba[0];
+        vertices8[m8+25] = rgba[1];
+        vertices8[m8+26] = rgba[2];
+        vertices8[m8+27] = rgba[3];
+        m++; // color
+      }
             
-      vertices[m++] = surf.normals[c][0];
-      vertices[m++] = surf.normals[c][1];
-      vertices[m++] = surf.normals[c][2];
-            
-            
-      vertices8[m8+24] = rgba[0];
-      vertices8[m8+25] = rgba[1];
-      vertices8[m8+26] = rgba[2];
-      vertices8[m8+27] = rgba[3];
-      m++; // color
+      for (c=0; c<surf.faces.length; c++) {
+        indices[i++] = surf.faces[c][0]+offset; indices[i++] = surf.faces[c][1]+offset; indices[i++] = surf.faces[c][2]+offset;
+      }
+      offset += surf.vertices.length;
     }
-          
-    for (c=0; c<surf.faces.length; c++) {
-      indices[i++] = surf.faces[c][0]+offset; indices[i++] = surf.faces[c][1]+offset; indices[i++] = surf.faces[c][2]+offset;
+    else {
+      const srcVerts = surf.vertices;
+      const srcNorms = surf.normals;
+      const len = srcVerts.length;
+      const verticesUint32 = new Uint32Array(vertices.buffer);
+      const packedColor = (rgba[3] << 24) | (rgba[2] << 16) | (rgba[1] << 8) | rgba[0];
+      for (let c = 0; c < len; c += 3) {
+        // Copy 3 position floats using a zero-allocation memory view
+        vertices.set(srcVerts.subarray(c, c + 3), m);
+        m += 3;
+
+        // Copy 3 normal floats using a zero-allocation memory view
+        vertices.set(srcNorms.subarray(c, c + 3), m);
+        m += 3;
+
+        // Write all 4 color bytes instantly into the 7th array slot
+        verticesUint32[m] = packedColor;
+        m += 1; 
+      }
+      for (c=0; c<surf.vertexIndex.length; c++) indices[i++] = surf.vertexIndex[c]+offset;
+      offset += surf.vertices.length/3;
     }
-    offset += surf.vertices.length;
   }
   
   
@@ -5224,7 +5311,7 @@ molmil.prepare2DRepr = function (chain, mdl) {
   
   if (chain.molecules.length < 2 || chain.isHet) {
     if (chain.SNFG) return;
-    return chain.displayMode = 0;
+    return;//chain.displayMode = 0;
   }
   var twoDcache = chain.twoDcache = [], m, previous_sndStruc, current_sndStruc, currentBlock, b, nor = chain.molecules.length, m0, m1, m2, m3, BN, temp = [], n, smooth, maxR;
   
@@ -7071,6 +7158,13 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
         chain.displaySettings = settings;
       }
     }
+    else if (dm == molmil.displayMode_ChainSurfaceSES) {
+      for (c=0; c<obj.chains.length; c++) {
+        chain = obj.chains[c];
+        chain.displayMode = molmil.displayMode_ChainSurfaceSES;
+        chain.HQsurface = false;
+      }
+    }
   }
   else if (obj instanceof molmil.chainObject) {
     if (dm == molmil.displayMode_None) {
@@ -7243,6 +7337,9 @@ molmil.displayEntry = function (obj, dm, rebuildGeometry, soup, settings) {
     else if (dm == molmil.displayMode_ChainSurfaceCG+0.5) {
       obj.displayMode = molmil.displayMode_ChainSurfaceCG;
       obj.HQsurface = true;
+    }
+    else if (dm == molmil.displayMode_ChainSurfaceSES) {
+      obj.displayMode = molmil.displayMode_ChainSurfaceSES;
     }
     else if (dm == molmil.displayMode_ChainSurfaceSimple) {
       obj.displayMode = molmil.displayMode_ChainSurfaceSimple;
@@ -8203,18 +8300,8 @@ molmil.tubeSurface = function(chains, settings, soup) { // volumetric doesn't dr
   return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", this.tubeSurface, this, [chains, settings, soup]); 
 }
 
-// use an alternate way of generating the isosurface...
-// 1) use a coarse grid (e.g. 4x lower density) to calculate the nearest point on the isosurface (vdw+probeR)
-// 2) throw away everything that wasn't mapped
-// 3) use a hq grid to calculate the sasa (previous isosurface-probeR)
-
-//molmil.coarseSurface = function(chain, res, probeR) {
-//  
-//}
-
-// ** generates a coarse surface for a chain **
-molmil.coarseSurface = function(chain, res, probeR, settings) {
-  return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", this.coarseSurface, this, [chain, res, probeR, settings]); 
+molmil.HQsurface = function(chain, res, probeR, settings) {
+  return molmil.loadPlugin(molmil.settings.src+"plugins/misc.js", this.HQsurface, this, [chain, res, probeR, settings]); 
 }
 
 molmil.lighterRGB = function(rgbIn, factor, nR) {
@@ -9889,7 +9976,7 @@ molmil.superpose = function(A, B, C, modelId, iterate) {
     atom.chain.modelsXYZ[modelId][atom.xyz+2] = xyz[2] + data[2][2];
   }
 
-  return {initial_rmsd: initialRMSD, rmsd: data[0], aligned_indices: selIdxs};
+  return {initial_rmsd: initialRMSD, rmsd: data[0], aligned_indices: selIdxs, matrix: rotationMatrix};
 };
 
 molmil.alignInfo = {};
@@ -9962,6 +10049,7 @@ molmil.align = function(A, B, options) {
   if (! options.skipOrient) molmil.orient(Aarr, A.entry.soup);
   A.entry.soup.renderer.rebuildRequired = true;
   molmil.geometry.reInitChains = true;
+  return data;
 }
 
 molmil.record = function(canvas, video_path, video_framerate) {
