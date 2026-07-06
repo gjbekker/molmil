@@ -21,6 +21,7 @@ molmil.canvasList = []; molmil.mouseDown = false; molmil.mouseDownS = {}; molmil
 molmil.longTouchTID = null; molmil.previousTouchEvent = null;
 molmil.ignoreBlackList = false;
 molmil.pdbj_data = "https://data.pdbjpw2.pdbj.org/";
+molmil.pdbj_rest = "https://pdbjdv1.pdbj.org/";
 molmil.xrSupported = false;
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(function(isSupported){molmil.xrSupported=isSupported;});
 
@@ -31,8 +32,8 @@ function stringInterpolate(string, params) {
 // switch PDBj URLs to newweb file service
 molmil.settings_default = {
   src: document.currentScript ? document.currentScript.src.split("/").slice(0, -1).join("/")+"/" : "https://pdbj.org/molmil2/",
-  pdb_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson/pdb_${pdbid}.json",
-  mmcif_url: molmil.pdbj_data+"pub/wwpdb/pdb/data/entries/${odbid23}/pdb_${pdbid}/structures/pdb_${pdbid}.cif.gz",
+  pdb_url: molmil.pdbj_rest+"/rest/newweb/fetch/file?id=${pdbid}&cat=pdb&type=mmjson-all&gunzip=0",
+  mmcif_url: molmil.pdbj_rest+"/rest/newweb/fetch/file?id=${pdbid}&cat=pdb&type=mmcif&gunzip=0",
   pdb_chain_url: molmil.pdbj_data+"pdbjplus/data/pdb/mmjson-chain/__ID__-chain.json",
   comp_url: molmil.pdbj_data+"pdbjplus/data/cc/mmjson/__ID__.json",
   data_url: molmil.pdbj_data,
@@ -8257,9 +8258,20 @@ molmil.loadPDB = function(pdbid, cb, async, soup) {
   soup = soup || molmil.cli_soup || molmil.fetchCanvas().molmilViewer;
   pdbid = pdbid.toLowerCase();
   if (pdbid.startsWith("pdb_")) pdbid = pdbid.substr(4);
-  if (pdbid.length == 4) pdbid = "0000"+pdbid;
-  var isBig = molmil.isBig.has(pdbid);
-  soup.loadStructure((isBig ? stringInterpolate(molmil.settings.mmcif_url, {pdbid: pdbid, pdbid23: pdbid.substr(5,1)}) : stringInterpolate(molmil.settings.pdb_url, {pdbid: pdbid})), isBig ? 2 : 1, cb || function(target, struc) {
+  
+  if (molmil.pdbj_rest == "https://pdbjdv1.pdbj.org/" && pdbid.length == 4) { // hybrid mode
+    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url : molmil.settings.pdb_url, {pdbid: pdbid});
+    var isBig = molmil.isBig.has("0000"+pdbid);
+  }
+  else {
+    if (pdbid.length == 4) pdbid = "0000"+pdbid;
+    var betaURL = "https://pdbjpw2.pdbj.org/";
+    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url.replace(molmil.pdbj_rest, betaURL) : molmil.settings.pdb_url.replace(molmil.pdbj_rest, betaURL), {pdbid: pdbid});
+    var isBig = molmil.isBig.has(pdbid);
+  }
+  
+  
+  soup.loadStructure(URL, isBig ? 2 : 1, cb || function(target, struc) {
     struc.meta.pdbid = pdbid;
     if (soup.AID > 1e5 || (soup.AID > 150000 && (navigator.userAgent.toLowerCase().indexOf("mobile") != -1 || navigator.userAgent.toLowerCase().indexOf("android") != -1 || window.navigator.msMaxTouchPoints))) molmil.displayEntry(struc, molmil.displayMode_Wireframe);
     else molmil.displayEntry(struc, 1);
