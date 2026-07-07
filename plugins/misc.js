@@ -1441,7 +1441,7 @@ molmil.buCheck = function(assembly_id, displayMode, colorMode, struct, soup) {
     if (struct.chains[c].display) sceneBU.displayedChains[struct.chains[c].name] = true;
   }
 
-  var BU = struct.BUassemblies[assembly_id];
+  var BU = struct.BUassemblies[assembly_id] || [];
   
   var selectionAtoms, chain;
   var selectionAtoms = JSON.parse(JSON.stringify(molmil.configBox.backboneAtoms4Display)); selectionAtoms.CA = 1;
@@ -1701,6 +1701,8 @@ molmil.selectBU = function(assembly_id, displayMode, colorMode, options, struct,
     
     if (soup.sceneBU.assembly_id != assembly_id) renderer.camera.z = soup.calcZ();
     soup.sceneBU.assembly_id = assembly_id;
+    
+    if (options.orient) molmil.orient(null, soup);
     
     return;
   }
