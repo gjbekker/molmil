@@ -8250,7 +8250,7 @@ molmil.loadFile = function(loc, format, cb, async, soup) {
   }, {async: async ? true : false});
 };
 
-molmil.isBig = new Set(["00009fqr"]);
+molmil.isBig = new Set(["00009fqr", "000036za"]);
 
 molmil.loadPDB = function(pdbid, cb, async, soup) {
   var tmp = molmil.configBox.skipComplexBondSearch;
