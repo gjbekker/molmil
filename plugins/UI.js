@@ -432,10 +432,7 @@ molmil.UI.prototype.showLM=function(icon) {
     e = this.menu.sub.pushNode("div", "PNG image", "molmil_UI_ME");
     e.UI = this.UI;
     e.onclick = function() {this.UI.savePNG();};
-
-    
-
-    if ((this.UI.soup.structures.length ? this.UI.soup.structures[0].number_of_frames : 0) > 1 && (window.initVideo !== undefined || molmil.settings.molmil_video_url !== undefined || window.SharedArrayBuffer !== undefined)) {
+    if ((this.UI.soup.structures.length ? this.UI.soup.structures[0].number_of_frames : 0) > 1 && molmil.initVideo !== undefined) {
       e = this.menu.sub.pushNode("div", "MP4 video", "molmil_UI_ME");
       e.UI = this.UI;
       e.onclick = function() {molmil.initVideo(this.UI);};
@@ -1492,7 +1489,8 @@ molmil.initVideo = function(UI) {
     molmil_dep.asyncStart(UI.videoRenderer, [], UI, 0);
     return;
   }
-  if (molmil.settings.molmil_video_url === undefined && window.SharedArrayBuffer !== undefined) {
+
+  if (molmil.settings.molmil_video_url === undefined) {
     var head = document.getElementsByTagName("head")[0];
     var obj = molmil_dep.dcE("script"); obj.src = molmil.settings.src+"lib/ffmpeg_handler.js"; 
     obj.onload = function() {UI.videoRenderer();};
@@ -2964,6 +2962,26 @@ molmil.UI.prototype.styleif_sites = function(contentBox) {
       UI.styleif_mesh(this.mesh, ev, {filename: this.filename});
     }
     UI.showSites = true;
+  }
+  
+  for (var i=0; i<this.soup.structures.length; i++) {
+    if (! this.soup.structures[i].meta || this.soup.structures[i].meta.special != "pocasa") continue;
+      var pdbid = this.soup.structures[i].meta.pocasaID;
+      var cont = downloads.pushNode("div");
+      var cont2 = cont.pushNode("span");
+      
+      
+      var pocketLink = cont2.pushNode("a", "POCASA Pocket file");
+      pocketLink.href = "https://data.pdbj.org/pdbjplus/data/pocasa/pockets/POCASA_"+pdbid+"_TopN_pockets.cif.gz";
+      pocketLink.target = "_blank";
+     
+      var centersLink = cont2.pushNode("a", "POCASA Center file");
+      centersLink.href = "https://data.pdbj.org/pdbjplus/data/pocasa/centers/POCASA_"+pdbid+"_Pocket_DepthCenters.cif.gz";
+      centersLink.target = "_blank";
+
+      var paramsLink = cont2.pushNode("a", "POCASA Center file");
+      paramsLink.href = "https://data.pdbj.org/pdbjplus/data/pocasa/params/POCASA_"+pdbid+"_Parameters.txt.gz";
+      paramsLink.target = "_blank";
   }
   
   for (var s=0; s<this.soup.structures.length; s++) {
