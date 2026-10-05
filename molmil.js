@@ -8260,14 +8260,14 @@ molmil.loadPDB = function(pdbid, cb, async, soup) {
   if (pdbid.startsWith("pdb_")) pdbid = pdbid.substr(4);
   
   if (molmil.pdbj_rest == "https://pdbjdv1.pdbj.org/" && pdbid.length == 4) { // hybrid mode
-    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url : molmil.settings.pdb_url, {pdbid: pdbid});
     var isBig = molmil.isBig.has("0000"+pdbid);
+    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url : molmil.settings.pdb_url, {pdbid: pdbid});
   }
   else {
     if (pdbid.length == 4) pdbid = "0000"+pdbid;
     var betaURL = "https://pdbjpw2.pdbj.org/";
-    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url.replace(molmil.pdbj_rest, betaURL) : molmil.settings.pdb_url.replace(molmil.pdbj_rest, betaURL), {pdbid: pdbid});
     var isBig = molmil.isBig.has(pdbid);
+    var URL = stringInterpolate(isBig ? molmil.settings.mmcif_url.replace(molmil.pdbj_rest, betaURL) : molmil.settings.pdb_url.replace(molmil.pdbj_rest, betaURL), {pdbid: pdbid});
   }
   
   
